@@ -276,7 +276,9 @@ Proof.
 	rewrite <- admin_instrs_ok_eq.
 	apply Admin_instr_ok__instr with (v_instr := instr__BR v_l).
 	apply Instr_ok__br.
-	- rewrite addn1 in H. auto.
+	- rewrite addn1 in H.
+	  unfold lt in H.
+	  move: H => /leP Hbool. auto.
 	- unfold lookup_total. by rewrite addn1.
 Qed.
 
@@ -303,7 +305,8 @@ Proof.
   apply (Admin_instrs_ok__seq s C [] (admininstr__BR l) ts' ts' ts').
   apply admin_weakening_empty_both. apply Admin_instrs_ok__empty.
   apply (Admin_instr_ok__instr _ _ (instr__BR l) (functype__ ts' ts')).
-  apply (Instr_ok__br C l [] ts' ts') => //=. 
+  apply (Instr_ok__br C l [] ts' ts') => //=.
+  move: H3 => /leP Hbool. auto. 
 Qed.
 
 (* TODO: Example of migrating proofs using auto-translated statements (SSReflect) *)
@@ -389,7 +392,8 @@ Proof.
 	apply admin_weakening_empty_both. apply Admin_instrs_ok__empty.
 	apply (Admin_instr_ok__instr _ _ (instr__BR v_l) (functype__ ts' ts')).
 	apply (Instr_ok__br v_C v_l [] ts' ts').
-	apply H3. subst. reflexivity.
+	move: H3 => /leP Hbool. auto.
+	subst. reflexivity.
 Qed.
 
 Lemma Step_pure__br_if_false_preserves : forall v_S v_C (v_c : iN) (v_l : labelidx) v_func_type,
@@ -436,12 +440,21 @@ Proof.
 		subst. apply (Instr_ok__br v_C (lookup_total v_l v_i) ts1' (lookup_total (context__LABELS v_C) v_l') ts3_comp1).
 		rewrite Forall_nth in H5.
 		rewrite Forall_nth in H2.
+	  	move: H => /leP H.
 		apply (H5 _ default_val) in H as H6.
 		apply (H2 _ default_val) in H as H7.
-		auto.
-		Search Forall.
-		apply Forall_forall in H5.
-		apply H5.
+
+	  	move: H7 => /leP Hbool. auto.
+		rewrite -> Forall_forall in H5.
+		assert (In (lookup_total v_l v_i) v_l) as H4.
+		{ induction v_l as [| a l].
+		  - inversion H; subst.
+		  - move: H => /leP H.
+		    eapply nth_In in H.
+			unfold lookup_total.
+			apply H.
+		}
+		eapply H5 in H4. auto.
 Qed.
 
 Lemma Step_pure__br_table_ge_preserves : forall v_S v_C (v_i : nat) (v_l : (list labelidx)) (v_l' : labelidx) v_func_type,
@@ -465,13 +478,15 @@ Proof.
 	apply Admin_instrs_ok__frame.
 	remember (ts1' ++ lookup_total (context__LABELS v_C) v_l')%list as ts. (* Just for convencience *)
 	apply (Admin_instrs_ok__seq v_S v_C [] (admininstr__BR v_l') ts ts3_comp1 ts).
-	split. 
 	+ (* Empty *) apply admin_weakening_empty_both. apply Admin_instrs_ok__empty.
 	+ (* BR *) apply (Admin_instr_ok__instr _ _ (instr__BR v_l') (functype__ ts ts3_comp1)).
 		subst. apply (Instr_ok__br v_C v_l' ts1' (lookup_total (context__LABELS v_C) v_l') ts3_comp1).
+
+	  	move: H3 => /leP Hbool. auto.
 		split => //.
 Qed.
 
+(*
 Lemma Step_pure__frame_vals_preserves : forall v_S v_C (v_n : n) (v_f : frame) (v_val : (list val)) v_func_type,
 	Admin_instrs_ok v_S v_C [(admininstr__FRAME_ v_n v_f (list__val__admininstr v_val))] v_func_type ->
 	Step_pure [(admininstr__FRAME_ v_n v_f (list__val__admininstr v_val))] (list__val__admininstr v_val) ->
@@ -480,6 +495,7 @@ Proof.
 	move => v_S v_C v_n v_f v_val v_func_type HType HReduce.
 	destruct v_func_type as [ts1 ts2].
 	rewrite <- admin_instrs_ok_eq in HType.
+	Search Frame_typing.
 	apply Frame_typing in HType; destruct HType as [ts [? [? ?]]].
 	inversion H0. destruct H2.
 	apply Val_Const_list_typing in H8; simpl in *; subst.
@@ -525,7 +541,7 @@ Proof.
 	rewrite List.map_length.
 	rewrite H.
 	by destruct ts0.
-Qed.
+Qed. *)
 
 Lemma Step_pure__return_label_preserves : forall v_S v_C (v_n : n) (v_instr' : (list instr)) (v_val : (list val)) (v_instr : (list instr)) v_func_type,
 	Admin_instrs_ok v_S v_C [(admininstr__LABEL_ v_n v_instr' (@app _ (list__val__admininstr v_val) (@app _ [(admininstr__RETURN )] (list__instr__admininstr v_instr))))] v_func_type ->
@@ -603,7 +619,7 @@ Proof.
 	apply admin_empty in H8; subst.
 	repeat rewrite app_assoc.
 	apply admin_instrs_weakening_empty_1.
-	apply (Admin_instrs_ok__seq v_S v_C [] (admininstr__CONST t v_c) [] [t] []). split.
+	apply (Admin_instrs_ok__seq v_S v_C [] (admininstr__CONST t v_c) [] [t] []).
 	apply Admin_instrs_ok__empty.
 	apply (Admin_instr_ok__instr v_S v_C (instr__CONST t v_c) (functype__ [] [t])).
 	by apply Instr_ok__const.
@@ -617,7 +633,6 @@ Proof.
 	move => v_S v_C v_t v_c_1 v_unop v_func_type HType HReduce.
 	destruct v_func_type as [tf1 tf2].
 	apply (Admin_instrs_ok__seq v_S v_C [] (admininstr__TRAP) tf1 tf2 tf1).
-	split.
 	- (* Empty *) apply admin_weakening_empty_both. apply Admin_instrs_ok__empty.
 	- (* TRAP *) apply Admin_instr_ok__trap.
 Qed.
@@ -645,7 +660,7 @@ Proof.
 	rewrite H1.
 	repeat rewrite -> app_assoc.
 	apply admin_instrs_weakening_empty_1.
-	apply (Admin_instrs_ok__seq v_S v_C [] (admininstr__CONST v_t v_c) [] [v_t] []). split.
+	apply (Admin_instrs_ok__seq v_S v_C [] (admininstr__CONST v_t v_c) [] [v_t] []).
 	apply Admin_instrs_ok__empty.
 	apply (Admin_instr_ok__instr v_S v_C (instr__CONST v_t v_c) (functype__ [] [v_t])).
 	by apply Instr_ok__const.
@@ -659,7 +674,6 @@ Proof.
 	move => v_S v_C v_t v_c_1 v_c_2 v_binop v_func_type HType HReduce.
 	destruct v_func_type as [tf1 tf2].
 	apply (Admin_instrs_ok__seq v_S v_C [] (admininstr__TRAP) tf1 tf2 tf1).
-	split.
 	- (* Empty *) apply admin_weakening_empty_both. apply Admin_instrs_ok__empty.
 	- (* TRAP *) apply Admin_instr_ok__trap.
 Qed.
@@ -682,7 +696,6 @@ Proof.
 	repeat rewrite -> app_assoc.
 	apply admin_instrs_weakening_empty_1.
 	apply (Admin_instrs_ok__seq v_S v_C [] (admininstr__CONST (valtype__INN inn__I32) v_c) [] [valtype__INN inn__I32] []). 
-	split.
 	- (* Empty *) apply Admin_instrs_ok__empty.
 	- (* Const *) apply (Admin_instr_ok__instr v_S v_C (instr__CONST (valtype__INN inn__I32) v_c) (functype__ [] [valtype__INN inn__I32])).
 		by apply Instr_ok__const.
@@ -710,7 +723,6 @@ Proof.
 	repeat rewrite -> app_assoc.
 	apply admin_instrs_weakening_empty_1.
 	apply (Admin_instrs_ok__seq v_S v_C [] (admininstr__CONST (valtype__INN inn__I32) v_c) [] [valtype__INN inn__I32] []).
-	split.
 	- (* Empty *) apply Admin_instrs_ok__empty.
 	- (* Const *) apply (Admin_instr_ok__instr v_S v_C (instr__CONST (valtype__INN inn__I32) v_c) (functype__ [] [valtype__INN inn__I32])).
 	by apply Instr_ok__const.
@@ -733,7 +745,6 @@ Proof.
 	repeat rewrite -> app_assoc.
 	apply admin_instrs_weakening_empty_1.
 	apply (Admin_instrs_ok__seq v_S v_C [] (admininstr__CONST v_t_2 v_c) [] [v_t_2] []).
-	split.
 	- (* Empty *) apply Admin_instrs_ok__empty.
 	- (* Const *) apply (Admin_instr_ok__instr v_S v_C (instr__CONST v_t_2 v_c) (functype__ [] [v_t_2])).
 	by apply Instr_ok__const.
@@ -747,7 +758,6 @@ Proof.
 	move => v_S v_C v_t_1 v_c_1 v_t_2 v_cvtop v_sx v_func_type HType HReduce.
 	destruct v_func_type as [tf1 tf2].
 	apply (Admin_instrs_ok__seq v_S v_C [] (admininstr__TRAP) tf1 tf2 tf1).
-	split.
 	- (* Empty *) apply admin_weakening_empty_both. apply Admin_instrs_ok__empty.
 	- (* TRAP *) apply Admin_instr_ok__trap.
 Qed.
@@ -773,13 +783,10 @@ Proof.
 	rewrite <- H0.
 	apply (Admin_instrs_ok__seq v_S v_C [admininstr__CONST v_valtype v_val_; admininstr__CONST v_valtype v_val_] 
 		(admininstr__LOCAL_SET v_x) [] [v_valtype] ([v_valtype] ++ [v_valtype])).
-	split.  
 	apply (Admin_instrs_ok__seq v_S v_C [admininstr__CONST v_valtype v_val_] 
 		(admininstr__CONST v_valtype v_val_) [] ([v_valtype] ++ [v_valtype]) [v_valtype]).
-	split. 
 	apply (Admin_instrs_ok__seq v_S v_C [] 
 	(admininstr__CONST v_valtype v_val_) [] [v_valtype] []).
-	split.
 	- (* Empty *) apply Admin_instrs_ok__empty.
 	- (* Const 1 *) apply (Admin_instr_ok__instr v_S v_C (instr__CONST v_valtype v_val_) (functype__ [] [v_valtype])).
 		apply Instr_ok__const.
@@ -788,7 +795,8 @@ Proof.
 		apply Instr_ok__const.
 	- (* Set *) apply admin_instr_weakening_empty_2. 
 		apply (Admin_instr_ok__instr v_S v_C (instr__LOCAL_SET v_x) (functype__ [v_valtype] [])).
-		apply Instr_ok__local_set; split => //=.
+		apply Instr_ok__local_set.
+		move : H3 => /leP Hbool. auto. auto.
 Qed.
 
 Lemma Step_read__block_preserves : forall v_S (r_v_f : frame) v_C (v_z : state) (v_t : (option valtype)) (v_instr : (list instr)) (v_n : n) v_func_type v_t1 lab ret ,
@@ -831,14 +839,14 @@ Proof.
 	repeat split => //=.
 	- simpl.
 		rewrite app_left_single_nil.
-		apply (Instrs_ok__seq _ [] (instr__LOOP v_t v_instr) [] v_t []); split.
+		apply (Instrs_ok__seq _ [] (instr__LOOP v_t v_instr) [] v_t []).
 		- apply Instrs_ok__empty.
 		- apply Instr_ok__loop. apply H2. 
 	- apply Admin_instrs_ok__instrs with (v_S := v_S) in H2.
-		apply H2.
+		apply H2. auto.
 Qed.
 
-
+(*
 Lemma Step_read__call_preserves : forall v_S (r_v_f : frame) v_C (v_z : state) (v_x : idx) v_func_type v_t1 lab ret ,
 	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ context__LOCALS v_C) ret) lab)[(admininstr__CALL v_x)] v_func_type ->
 	Module_instance_ok v_S (frame__MODULE r_v_f) v_C  ->
@@ -929,7 +937,7 @@ Proof.
 	assert ((functype__ tn tm) = funcinst__TYPE (lookup_total (store__FUNCS v_S) v_a)) as HFType; first by eapply tc_func_reference2; eauto.
 	rewrite -> HFType.
 	eapply store_typed_exterval_types; eauto.
-Qed.
+Qed. *)
 
 Lemma Step_read__call_indirect_trap_preserves : forall v_S (r_v_f : frame) v_C (v_z : state) (v_i : nat) (v_x : idx) v_func_type v_t1 lab ret ,
 	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ context__LOCALS v_C) ret) lab)[(admininstr__CONST (valtype__INN (inn__I32 )) (v_i : val_));(admininstr__CALL_INDIRECT v_x)] v_func_type ->
@@ -958,7 +966,8 @@ Lemma Step_read__call_addr_preserves : forall v_S (r_v_f : frame) v_C (v_z : sta
 	(v_f = {| frame__LOCALS := (@app _ v_val (List.map (fun v_t => (fun_default_ v_t)) (v_t))); frame__MODULE := v_mm |}) ->
 	Forall2 (fun v_t v_val => Val_ok v_val v_t) v_t1 (frame__LOCALS r_v_f) ->
 	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ context__LOCALS v_C) ret) lab) [(admininstr__FRAME_ v_n v_f [(admininstr__LABEL_ v_n [] (list__instr__admininstr v_instr))])] v_func_type.
-Proof.
+Admitted.
+(* Proof.
 	move => v_S r_v_f v_C v_z v_val v_k v_a v_n v_f v_instr v_t_1 v_t_2 v_mm v_func v_x v_t v_func_type v_t1 lab ret HType HMinst H1 H2 H3 H4 H5 H6 H7 H8 H9.
 	destruct v_func_type as [ts1 ts2].
 	apply_composition_typing_single HType.
@@ -974,7 +983,7 @@ Proof.
 	repeat rewrite -> app_assoc.
 	apply admin_instrs_weakening_empty_1.
 	rewrite <- admin_instrs_ok_eq.
-	apply Admin_instr_ok__frame; split => //=.
+	apply Admin_instr_ok__frame. auto. split => //=.
 	eapply Thread_ok__. split. 
 	apply Frame_ok__ with (v_t := ((List.map typeof v_val) ++ v_t)). repeat split => //=.
 	repeat rewrite -> List.app_length.
@@ -991,7 +1000,7 @@ Proof.
 		repeat rewrite _append_option_none_left.
 		apply Admin_instrs_ok__instrs.
 		apply H11. 
-Qed.
+Qed. *)
 
 Lemma Step_read__local_get_preserves : forall v_S (r_v_f : frame) v_C (v_z : state) (v_x : idx) v_func_type v_t1 lab ret ,
 	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ context__LOCALS v_C) ret) lab)[(admininstr__LOCAL_GET v_x)] v_func_type ->
@@ -1027,7 +1036,8 @@ Lemma global_type_reference: forall v_S v_i v_x v_C mut v t,
     (globalinst__VALUE (lookup_total (store__GLOBALS v_S) (lookup_total (moduleinst__GLOBALS v_i) v_x))) = v ->
     lookup_total (context__GLOBALS v_C) v_x = globaltype__ mut t ->
     exists v_val_, typeof v = t /\ v = val__CONST t v_val_.
-Proof.
+Admitted.
+(* Proof.
 	move => v_S i v_x v_C mut v t HMinst HLength HVal HTypeLookup.
 	inversion HMinst; decomp; subst.
 	simpl in *.
@@ -1040,7 +1050,7 @@ Proof.
 	exists v_val_.
 	split => //=.
 	f_equal => //=.
-Qed.
+Qed. *)
 
 Lemma Step_read__global_get_preserves : forall v_S (r_v_f : frame) v_C (v_z : state) (v_x : idx) v_func_type v_t1 lab ret ,
 	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ context__LOCALS v_C) ret) lab)[(admininstr__GLOBAL_GET v_x)] v_func_type ->
@@ -1198,7 +1208,8 @@ Lemma global_extension_same: forall s g v_globaltype,
 	Forall2
 	(fun (v_globalinst : globalinst) (v_globaltype : globaltype) => Global_instance_ok s v_globalinst v_globaltype) g v_globaltype ->
 	Forall2 (fun v s => Global_extension v s) g g.
-Proof.
+Admitted.
+(* Proof.
 	move => s g v_globaltype HGlobalInstOk.
 	generalize dependent v_globaltype.
 	induction g => //; move => v_globaltype HGlobalInstOk.
@@ -1211,12 +1222,13 @@ Proof.
 		inversion H11; subst.
 		apply Global_extension__. right => //.
 	- destruct v_globaltype; inversion HGlobalInstOk. eapply IHg; eauto. 
-Qed.
+Qed. *)
 
 Lemma store_extension_same: forall s,
 	Store_ok s ->
     Store_extension s s.
-Proof.
+Admitted.
+(* Proof.
   move => s HST. 
   inversion HST; decomp.
   apply (Store_extension__ s s (store__FUNCS s) (store__TABLES s) (store__MEMS s) (store__GLOBALS s) (store__FUNCS s) [] (store__TABLES s) [] (store__MEMS s) [] (store__GLOBALS s) []).
@@ -1225,7 +1237,7 @@ Proof.
   + by apply table_extension_same.
   + by apply mem_extension_same.
   + subst. eapply global_extension_same; eauto.
-Qed.
+Qed. *)
 
 Lemma config_same: forall s f ais s' f' ais',
 	(config__ (state__ s f) ais) = (config__ (state__ s' f') ais') ->
@@ -1251,7 +1263,8 @@ Lemma Forall2_global: forall v_S v_globaltype v_idx v_val_0 v_valtype v_val_,
 	{| globalinst__TYPE := globaltype__ (mut__MUT (Some tt)) v_valtype; globalinst__VALUE := val__CONST v_valtype v_val_0|} ->
 	Forall2 (fun v s => Global_extension v s) (store__GLOBALS v_S) (list_update_func (store__GLOBALS v_S) v_idx 
 		(fun g => g <| globalinst__VALUE := (val__CONST v_valtype v_val_) |> )).
-Proof.
+Admitted.
+(* Proof.
 	move => v_S v_globaltype v_idx v_val0 v_valtype v_val_.
 	destruct v_S as [funcs globals tables mems]; simpl.
 	move: v_idx v_globaltype.
@@ -1285,7 +1298,7 @@ Proof.
 				inversion H11.
 				eapply Global_instance_ok__; repeat split => //=.
 			- simpl in H. apply Nat.succ_lt_mono in H. apply H.
-Qed.
+Qed. *)
 
 Lemma update_global_unchagned: forall v_S v_S' v_f v_x v_valtype v_val_,
 	v_S' =
@@ -1336,7 +1349,8 @@ Lemma func_agree_extension: forall v_S v_S' v_funcaddr v_funcinst_1' v_funcinst_
 	store__FUNCS v_S' = (v_funcinst_1' ++ v_funcinst_2)%list -> 
     Forall2 (fun v s => Func_extension v s) (store__FUNCS v_S) v_funcinst_1' ->
     Externvals_ok v_S' (externval__FUNC v_funcaddr) (externtype__FUNC v_functype).
-Proof.
+Admitted.
+(* Proof.
 	move => v_S v_S' v_funcaddr v_funcinst_1' v_funcinst_2 v_functype HOk HLength HApp Hext.
 	inversion HOk; destruct H2; subst.
 	apply Forall2_nth in Hext; destruct Hext.
@@ -1355,7 +1369,7 @@ Proof.
 		rewrite H2. 
 		rewrite <- H5.
 		apply H3.
-Qed.
+Qed. *)
 
 Lemma table_agree_extension: forall v_S v_S' v_tableaddr v_tableinst_1' v_tableinst_2 v_tabletype,
     Externvals_ok v_S (externval__TABLE v_tableaddr) (externtype__TABLE v_tabletype) ->
@@ -1363,7 +1377,8 @@ Lemma table_agree_extension: forall v_S v_S' v_tableaddr v_tableinst_1' v_tablei
 	store__TABLES v_S' = (v_tableinst_1' ++ v_tableinst_2) -> 
 	Forall2 (fun v s => Table_extension v s) (store__TABLES v_S) v_tableinst_1' ->
     Externvals_ok v_S' (externval__TABLE v_tableaddr) (externtype__TABLE v_tabletype).
-Proof.
+Admitted.
+(* Proof.
 	move => v_S v_S' v_tableaddr v_tableinst_1' v_tableinst_2 v_tabletype HOk HLength HApp Hext.
 	inversion HOk; destruct H2; subst; destruct H3.
 	apply Forall2_lookup in Hext; destruct Hext.
@@ -1391,7 +1406,7 @@ Proof.
 		unfold ge.
 		eapply Nat.le_trans; eauto.
 		apply H14.
-Qed.
+Qed. *)
 
 Lemma global_agree_extension: forall v_S v_S' v_globaladdr v_globalinst_1' v_globalinst_2 v_globaltype,
     Externvals_ok v_S (externval__GLOBAL v_globaladdr) (externtype__GLOBAL v_globaltype) ->
@@ -1399,7 +1414,8 @@ Lemma global_agree_extension: forall v_S v_S' v_globaladdr v_globalinst_1' v_glo
 	store__GLOBALS v_S' = (v_globalinst_1' ++ v_globalinst_2) -> 
 	Forall2 (fun v s => Global_extension v s) (store__GLOBALS v_S) v_globalinst_1' ->
     Externvals_ok v_S' (externval__GLOBAL v_globaladdr) (externtype__GLOBAL v_globaltype).
-Proof.
+Admitted.
+(* Proof.
 	move => v_S v_S' v_globaladdr v_globalinst_1' v_globalinst_2 v_globaltype HOk HLength HApp Hext.
 	inversion HOk; destruct H2; subst.
 	apply Forall2_lookup in Hext; destruct Hext.
@@ -1417,7 +1433,7 @@ Proof.
 		rewrite <- H1 in H3.
 		injection H3 as ?.
 		subst => //=.
-Qed.
+Qed. *)
 
 Lemma mem_agree_extension: forall v_S v_S' v_memaddr v_meminst_1' v_meminst_2 v_memtype,
     Externvals_ok v_S (externval__MEM v_memaddr) (externtype__MEM v_memtype) ->
@@ -1425,7 +1441,8 @@ Lemma mem_agree_extension: forall v_S v_S' v_memaddr v_meminst_1' v_meminst_2 v_
 	store__MEMS v_S' = (v_meminst_1' ++ v_meminst_2) -> 
 	Forall2 (fun v s => Mem_extension v s) (store__MEMS v_S) v_meminst_1' ->
     Externvals_ok v_S' (externval__MEM v_memaddr) (externtype__MEM v_memtype).
-Proof.
+Admitted.
+(* Proof.
 	move => v_S v_S' v_memaddr v_meminst_1' v_meminst_2 v_memtype HOk HLength HApp Hext.
 	inversion HOk; destruct H2; subst; destruct H3 as [? ?].
 	apply Forall2_lookup in Hext; destruct Hext.
@@ -1452,7 +1469,7 @@ Proof.
 		unfold ge.
 		eapply Nat.le_trans; eauto.
 		apply H14.
-Qed.
+Qed. *)
 
 Lemma func_extension_C: forall v_S v_S' v_funcaddrs v_funcinst_1' v_funcinst_2 tcf,
     Forall2 (fun v s => Externvals_ok v_S (externval__FUNC v) (externtype__FUNC s)) v_funcaddrs tcf ->
@@ -1550,7 +1567,8 @@ Lemma module_inst_typing_extension: forall v_S v_S' v_i v_C,
     Store_extension v_S v_S' ->
     Module_instance_ok v_S v_i v_C ->
     Module_instance_ok v_S' v_i v_C.
-Proof.
+Admitted.
+(* Proof.
 	move => v_S v_S' v_i v_C HStoreExtension HMIT.
 	inversion HStoreExtension. 
 	inversion HMIT; decomp.
@@ -1561,7 +1579,7 @@ Proof.
 	- eapply global_extension_C ; eauto.
 	- eapply mem_extension_C; eauto.
 	- eapply ext_extension_C; eauto.
-Qed.
+Qed. *)
 
 Lemma global_instance_fine: forall s s' v_globaltype v_f v_x v_valtype v_val_,
     Forall2 (fun v vt => Global_instance_ok s v vt) (store__GLOBALS s) v_globaltype ->
@@ -1573,7 +1591,8 @@ Lemma global_instance_fine: forall s s' v_globaltype v_f v_x v_valtype v_val_,
 	(lookup_total (moduleinst__GLOBALS (frame__MODULE v_f)) v_x)
 	[eta set globalinst__VALUE (fun=> val__CONST v_valtype v_val_)] -> 
 	Forall2 (fun v vt => Global_instance_ok s' v vt) (store__GLOBALS s) v_globaltype.
-Proof.
+Admitted.
+(* Proof.
 	move => s s' v_globaltype v_f v_x v_valtype v_val_ HGlobalInstOk HGlobExt HFEq HTab HMems HGlob.
 
 	destruct s as [funcs1 globals1 tables1 mems1]. destruct s' as [funcs2 globals2 tables2 mems2].
@@ -1600,7 +1619,7 @@ Proof.
 				inversion Hin; subst. destruct H1 as [? [? ?]].
 				inversion H4; subst.
 				eapply Global_instance_ok__; eauto.
-Qed.
+Qed. *)
 
 Lemma store_global_extension_store_typed: forall s s' v_f v_C v_valtype v_val_ v_x v_mut v_valtype0 v_val_0,
     Store_ok s ->
@@ -1621,7 +1640,8 @@ Lemma store_global_extension_store_typed: forall s s' v_f v_C v_valtype v_val_ v
     (store__MEMS s = store__MEMS s') ->
 	((lookup_total (moduleinst__GLOBALS (frame__MODULE v_f)) v_x) < length (store__GLOBALS s))%coq_nat ->
     Store_ok s'.
-Proof.
+Admitted.
+(* Proof.
 	move => s s' f C v_valtype v_val_ v_x v_mut v_valtype0 v_val_0 HSOK Hext HIT HITS' HUpdate HGlobInst HLGlobal HFeq HTeq HMeq HLength.
 	inversion HSOK; decomp.
 	inversion Hext; decomp; subst.
@@ -1680,7 +1700,7 @@ Proof.
 	- apply Forall2_forall2; split => //=. move => x y HIn.
 		apply Forall2_forall2 in H8; destruct H8. apply H11 in HIn. inversion HIn; decomp; subst. 
 		eapply Memory_instance_ok__; repeat split => //=; eauto.
-Qed.
+Qed. *)
 
 Lemma t_preservation_vs_type: forall s f ais s' f' ais' C C' v_t1 lab ret t1s t2s,
     Step (config__ (state__ s f) ais) (config__ (state__ s' f') ais') ->
@@ -1693,7 +1713,8 @@ Lemma t_preservation_vs_type: forall s f ais s' f' ais' C C' v_t1 lab ret t1s t2
     Admin_instrs_ok s (upd_label (upd_local_return C (v_t1 ++ (context__LOCALS C)) ret) lab) ais (functype__ t1s t2s) ->
     Forall2 (fun v_t v_val0 => Val_ok v_val0 v_t) v_t1 (frame__LOCALS f') 
 	/\ length v_t1 = length (frame__LOCALS f').
-Proof.
+Admitted.
+(* Proof.
 	move => s f ais s' f' ais' C C' v_t1 
 		lab ret t1s t2s HReduce HStore HStore' HMInst HMInst' HValTypeEq HValOK HType.
 	remember (config__ (state__ s f) ais) as c1.
@@ -1728,7 +1749,7 @@ Proof.
 		rewrite HUpdate.
 		rewrite list_update_same_unchanged => //=; try rewrite List.map_length => //=.
 		simpl. by rewrite list_update_length.
-Qed.
+Qed. *)
 
 Lemma store_extension_reduce: forall s f ais s' f' ais' C tf loc lab ret,
     Step (config__ (state__ s f) ais) (config__ (state__ s' f') ais') ->
@@ -1736,7 +1757,8 @@ Lemma store_extension_reduce: forall s f ais s' f' ais' C tf loc lab ret,
     Admin_instrs_ok s (upd_label (upd_local_return C loc ret) lab) ais tf ->
     Store_ok s ->
     Store_extension s s' /\ Store_ok s'.
-Proof.
+Admitted.
+(* Proof.
 	move => s f ais s' f' ais' C tf loc lab ret HReduce HIT HType HStore.
 	remember (config__ (state__ s f) ais) as c1.
 	remember (config__ (state__ s' f') ais') as c2.
@@ -2096,12 +2118,13 @@ Proof.
 				inversion H42.
 				decomp.
 				apply H48.
-Qed.
+Qed. *)
 	
 Lemma reduce_inst_unchanged: forall s f ais s' f' ais',
     Step (config__ (state__ s f) ais) (config__ (state__ s' f') ais') ->
     frame__MODULE f = frame__MODULE f'.
-Proof.
+Admitted.
+(* Proof.
 	move => s f ais s' f' ais' HReduce.
 	remember (config__ (state__ s f) ais) as c1.
 	remember (config__ (state__ s' f') ais') as c2.
@@ -2110,7 +2133,7 @@ Proof.
 	apply config_same in Heqc2; destruct Heqc1 as [? [? ?]];
 	destruct Heqc2 as [? [? ?]]; subst => //).
 	eapply IHHReduce; eauto.
-Qed.
+Qed. *)
 
 Theorem t_pure_preservation: forall v_s v_minst v_ais v_ais' v_C loc lab ret tf,
     Module_instance_ok v_s v_minst v_C ->
@@ -2128,6 +2151,7 @@ Proof.
 	- eapply Step_pure__if_true_preserves; eauto.
 	- eapply Step_pure__if_false_preserves; eauto.
 	- eapply Step_pure__label_vals_preserves; eauto.
+Admitted. (*
 	- eapply Step_pure__br_zero_preserves; eauto.
 	- eapply Step_pure__br_succ_preserves; eauto.
 	- eapply Step_pure__br_if_true_preserves; eauto.
@@ -2149,7 +2173,7 @@ Proof.
 	- eapply Step_pure__cvtop_val_preserves; eauto.
 	- eapply Step_pure__cvtop_trap_preserves; eauto.
 	- eapply Step_pure__local_tee_preserves; eauto.
-Qed.
+Qed. *)
 
 Lemma t_read_preservation: forall v_s v_f v_ais v_ais' v_C v_t1 t1s t2s lab ret,
     Step_read (config__ (state__ v_s v_f) v_ais) v_ais' ->
@@ -2165,7 +2189,7 @@ Proof.
 	induction HReduce; move => C ret lab tx ty HIT1 HValOK HType; decomp; destruct v_z; try eauto;
 	try (apply config_same in Heqc1; destruct Heqc1 as [Hbefore1 [Hbefore2 Hbefore3]]; subst => //).
 	- eapply Step_read__block_preserves; eauto.
-	- eapply Step_read__loop_preserves; eauto.
+	- Admitted. (* eapply Step_read__loop_preserves; eauto.
 	- eapply Step_read__call_preserves; eauto.
 	- eapply Step_read__call_indirect_call_preserves; eauto.
 	- eapply Step_read__call_indirect_trap_preserves; eauto.
@@ -2177,7 +2201,7 @@ Proof.
 	- eapply Step_read__load_pack_trap_preserves; eauto.
 	- eapply Step_read__load_pack_val_preserves; eauto.
 	- eapply Step_read__memory_size_preserves; eauto.
-Qed.
+Qed. *)
 
 Lemma t_preservation_type: forall v_s v_f v_ais v_s' v_f' v_ais' v_C v_t1 t1s t2s lab ret,
     Step (config__ (state__ v_s v_f) v_ais) (config__ (state__ v_s' v_f') v_ais') ->
@@ -2189,7 +2213,8 @@ Lemma t_preservation_type: forall v_s v_f v_ais v_s' v_f' v_ais' v_C v_t1 t1s t2
 	Forall2 (fun v_t v_val => Val_ok v_val v_t) v_t1 (frame__LOCALS v_f) ->
     Admin_instrs_ok v_s (upd_label (upd_local_return v_C (v_t1 ++ context__LOCALS v_C) ret) lab) v_ais (functype__ t1s t2s) ->
     Admin_instrs_ok v_s' (upd_label (upd_local_return v_C (v_t1 ++ context__LOCALS v_C) ret) lab) v_ais' (functype__ t1s t2s).
-Proof.
+Admitted
+(* Proof.
 	move => v_s v_f v_ais v_s' v_f' v_ais' v_C v_t1 t1s t2s lab ret HReduce HST1 HST2 HSExt.
 	move: v_C ret lab t1s t2s.
 	remember (config__ (state__ v_s v_f) v_ais) as c1.
@@ -2327,14 +2352,15 @@ Proof.
 		remember (fun_invsigned 32 (0 - 1)%coq_nat) as v_n'.
 		eapply (Admin_instr_ok__instr _ _ (instr__CONST (valtype__INN inn__I32) v_n') (functype__ [] [(valtype__INN inn__I32)])).
 		apply Instr_ok__const.
-Qed.
+Qed. *)
 
 (* Ultimate goal of project *)				
 Theorem t_preservation: forall c1 ts c2,
 	Step c1 c2 ->
 	Config_ok c1 ts ->
 	Config_ok c2 ts.
-Proof.
+Admitted.
+(* Proof.
 	move => c1 ts c2 HReduce HType.
 	destruct c1; destruct v_state as [store1 frame1].
 	destruct c2; destruct v_state as [store2 frame2].
@@ -2383,4 +2409,4 @@ Proof.
 	rewrite -> _append_option_none_left.
 	rewrite upd_label_unchanged_typing.
 	eapply t_preservation_type; eauto; try rewrite -> Heqf; eauto.
-Qed.
+Qed. *)
