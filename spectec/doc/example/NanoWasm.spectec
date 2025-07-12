@@ -12,13 +12,13 @@ syntax valtype = I32 | I64 | F32 | F64
 syntax functype = valtype* -> valtype*
 syntax globaltype = mut? valtype
 
-syntax const = nat
+syntax consttype = nat
 
 syntax instr =
     | NOP
     | DROP
     | SELECT
-    | CONST valtype const   hint(show %.CONST %)
+    | CONST valtype consttype   hint(show %.CONST %)
     | LOCAL.GET localidx
     | LOCAL.SET localidx
     | GLOBAL.GET globalidx
@@ -27,7 +27,7 @@ syntax instr =
 
 ;; Validation
 
-syntax context = { GLOBALS globaltype*, LOCALS valtype* }
+syntax context hint(prefix "C_") = { GLOBALS globaltype*, LOCALS valtype* }
 
 var C : context
 
@@ -66,9 +66,9 @@ rule Instr_ok/global.set:
 ;; Execution
 
 syntax addr = nat
-syntax moduleinst = { GLOBALS addr* }
+syntax moduleinst hint(prefix "MODULE_") = { GLOBALS addr* }
 
-syntax val = CONST valtype const
+syntax val hint(prefix "VAL_") = CONST valtype consttype
 
 syntax store = { GLOBALS val* }
 syntax frame = { LOCALS val*, MODULE moduleinst }
@@ -95,8 +95,8 @@ def $update_global((s; f), x, v) = s[.GLOBALS[f.MODULE.GLOBALS[x]] = v]; f
 relation Step: config ~> config
 relation Step_pure: instr* ~> instr*
 
-relation Step hint(tabular)
-relation Step_pure hint(tabular)
+relation Step hint(tabular) hint(prefix "step_")
+relation Step_pure hint(tabular) hint(prefix "step_")
 
 rule Step/pure:
     z; instr*  ~>  z; instr'*
@@ -133,7 +133,7 @@ rule Step/global.set:
 
 ;; Binary Format
 
-def $float(nat, nat*) : const
+def $float(nat, nat*) : consttype
 
 grammar Bbyte : nat = b:0x00 | ... | b:0xFF => b
 
@@ -141,14 +141,14 @@ grammar Bu(N : nat) : nat =
   | n:Bbyte              => n                       -- if $(n < 2^7 /\ n < 2^N)
   | n:Bbyte m:Bu($(N-7)) => $(2^7 * m + (n - 2^7))  -- if $(n >= 2^7 /\ N > 7)
 
-grammar Bu32 : const = n:Bu(32) => n
-grammar Bu64 : const = n:Bu(64) => n
+grammar Bu32 : consttype = n:Bu(32) => n
+grammar Bu64 : consttype = n:Bu(64) => n
 
 grammar Bf(N : nat) : nat =
   | b*:Bbyte^(N/8) => $float(N, b*)
 
-grammar Bf32 : const = p:Bf(32) => p
-grammar Bf64 : const = p:Bf(64) => p
+grammar Bf32 : consttype = p:Bf(32) => p
+grammar Bf64 : consttype = p:Bf(64) => p
 
 
 grammar Bvaltype : valtype =
