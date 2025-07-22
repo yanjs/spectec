@@ -1,4 +1,4 @@
-From Coq Require Import String List Unicode.Utf8 NArith Arith.
+From Stdlib Require Import String List Unicode.Utf8 NArith Arith.
 Require Import Stdlib.Program.Equality.
 From RecordUpdate Require Import RecordSet.
 
@@ -8,6 +8,56 @@ Import ListNotations.
 Import RecordSetNotations.
 From WasmSpectec Require Import wasm helper_lemmas helper_tactics.
 From mathcomp Require Import ssreflect ssrfun ssrnat ssrbool seq.
+
+Definition fun_nat__u32 : nat -> u32 := mk_uN 32.
+Definition fun_u32__nat : u32 -> nat := fun x => match x with
+    |  mk_uN v => v
+	end.
+Coercion fun_nat__u32 : nat >-> u32.
+Coercion fun_u32__nat : u32 >-> nat.
+
+Definition fun_nat__labelidx : nat -> labelidx := mk_uN 32.
+Definition fun_labelidx__nat : labelidx -> nat := fun x => match x with
+    |  mk_uN v => v
+	end.
+Coercion fun_nat__labelidx : nat >-> labelidx.
+Coercion fun_labelidx__nat : labelidx >-> nat.
+
+Definition fun_nat__localidx : nat -> localidx := mk_uN 32.
+Definition fun_localidx__nat : localidx -> nat := fun x => match x with
+    |  mk_uN v => v
+	end.
+Coercion fun_nat__localidx : nat >-> localidx.
+Coercion fun_localidx__nat : localidx >-> nat.
+
+Definition fun_nat__globalidx : nat -> globalidx := mk_uN 32.
+Definition fun_globalidx__nat : globalidx -> nat := fun x => match x with
+    |  mk_uN v => v
+	end.
+Coercion fun_nat__globalidx : nat >-> globalidx.
+Coercion fun_globalidx__nat : globalidx >-> nat.
+
+Definition fun_nat__memidx : nat -> memidx := mk_uN 32.
+Definition fun_memidx__nat : memidx -> nat := fun x => match x with
+    |  mk_uN v => v
+	end.
+Coercion fun_nat__memidx : nat >-> memidx.
+Coercion fun_memidx__nat : memidx >-> nat.
+
+
+Definition fun_nat__tableidx : nat -> tableidx := mk_uN 32.
+Definition fun_tableidx__nat : tableidx -> nat := fun x => match x with
+    |  mk_uN v => v
+	end.
+Coercion fun_nat__tableidx : nat >-> tableidx.
+Coercion fun_tableidx__nat : tableidx >-> nat.
+
+Definition fun_nat__idx : nat -> idx := mk_uN 32.
+Definition fun_idx__nat : idx -> nat := fun x => match x with
+    |  mk_uN v => v
+	end.
+Coercion fun_nat__idx : nat >-> idx.
+Coercion fun_idx__nat : idx >-> nat.
 
 Definition upd_label C labs :=
 	C <| C_LABELS := labs |>.
@@ -126,7 +176,7 @@ Proof.
 		- rewrite H2. by apply IHv_t1.
 Qed.
 
-Lemma instrs_empty: forall C t1 t2,
+Lemma instrs_empty_same_type: forall C t1 t2,
 	Instrs_ok C [] (mk_functype t1 t2) ->
 	t1 = t2.
 Proof.
@@ -135,14 +185,14 @@ Proof.
 	- (* Frame *) f_equal. by eapply IHInstrs_ok.
 Qed. 
 
-Lemma admin_empty: forall v_S C t1 t2,
+Lemma admin_empty_same_type: forall v_S C t1 t2,
 	Admin_instrs_ok v_S C [] (mk_functype t1 t2) ->
 	t1 = t2.
 Proof.
 	move => v_S C t t2 H. gen_ind_subst H => //.
 		- (* Seq *) symmetry in Enil. apply app_cons_not_nil in Enil. exfalso. apply Enil. 
 		- (* Frame *) f_equal. by eapply IHAdmin_instrs_ok.
-		- (* Instrs *) apply (instrs_empty C). apply map_eq_nil in Enil. subst. apply H.
+		- (* Instrs *) apply (instrs_empty_same_type C). apply map_eq_nil in Enil. subst. apply H.
 Qed. 
 
 Lemma val_is_same_as_admin_const: forall v_S v_C (v : val) ts,
@@ -262,7 +312,7 @@ Ltac apply_instrs_composition_typing_single H :=
     let H4 := fresh "H4_comp" in
 	rewrite -> app_left_single_nil in H;
     apply composition_typing_single in H; destruct H as [ts1 [ts2 [ts3 [ts4 [H1 [H2 [H3 H4]]]]]]];
-	try apply instrs_empty in H3.
+	try apply instrs_empty_same_type in H3.
 
 Ltac apply_composition_typing_single H := 
 	let ts1 := fresh "ts1_comp" in
@@ -275,7 +325,7 @@ Ltac apply_composition_typing_single H :=
     let H4 := fresh "H4_comp" in
 	rewrite -> app_left_single_nil in H;
     apply admin_composition_typing_single in H; destruct H as [ts1 [ts2 [ts3 [ts4 [H1 [H2 [H3 H4]]]]]]];
-	try apply admin_empty in H3.
+	try apply admin_empty_same_type in H3.
 	
 Lemma admin_composition_typing: forall v_S v_C v_ais1 v_ais2 t1s t2s,
 	Admin_instrs_ok v_S v_C (v_ais1 ++ v_ais2) (mk_functype t1s t2s) ->
@@ -360,7 +410,7 @@ Admitted.
 	move => v_S v_C v_ais1 v_ais2.
 	move: v_ais1.
 	induction v_ais2 using List.rev_ind; move => v_ais1 t1s t2s t3s HType1 HType2.
-		- apply admin_empty in HType2; by rewrite cats0; subst.
+		- apply admin_empty_same_type in HType2; by rewrite cats0; subst.
 		- apply_composition_typing_single HType2.
 	subst.
 	rewrite catA. eapply AIs_ok_seq; split.
@@ -473,7 +523,7 @@ Lemma Val_Const_list_typing: forall v_S v_C v_vals t1s t2s,
 Proof.
 	move => v_S v_C v_vals.
 	induction v_vals => //=; move => t1s t2s HType.
-	- apply admin_empty in HType. subst. by rewrite cats0.
+	- apply admin_empty_same_type in HType. subst. by rewrite cats0.
 	- destruct a.
 	  apply_composition_typing_and_single HType.
 	  apply AI_const_typing in H4_comp0.
@@ -505,11 +555,6 @@ Admitted.
 	repeat split => //=; try rewrite <- app_assoc; try reflexivity.
 Qed. *)
 
-Definition fun_nat__u32 : nat -> u32 := mk_uN 32.
-
-Definition fun_u32__nat : u32 -> nat := fun x => match x with
-    |  mk_uN v => v
-	end.
 
 
 Lemma Br_if_typing: forall v_S v_C ts1 ts2 v_memaddr, 
@@ -529,12 +574,12 @@ Admitted.
 Qed. *)
 
 Lemma Br_table_typing: forall v_S v_C ts1 ts2 ids i0,
-    Admin_instr_ok v_S v_C (AI_BR_TABLE (map fun_nat__u32 ids) (fun_nat__u32 i0)) (mk_functype ts1 ts2) ->
+    Admin_instr_ok v_S v_C (AI_BR_TABLE ids i0) (mk_functype ts1 ts2) ->
     exists ts1' (ts : resulttype) , ts1 = ts1' ++ ts ++ [I32] /\
-                        List.Forall (fun i => (i < length (C_LABELS v_C))%coq_nat) (ids) /\
+                        List.Forall (fun i => (fun_labelidx__nat i < length (C_LABELS v_C))%coq_nat) (ids) /\
 						(i0 < length (C_LABELS v_C))%coq_nat /\
 						(ts = (lookup_total (C_LABELS v_C) i0)) /\
-						List.Forall (fun i => ts = lookup_total (C_LABELS v_C) i) (ids).
+						List.Forall (fun i => ts = lookup_total (C_LABELS v_C) (fun_labelidx__nat i)) (ids).
 Admitted.
 (* Proof.
 	move => v_S v_C ts1 ts2 ids i0 HType.
@@ -573,11 +618,10 @@ Proof.
 	exists (v_t ++ x). by repeat split => //=; try rewrite <- app_assoc.
 Qed.
 
-
 Lemma Local_tee_typing: forall v_S v_C v_memaddr ts1 ts2,
-    Admin_instr_ok v_S v_C (AI_LOCAL_TEE (fun_nat__u32 v_memaddr)) (mk_functype ts1 ts2) ->
-    exists ts t, ts1 = ts2 /\ ts1 = ts ++ [t] /\ (v_memaddr < length (C_LOCALS v_C))%coq_nat /\
-                lookup_total (C_LOCALS v_C) v_memaddr = t.
+    Admin_instr_ok v_S v_C (AI_LOCAL_TEE v_memaddr) (mk_functype ts1 ts2) ->
+    exists ts t, ts1 = ts2 /\ ts1 = ts ++ [t] /\ (fun_u32__nat v_memaddr < length (C_LOCALS v_C))%coq_nat /\
+                lookup_total (C_LOCALS v_C) (fun_u32__nat v_memaddr) = t.
 Admitted.
 (* Proof.
 	move => v_S v_C v_memaddr ts1 ts2 HType.
@@ -607,10 +651,10 @@ Admitted.
 		- (* Weakening *) edestruct IHHType as [? [? [? [? ?]]]] => //=; subst. exists x, x0. by repeat split => //=; try rewrite <- app_assoc.
 Qed. *)
 
-(* Lemma Frame_typing: forall v_S v_C n v_F v_ais t1s t2s,
+Lemma Frame_typing: forall v_S v_C n v_F v_ais t1s t2s,
     Admin_instr_ok v_S v_C (AI_FRAME_ n v_F v_ais) (mk_functype t1s t2s) ->
     exists (ts : resulttype), t2s = t1s ++ ts /\
-               Thread_ok v_S ts v_F v_ais ts /\ 
+               Thread_ok v_S (Some ts) v_F v_ais ts /\ 
 			   (n = (fun_optionSize ts)). 
 Proof.
 	move => v_S v_C n v_F v_ais t1s t2s HType.
@@ -619,7 +663,7 @@ Proof.
 	- (* Frame *)  exists v_t => //=.
 	- (* Weakening *) edestruct IHHType as [ts2 [??]]; eauto. subst.
 		exists ts2. by repeat split => //=; try rewrite <- app_assoc.
-Qed. *)
+Qed.
 
 Lemma Set_local_typing: forall v_S C i t1s t2s,
     Admin_instr_ok v_S C (AI_LOCAL_SET (fun_nat__u32 i)) (mk_functype t1s t2s) ->
@@ -638,7 +682,7 @@ Admitted.
 Qed. *)
 
 Lemma Get_local_typing: forall v_S v_C i t1s t2s,
-    Admin_instr_ok v_S v_C (AI_LOCAL_GET (fun_nat__u32 i)) (mk_functype t1s t2s) ->
+    Admin_instr_ok v_S v_C (AI_LOCAL_GET i) (mk_functype t1s t2s) ->
     exists t, lookup_total (C_LOCALS v_C) i = t /\
     t2s = t1s ++ [::t] /\
     (i < length (C_LOCALS v_C))%coq_nat.
@@ -654,8 +698,8 @@ Admitted.
 Qed. *)
 
 
-Lemma Get_global_typing: forall v_S v_C i t1s t2s,
-    Admin_instr_ok v_S v_C (AI_GLOBAL_GET (fun_nat__u32 i)) (mk_functype t1s t2s) ->
+Lemma Get_global_typing: forall v_S v_C (i: globalidx) t1s t2s,
+    Admin_instr_ok v_S v_C (AI_GLOBAL_GET i) (mk_functype t1s t2s) ->
     exists mut t, (lookup_total (C_GLOBALS v_C) i) = mk_globaltype mut t /\
     t2s = t1s ++ [::t] /\
     (i < length (C_GLOBALS v_C))%coq_nat.
