@@ -4,10 +4,10 @@ From RecordUpdate Require Import RecordSet.
 
 Declare Scope wasm_scope.
 Open Scope wasm_scope.
-Import ListNotations.
 Import RecordSetNotations.
 From WasmSpectec Require Import wasm helper_lemmas helper_tactics typing_lemmas.
 From mathcomp Require Import ssreflect ssrfun ssrnat ssrbool seq.
+Import ListNotations.
 
 Lemma inst_t_context_local_empty: forall s i C,
 	Module_instance_ok s i C ->
@@ -23,7 +23,6 @@ Proof.
 	move => s i C HMInst. inversion HMInst => //=.
 Qed.
 
-		
 Lemma Step_pure__unreachable_preserves : forall v_S v_C  v_func_type,
 	Admin_instrs_ok v_S v_C [(AI_UNREACHABLE )] v_func_type ->
 	Step_pure [(AI_UNREACHABLE )] [(AI_TRAP )] ->
@@ -696,12 +695,12 @@ Proof.
 	by apply const.
 Qed.
 
-Lemma Step_pure__cvtop_val_preserves : forall v_S v_C (v_t_1 : valtype) v_c_1 (v_t_2 : valtype) (v_cvtop : cvtop) (v_sx : (option sx)) v_c v_func_type,
+Lemma Step_pure__cvtop_val_preserves : forall v_S v_C (v_t_1 : valtype) v_c_1 (v_t_2 : valtype) (v_cvtop : cvtop) v_c v_func_type,
 	Admin_instrs_ok v_S v_C [(AI_CONST v_t_1 v_c_1);(AI_CVTOP v_t_2 v_t_1 v_cvtop)] v_func_type ->
 	Step_pure [(AI_CONST v_t_1 v_c_1);(AI_CVTOP v_t_2 v_t_1 v_cvtop)] [(AI_CONST v_t_2 v_c)] ->
 	Admin_instrs_ok v_S v_C [(AI_CONST v_t_2 v_c)] v_func_type.
 Proof.
-	move => v_S v_C v_t_1 v_c_1 v_t_2 v_cvtop v_sx v_c v_func_type HType HReduce.
+	move => v_S v_C v_t_1 v_c_1 v_t_2 v_cvtop v_c v_func_type HType HReduce.
 	destruct v_func_type as [tf1 tf2].
 	apply_composition_typing_and_single HType.
 	apply_composition_typing_single H4_comp.
@@ -718,12 +717,12 @@ Proof.
 	by apply const.
 Qed.
 
-Lemma Step_pure__cvtop_trap_preserves : forall v_S v_C (v_t_1 : valtype) v_c_1 (v_t_2 : valtype) (v_cvtop : cvtop) (v_sx : (option sx)) v_func_type,
+Lemma Step_pure__cvtop_trap_preserves : forall v_S v_C (v_t_1 : valtype) v_c_1 (v_t_2 : valtype) (v_cvtop : cvtop) v_func_type,
 	Admin_instrs_ok v_S v_C [(AI_CONST v_t_1 v_c_1);(AI_CVTOP v_t_2 v_t_1 v_cvtop)] v_func_type ->
 	Step_pure [(AI_CONST v_t_1 v_c_1);(AI_CVTOP v_t_2 v_t_1 v_cvtop)] [(AI_TRAP )] ->
 	Admin_instrs_ok v_S v_C [(AI_TRAP )] v_func_type.
 Proof.
-	move => v_S v_C v_t_1 v_c_1 v_t_2 v_cvtop v_sx v_func_type HType HReduce.
+	move => v_S v_C v_t_1 v_c_1 v_t_2 v_cvtop v_func_type HType HReduce.
 	destruct v_func_type as [tf1 tf2].
 	apply (AIs_ok_seq v_S v_C [] (AI_TRAP) tf1 tf2 tf1).
 	- (* Empty *) apply admin_weakening_empty_both. apply AIs_ok_empty.
@@ -1057,7 +1056,7 @@ Lemma Step_read__load_num_trap_preserves : forall v_S (r_v_f : frame) v_C (v_z :
 	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab)[(AI_CONST I32 v_i);(AI_LOAD v_t None v_mo)] v_func_type ->
 	Module_instance_ok v_S (F_MODULE r_v_f) v_C  ->
 	v_z = mk_state v_S r_v_f ->
-	((List.length (BYTES (fun_mem v_z 0))) < ((fun_u32__nat v_i + (OFFSET v_mo)) + ((fun_size v_t) / 8))) ->
+	((List.length (BYTES (fun_mem v_z 0))) < ((v_i + (OFFSET v_mo)) + ((fun_size v_t) / 8))) ->
 	Forall2 (fun v_t v_val => Val_ok v_val v_t) v_t1 (LOCALS r_v_f) ->
 	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab) [(AI_TRAP )] v_func_type.
 Proof.
@@ -1092,7 +1091,7 @@ Admitted. (*
 	apply const.
 Qed. *)
 
-Lemma Step_read__load_pack_trap_I32_preserves : forall v_S (r_v_f : frame) v_C (v_z : state) (v_i : uN 32) (v_valtype : valtype) (v_n : n) (v_sx : sx) (v_mo : memarg) v_func_type v_t1 lab ret ,
+Lemma Step_read__load_pack_trap_I32_preserves : forall v_S (r_v_f : frame) v_C (v_z : state) (v_i : uN 32) (v_n : n) (v_sx : sx) (v_mo : memarg) v_func_type v_t1 lab ret ,
 	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab)[(AI_CONST I32 v_i);(AI_LOAD INN_I32 (Some (op__ INN_I32 (mk_sz v_n) v_sx)) v_mo)] v_func_type ->
 	Module_instance_ok v_S (F_MODULE r_v_f) v_C  ->
 	v_z = mk_state v_S r_v_f ->
@@ -1101,7 +1100,7 @@ Lemma Step_read__load_pack_trap_I32_preserves : forall v_S (r_v_f : frame) v_C (
 	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab) [(AI_TRAP )] v_func_type.
 Admitted.
 
-Lemma Step_read__load_pack_trap_I64_preserves : forall v_S (r_v_f : frame) v_C (v_z : state) (v_i : uN 32) (v_valtype : valtype) (v_n : n) (v_sx : sx) (v_mo : memarg) v_func_type v_t1 lab ret ,
+Lemma Step_read__load_pack_trap_I64_preserves : forall v_S (r_v_f : frame) v_C (v_z : state) (v_i : uN 32) (v_n : n) (v_sx : sx) (v_mo : memarg) v_func_type v_t1 lab ret ,
 	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab)[(AI_CONST I32 v_i);(AI_LOAD INN_I64 (Some (op__ INN_I64 (mk_sz v_n) v_sx)) v_mo)] v_func_type ->
 	Module_instance_ok v_S (F_MODULE r_v_f) v_C  ->
 	v_z = mk_state v_S r_v_f ->
@@ -2171,8 +2170,8 @@ Proof.
 	- eapply Step_pure__binop_trap_preserves; eauto.
 	- eapply Step_pure__testop_preserves; eauto.
 	- eapply Step_pure__relop_preserves; eauto.
-	- eapply Step_pure__cvtop_val_preserves; try exact None; eauto.
-	- eapply Step_pure__cvtop_trap_preserves; try exact None; eauto.
+	- eapply Step_pure__cvtop_val_preserves; eauto.
+	- eapply Step_pure__cvtop_trap_preserves; eauto.
 	- eapply Step_pure__local_tee_preserves; eauto.
 Qed.
 
@@ -2199,8 +2198,8 @@ Proof.
 	- eapply Step_read__global_get_preserves; eauto.
 	- eapply Step_read__load_num_trap_preserves; eauto.
 	- eapply Step_read__load_num_val_preserves; eauto.
-	- eapply Step_read__load_pack_trap_I32_preserves; eauto. exact I32.
-	- eapply Step_read__load_pack_trap_I64_preserves; eauto. exact I32.
+	- eapply Step_read__load_pack_trap_I32_preserves; eauto.
+	- eapply Step_read__load_pack_trap_I64_preserves; eauto.
 	- eapply Step_read__load_pack_val_I32_preserves; eauto.
 	- eapply Step_read__load_pack_val_I64_preserves; eauto.
 	- eapply Step_read__memory_size_preserves; eauto.
