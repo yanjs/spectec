@@ -120,9 +120,14 @@ and string_of_expr expr =
   | LiftE e -> string_of_expr e
   | AccE (e, p) -> sprintf "%s%s" (string_of_expr e) (string_of_path p)
   | ExtE (e1, ps, e2, dir) -> (
+    let prep =
+      match e1.it with
+      | ExtE _ -> "and"
+      | _ -> "with"
+    in
     match dir with
-    | Front -> sprintf "%s with %s prepended by %s" (string_of_expr e1) (string_of_paths ps) (string_of_expr e2)
-    | Back -> sprintf "%s with %s appended by %s" (string_of_expr e1) (string_of_paths ps) (string_of_expr e2))
+    | Front -> sprintf "%s %s %s prepended by %s" (string_of_expr e1) prep (string_of_paths ps) (string_of_expr e2)
+    | Back -> sprintf "%s %s %s appended by %s" (string_of_expr e1) prep (string_of_paths ps) (string_of_expr e2))
   | UpdE (e1, ps, e2) ->
     sprintf "%s with %s replaced by %s" (string_of_expr e1) (string_of_paths ps) (string_of_expr e2)
   | StrE r -> string_of_record_expr r
@@ -386,15 +391,15 @@ let string_of_prose_binop = function
 | `EquivOp -> "if and only if"
 
 let string_of_pphint = function
-| Some text -> " " ^ text ^ " "
-| None -> " with "
+| Some text -> text
+| None -> "with"
 
 let rec raw_string_of_single_stmt stmt =
   match stmt with
   | LetS (e1, e2) ->
-    sprintf "Let %s be %s"
-      (string_of_expr e1)
-      (string_of_expr_with_type e2)
+    sprintf "%s is %s"
+      (string_of_expr_with_type e1)
+      (string_of_expr e2)
   | CondS e ->
     sprintf "%s"
       (string_of_expr e)
@@ -408,7 +413,7 @@ let rec raw_string_of_single_stmt stmt =
     sprintf "%s%s is valid%s"
       (string_of_opt "Under the context " string_of_expr ", " c_opt)
       (string_of_expr_with_type e)
-      (string_of_nullable_list string_of_expr_with_type prep " and " "" es)
+      (if prep = "" then "" else (string_of_nullable_list string_of_expr_with_type (" " ^ prep ^ " ") " and " "" es))
   | MatchesS (e1, e2) when Al.Eq.eq_expr e1 e2 ->
     sprintf "%s matches only itself"
       (string_of_expr_with_type e1)
@@ -427,6 +432,10 @@ let rec raw_string_of_single_stmt stmt =
     sprintf "%s %s defaultable"
       (string_of_expr_with_type e)
       (string_of_cmpop cmpop)
+  | IsConcatS (e1, e2) ->
+    sprintf "%s is the concatenation of all such %s"
+      (string_of_expr_with_type e1)
+      (string_of_expr e2)
   | ContextS (e1, e2) ->
     sprintf "%s is the context %s"
       (string_of_expr_with_type e1)
@@ -435,7 +444,7 @@ let rec raw_string_of_single_stmt stmt =
     let args = List.map string_of_expr_with_type es in
     Prose_util.apply_prose_hint s args
   | YetS s -> indent () ^ " Yet: " ^ s
-  | _ -> assert false
+  | IfS _ | ForallS _ | EitherS _ | BinS _ -> assert false
 
 
 and raw_string_of_stmt stmt =

@@ -32,6 +32,22 @@ let try_with_error fname at stringifier f step =
   | Exception.FreeVar _) as e -> error at (prefix ^ Printexc.to_string e) (stringifier step)
   | Failure msg -> error at (prefix ^ msg) (stringifier step)
 
+let warn msg = print_endline ("warning: " ^ msg)
+
+
+(* Hints *)
+
+(* Try to find a hint `hintid` on a spectec function definition `fname`. *)
+let find_hint fname hintid =
+  let open Il.Ast in
+  let open Il2al.Il2al_util in
+  List.find_map (fun hintdef ->
+    match hintdef.it with
+    | DecH (id', hints) when fname = id'.it ->
+      List.find_opt (fun hint -> hint.hintid.it = hintid) hints
+    | _ -> None
+  ) !hintdefs
+
 
 (* Matrix operations *)
 
@@ -143,7 +159,7 @@ and check_type ty v expr =
   let inn_types = [ "I32"; "I64" ] in
   let fnn_types = [ "F32"; "F64" ] in
   let vnn_types = [ "V128"; ] in
-  let abs_heap_types = [
+  let abs_heaptypes = [
     "ANY"; "EQ"; "I31"; "STRUCT"; "ARRAY"; "NONE"; "FUNC";
     "NOFUNC"; "EXN"; "NOEXN"; "EXTERN"; "NOEXTERN"
   ] in
@@ -172,17 +188,17 @@ and check_type ty v expr =
   | CaseV ("REF", _) ->
     boolV (ty = "reftype" || ty = "valtype" || ty = "val")
   (* absheaptype *)
-  | CaseV (aht, []) when List.mem aht abs_heap_types ->
+  | CaseV (aht, []) when List.mem aht abs_heaptypes ->
     boolV (ty = "absheaptype" || ty = "heaptype")
   (* deftype *)
-  | CaseV ("DEF", [ _; _ ]) ->
-    boolV (ty = "deftype" || ty = "heaptype")
+  | CaseV ("_DEF", [ _; _ ]) ->
+    boolV (ty = "heaptype" || ty = "typeuse" || ty = "deftype")
   (* typevar *)
   | CaseV ("_IDX", [ _ ]) ->
-    boolV (ty = "heaptype" || ty = "typevar")
+    boolV (ty = "heaptype" || ty = "typeuse" || ty = "typevar")
   (* heaptype *)
   | CaseV ("REC", [ _ ]) ->
-    boolV (ty = "heaptype" || ty = "typevar")
+    boolV (ty = "heaptype" || ty = "typeuse" || ty = "typevar")
   (* packval *)
   | CaseV ("PACK", CaseV (pt, [])::_) when List.mem pt pnn_types ->
     boolV (ty = "val")
@@ -257,7 +273,20 @@ and eval_expr env expr =
     let el = remove_typargs al in
     (* TODO: refactor numerics function name *)
     let args = List.map (eval_arg env) el in
-    (match call_func ("inverse_of_"^fname') args  with
+    let inv_fname =
+      (* If function $f has hint(inverse $invf), but $invf is defined in terms
+       * of the inversion of $f, then infinite loop! Implement loop checks? *)
+      match find_hint fname' "inverse" with
+      | None ->
+        fail_expr expr (sprintf "no inverse hint is given for definition `%s`" fname')
+      | Some hint ->
+        (* We assume that there is only one way to invert the function, on the
+         * last argument. We could extend the hint syntax to denote an argument. *)
+        match hint.hintexp.it with
+        | CallE (fid, []) -> fid.it
+        | _ -> failwith (sprintf "ill-formed inverse hint for definition `%s`" fname')
+    in
+    (match call_func inv_fname args with
     | Some v -> v
     | _ -> raise (Exception.MissingReturnValue fname)
     )
@@ -392,9 +421,9 @@ and eval_expr env expr =
     check_type (string_of_typ t) v expr
   | MatchE (e1, e2) ->
     (* Deferred to reference interpreter *)
-    let rt1 = e1 |> eval_expr env |> Construct.al_to_ref_type in
-    let rt2 = e2 |> eval_expr env |> Construct.al_to_ref_type in
-    boolV (Match.match_ref_type [] rt1 rt2)
+    let rt1 = e1 |> eval_expr env |> Construct.al_to_reftype in
+    let rt2 = e2 |> eval_expr env |> Construct.al_to_reftype in
+    boolV (Match.match_reftype [] rt1 rt2)
   | TopValueE _ ->
     (* TODO: type check *)
     boolV (List.length (WasmContext.get_value_stack ()) > 0)
@@ -678,7 +707,7 @@ and step_wasm (ctx: AlContext.t) : value -> AlContext.t = function
   | CaseV ("REF.NULL", _)
   | CaseV ("CONST", _)
   | CaseV ("VCONST", _) as v -> WasmContext.push_value v; ctx
-  | CaseV (name, []) when Builtin.is_builtin name -> Builtin.call name; ctx
+  | CaseV (name, []) when Host.is_host name -> Host.call name; ctx
   | CaseV (name, args) -> create_context name args :: ctx
   | v -> fail_value "cannot step a wasm instr" v
 
@@ -753,14 +782,26 @@ and create_context (name: string) (args: value list) : AlContext.mode =
   AlContext.al (name, params, body, env, 0)
 
 and call_func (name: string) (args: value list) : value option =
-  (* Function *)
-  if bound_func name then
-    [create_context name args]
-    |> run
-    |> AlContext.get_return_value
-  (* Numerics *)
-  else if Numerics.mem name then
-    Some (Numerics.call_numerics name args)
+   let builtin_name, is_builtin =
+     match find_hint name "builtin" with
+     | None -> name, false
+     | Some hint ->
+       match hint.hintexp.it with
+       | SeqE [] -> name, true         (* hint(builtin) *)
+       | TextE fname -> fname, true    (* hint(builtin "g") *)
+       | _ -> failwith (sprintf "ill-formed builtin hint for definition `%s`" name)
+   in
+   (* Function *)
+   if bound_func name && not is_builtin then
+     [create_context name args]
+     |> run
+     |> AlContext.get_return_value
+   (* Numerics *)
+   else if Numerics.mem builtin_name then (
+     if not is_builtin then
+       warn (sprintf "Numeric function `%s` is not defined in source, consider adding a hint(builtin)" name);
+     Some (Numerics.call_numerics builtin_name args)
+   )
   (* Relation *)
   else if Relation.mem name then (
     if bound_rule name then

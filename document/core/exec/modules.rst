@@ -1,7 +1,7 @@
 Modules
 -------
 
-For modules, the execution semantics primarily defines :ref:`instantiation <exec-instantiation>`, which :ref:`allocates <alloc>` instances for a module and its contained definitions, initializes :ref:`tables <syntax-table>` and :ref:`memories <syntax-mem>` from contained :ref:`element <syntax-elem>` and :ref:`data <syntax-data>` segments, and invokes the :ref:`start function <syntax-start>` if present. It also includes :ref:`invocation <exec-invocation>` of exported functions.
+For modules, the execution semantics primarily defines :ref:`instantiation <exec-instantiation>`, which :ref:`allocates <alloc>` instances for a module and its contained definitions, initializes :ref:`memories <syntax-mem>` and :ref:`tables <syntax-table>` from contained :ref:`data <syntax-data>` and :ref:`element <syntax-elem>` segments, and invokes the :ref:`start function <syntax-start>` if present. It also includes :ref:`invocation <exec-invocation>` of exported functions.
 
 
 .. index:: ! allocation, store, address
@@ -11,47 +11,14 @@ Allocation
 ~~~~~~~~~~
 
 New instances of
-:ref:`functions <syntax-funcinst>`,
-:ref:`tables <syntax-tableinst>`,
-:ref:`memories <syntax-meminst>`,
-:ref:`globals <syntax-globalinst>`,
 :ref:`tags <syntax-taginst>`,
-:ref:`element segments <syntax-eleminst>`, and
-:ref:`data segments <syntax-datainst>`
+:ref:`globals <syntax-globalinst>`,
+:ref:`memories <syntax-meminst>`,
+:ref:`tables <syntax-tableinst>`,
+:ref:`functions <syntax-funcinst>`,
+:ref:`data segments <syntax-datainst>`, and
+:ref:`element segments <syntax-eleminst>`
 are *allocated* in a :ref:`store <syntax-store>` ${:s}, as defined by the following auxiliary functions.
-
-
-.. index:: function, function instance, function address, module instance, function type
-.. _alloc-func:
-
-:ref:`Functions <syntax-funcinst>`
-..................................
-
-$${definition-prose: allocfunc}
-
-$${definition: allocfunc}
-
-
-.. index:: table, table instance, table address, table type, limits
-.. _alloc-table:
-
-:ref:`Tables <syntax-tableinst>`
-................................
-
-$${definition-prose: alloctable}
-
-$${definition: alloctable}
-
-
-.. index:: memory, memory instance, memory address, memory type, limits, byte
-.. _alloc-mem:
-
-:ref:`Memories <syntax-meminst>`
-................................
-
-$${definition-prose: allocmem}
-
-$${definition: allocmem}
 
 
 .. index:: tag, tag instance, tag address, tag type
@@ -76,15 +43,37 @@ $${definition-prose: allocglobal}
 $${definition: allocglobal}
 
 
-.. index:: element, element instance, element address
-.. _alloc-elem:
+.. index:: memory, memory instance, memory address, memory type, limits, byte
+.. _alloc-mem:
 
-:ref:`Element segments <syntax-eleminst>`
-.........................................
+:ref:`Memories <syntax-meminst>`
+................................
 
-$${definition-prose: allocelem}
+$${definition-prose: allocmem}
 
-$${definition: allocelem}
+$${definition: allocmem}
+
+
+.. index:: table, table instance, table address, table type, limits
+.. _alloc-table:
+
+:ref:`Tables <syntax-tableinst>`
+................................
+
+$${definition-prose: alloctable}
+
+$${definition: alloctable}
+
+
+.. index:: function, function instance, function address, module instance, function type
+.. _alloc-func:
+
+:ref:`Functions <syntax-funcinst>`
+..................................
+
+$${definition-prose: allocfunc}
+
+$${definition: allocfunc}
 
 
 .. index:: data, data instance, data address
@@ -98,15 +87,15 @@ $${definition-prose: allocdata}
 $${definition: allocdata}
 
 
-.. index:: table, table instance, table address, grow, limits
-.. _grow-table:
+.. index:: element, element instance, element address
+.. _alloc-elem:
 
-Growing :ref:`tables <syntax-tableinst>`
-........................................
+:ref:`Element segments <syntax-eleminst>`
+.........................................
 
-$${definition-prose: growtable}
+$${definition-prose: allocelem}
 
-$${definition: growtable}
+$${definition: allocelem}
 
 
 .. index:: memory, memory instance, memory address, grow, limits
@@ -120,7 +109,18 @@ $${definition-prose: growmem}
 $${definition: growmem}
 
 
-.. index:: module, module instance, function instance, table instance, memory instance, tag instance, global instance, export instance, function address, table address, memory address, tag address, global address, function index, table index, memory index, tag index, global index, type, function, table, memory, tag, global, import, export, external address, external type, matching
+.. index:: table, table instance, table address, grow, limits
+.. _grow-table:
+
+Growing :ref:`tables <syntax-tableinst>`
+........................................
+
+$${definition-prose: growtable}
+
+$${definition: growtable}
+
+
+.. index:: module, module instance, tag instance, global instance, memory instance, table instance, function instance, data instance, element instance, export instance, tag address, global address, memory address, table address, function address, data address, element address, tag index, global index, memory index, table index, function index, type, tag, global, memory, table, function, data segment, element segment, import, export, external address, external type, matching
 .. _alloc-module:
 
 :ref:`Modules <syntax-moduleinst>`
@@ -133,7 +133,7 @@ $${definition: allocmodule}
 Here, the notation :math:`\F{allocx}^\ast` is shorthand for multiple :ref:`allocations <alloc>` of object kind :math:`X`, defined as follows:
 
 $${definition: allocXs}
-$${definition-ignore: allocfuncs allocglobals alloctables allocmems allocelems allocdatas}
+$${definition-ignore: alloctags allocglobals allocmems alloctables allocfuncs allocdatas allocelems}
 
 For types, however, allocation is defined in terms of :ref:`rolling <aux-roll-rectype>` and :ref:`substitution <notation-subst>` of all preceding types to produce a list of :ref:`closed <type-closed>` :ref:`defined types <syntax-deftype>`:
 
@@ -182,6 +182,8 @@ $${definition-prose: instantiate}
 
 2. Assert: :math:`\module` is :ref:`valid <valid-module>` with :ref:`external types <syntax-externtype>` :math:`\externtype_{\F{im}}^m` classifying its :ref:`imports <syntax-import>`.
 
+3. Let :math:`\MODULE~\type^\ast~\import^\ast~\tag^\ast~\global^\ast~\mem^\ast~\table^\ast~\func^\ast~\data^\ast~\elem^\ast~\start^?~\export^\ast` the deconstruction of :math:`\module`.
+
 3. If the number :math:`m` of :ref:`imports <syntax-import>` is not equal to the number :math:`n` of provided :ref:`external addresses <syntax-externaddr>`, then:
 
    a. Fail.
@@ -206,9 +208,11 @@ $${definition-prose: instantiate}
 
 8. Let :math:`\val_{\F{g}}^\ast` be the list of :ref:`global <syntax-global>` initialization :ref:`values <syntax-val>` determined by :math:`\module` and :math:`\externaddr^n`. These may be calculated as follows.
 
-   a. For each :ref:`global <syntax-global>` :math:`\global_i` in :math:`\module.\MGLOBALS`, do:
+   a. For each :ref:`global <syntax-global>` :math:`\global_i` in :math:`\global^\ast`, do:
 
-      i. Let :math:`\val_{\F{g}i}` be the result of :ref:`evaluating <exec-expr>` the initializer expression :math:`\global_i.\GINIT`.
+      i. Let :math:`\GLOBAL~\X{gt}_i~\expr_{\F{t}i}` be the deconstruction of :math:`\global_i`.
+
+      ii. Let :math:`\val_{\F{g}i}` be the result of :ref:`evaluating <exec-expr>` the initializer expression :math:`\expr_{\F{g}i}`.
 
    b. Assert: due to :ref:`validation <valid-module>`, the frame :math:`F` is now on the top of the stack.
 
@@ -216,13 +220,15 @@ $${definition-prose: instantiate}
 
 9. Let :math:`\reff_{\F{t}}^\ast` be the list of :ref:`table <syntax-table>` initialization :ref:`references <syntax-ref>` determined by :math:`\module` and :math:`\externaddr^n`. These may be calculated as follows.
 
-   a. For each :ref:`table <syntax-table>` :math:`\table_i` in :math:`\module.\MTABLES`, do:
+   a. For each :ref:`table <syntax-table>` :math:`\table_i` in :math:`\table^\ast`, do:
 
-      i. Let :math:`\val_{\F{t}i}` be the result of :ref:`evaluating <exec-expr>` the initializer expression :math:`\table_i.\TINIT`.
+      i. Let :math:`\TABLE~\X{tt}_i~\expr_{\F{t}i}` be the deconstruction of :math:`\global_i`.
 
-      ii. Assert: due to :ref:`validation <valid-table>`, :math:`\val_{\F{t}i}` is a :ref:`reference <syntax-ref>`.
+      ii. Let :math:`\val_{\F{t}i}` be the result of :ref:`evaluating <exec-expr>` the initializer expression :math:`\expr_{\F{t}i}`.
 
-      iii. Let :math:`\reff_{\F{t}i}` be the reference :math:`\val_{\F{t}i}`.
+      iii. Assert: due to :ref:`validation <valid-table>`, :math:`\val_{\F{t}i}` is a :ref:`reference <syntax-ref>`.
+
+      iv. Let :math:`\reff_{\F{t}i}` be the reference :math:`\val_{\F{t}i}`.
 
    b. Assert: due to :ref:`validation <valid-module>`, the frame :math:`F` is now on the top of the stack.
 
@@ -230,9 +236,11 @@ $${definition-prose: instantiate}
 
 10. Let :math:`(\reff_{\F{e}}^\ast)^\ast` be the list of :ref:`reference <syntax-ref>` lists determined by the :ref:`element segments <syntax-elem>` in :math:`\module`. These may be calculated as follows.
 
-    a. For each :ref:`element segment <syntax-elem>` :math:`\elem_i` in :math:`\module.\MELEMS`, and for each element :ref:`expression <syntax-expr>` :math:`\expr_{ij}` in :math:`\elem_i.\EINIT`, do:
+    a. For each :ref:`element segment <syntax-elem>` :math:`\elem_i` in :math:`\elem^\ast`, do:
 
-       i. Let :math:`\reff_{ij}` be the result of :ref:`evaluating <exec-expr>` the initializer expression :math:`\expr_{ij}`.
+       i. Let :math:`\ELEM~\X{rt}_i~\expr_{\F{e}i}*~\X{mode}` be the deconstruction of :math:`\elem_i`.
+
+       ii. For each initializer :ref:`expression <syntax-expr>` :math:`\expr_{ij}` in :math:`\expr_{\F{e}i}*`, let :math:`\reff_{ij}` be the result of :ref:`evaluating <exec-expr>` :math:`\expr_{ij}`.
 
     b. Let :math:`\reff^\ast_i` be the concatenation of function elements :math:`\reff_{ij}` in order of index :math:`j`.
 
@@ -240,9 +248,9 @@ $${definition-prose: instantiate}
 
 11. Let :math:`\moduleinst` be a new module instance :ref:`allocated <alloc-module>` from :math:`\module` in store :math:`S` with imports :math:`\externaddr^n`, global initializer values :math:`\val_{\F{g}}^\ast`, table initializer values :math:`\reff_{\F{t}}^\ast`, and element segment contents :math:`(\reff_{\F{e}}^\ast)^\ast`, and let :math:`S'` be the extended store produced by module allocation.
 
-12. For each :ref:`element segment <syntax-elem>` :math:`\elem_i` in :math:`\module.\MELEMS` whose :ref:`mode <syntax-elemmode>` is of the form :math:`\EACTIVE~\{ \ETABLE~\tableidx_i, \EOFFSET~\X{einstr}^\ast_i~\END \}`, do:
+12. For each :ref:`element segment <syntax-elem>` :math:`\elem_i` in :math:`\elem^\ast` whose :ref:`mode <syntax-elemmode>` is of the form :math:`\EACTIVE~~\tableidx_i~\X{einstr}^\ast_i`, do:
 
-    a. Let :math:`n` be the length of the list :math:`\elem_i.\EINIT`.
+    a. Let :math:`n` be the length of the element segment's initializer list.
 
     b. :ref:`Execute <exec-instrs>` the instruction sequence :math:`\X{einstr}^\ast_i`.
 
@@ -254,13 +262,13 @@ $${definition-prose: instantiate}
 
     f. :ref:`Execute <exec-elem.drop>` the instruction :math:`\ELEMDROP~i`.
 
-13. For each :ref:`element segment <syntax-elem>` :math:`\elem_i` in :math:`\module.\MELEMS` whose :ref:`mode <syntax-elemmode>` is of the form :math:`\EDECLARE`, do:
+13. For each :ref:`element segment <syntax-elem>` :math:`\elem_i` in :math:`\elem^\ast` whose :ref:`mode <syntax-elemmode>` is of the form :math:`\EDECLARE`, do:
 
     a. :ref:`Execute <exec-elem.drop>` the instruction :math:`\ELEMDROP~i`.
 
-14. For each :ref:`data segment <syntax-data>` :math:`\data_i` in :math:`\module.\MDATAS` whose :ref:`mode <syntax-datamode>` is of the form :math:`\DACTIVE~\{ \DMEM~\memidx_i, \DOFFSET~\X{dinstr}^\ast_i~\END \}`, do:
+14. For each :ref:`data segment <syntax-data>` :math:`\data_i` in :math:`\data^\ast` whose :ref:`mode <syntax-datamode>` is of the form :math:`\DACTIVE~\memidx_i~\X{dinstr}^\ast_i`, do:
 
-    a. Let :math:`n` be the length of the list :math:`\data_i.\DINIT`.
+    a. Let :math:`n` be the length of the data segment's byte list.
 
     b. :ref:`Execute <exec-instrs>` the instruction sequence :math:`\X{dinstr}^\ast_i`.
 
@@ -272,11 +280,11 @@ $${definition-prose: instantiate}
 
     f. :ref:`Execute <exec-data.drop>` the instruction :math:`\DATADROP~i`.
 
-15. If the :ref:`start function <syntax-start>` :math:`\module.\MSTART` is not empty, then:
+15. If the :ref:`start function <syntax-start>` :math:`\start^?` is not empty, then:
 
-    a. Let :math:`\start` be the :ref:`start function <syntax-start>` :math:`\module.\MSTART`.
+    a. Let :math:`\START~x_{\K{s}}` be the :ref:`start function <syntax-start>` :math:`\start`.
 
-    b. :ref:`Execute <exec-call>` the instruction :math:`\CALL~\start.\SFUNC`.
+    b. :ref:`Execute <exec-call>` the instruction :math:`\CALL~x_{\K{s}}`.
 
 16. Assert: due to :ref:`validation <valid-module>`, the frame :math:`F` is now on the top of the stack.
 
@@ -293,14 +301,14 @@ $${definition-prose: evalglobals}
 
 $${definition: evalglobals}
 
-.. _aux-runelem:
 .. _aux-rundata:
-
-$${definition-prose: runelem_}
+.. _aux-runelem:
 
 $${definition-prose: rundata_}
 
-$${definition: runelem_ rundata_}
+$${definition-prose: runelem_}
+
+$${definition: rundata_ runelem_}
 
 .. note::
    Checking import types assumes that the :ref:`module instance <syntax-moduleinst>` has already been :ref:`allocated <alloc-module>` to compute the respective :ref:`closed <type-closed>` :ref:`defined types <syntax-deftype>`.
@@ -342,7 +350,7 @@ The following steps are performed:
 
 2. Let :math:`\funcinst` be the :ref:`function instance <syntax-funcinst>` :math:`S.\SFUNCS[\funcaddr]`.
 
-3. Let :math:`\TFUNC~[t_1^n] \toF [t_2^m]` be the :ref:`composite type <syntax-comptype>` :math:`\expanddt(\funcinst.\FITYPE)`.
+3. Let :math:`\TFUNC~[t_1^n] \Tarrow [t_2^m]` be the :ref:`composite type <syntax-comptype>` :math:`\expanddt(\funcinst.\FITYPE)`.
 
 4. If the length :math:`|\val^\ast|` of the provided argument values is different from the number :math:`n` of expected arguments, then:
 

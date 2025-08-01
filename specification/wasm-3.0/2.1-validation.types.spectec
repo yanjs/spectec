@@ -76,16 +76,17 @@ rule Expand_use/typeidx: _IDX typeidx ~~_C comptype  -- Expand: C.TYPES[typeidx]
 
 ;; Type definitions
 
-syntax oktypeidx hint(show OK#((typeidx)))    = | OK typeidx      hint(show OK#(%))     hint(macro "%subtype")
-syntax oktypeidxnat hint(show OK#(typeidx,n)) = | OK typeidx nat  hint(show OK#(%,%))   hint(macro "%subtypeext")
+syntax oktypeidx hint(show OK#((typeidx))) hint(prose_desc "type index") =
+  | OK typeidx      hint(show OK#(%))     hint(macro "%subtype")    hint(prose "%1")
+syntax oktypeidxnat hint(show OK#(typeidx,n)) =
+  | OK typeidx nat  hint(show OK#(%,%))   hint(macro "%subtypeext")
 
 relation Packtype_ok: context |- packtype : OK          hint(name "K-pack")    hint(macro "%packtype")
 relation Fieldtype_ok: context |- fieldtype : OK        hint(name "K-field")   hint(macro "%fieldtype")
 relation Storagetype_ok: context |- storagetype : OK    hint(name "K-storage") hint(macro "%storagetype")
 relation Comptype_ok: context |- comptype : OK          hint(name "K-comp")    hint(macro "%comptype")
-relation Functype_ok: context |- functype : OK          hint(name "K-func")    hint(macro "%functype")
-relation Subtype_ok: context |- subtype : oktypeidx     hint(name "K-sub")     hint(macro "%subtype")  hint(prosepp "for")
-relation Rectype_ok: context |- rectype : oktypeidx     hint(name "K-rect")    hint(macro "%rectype")  hint(prosepp "for")
+relation Subtype_ok: context |- subtype : oktypeidx     hint(name "K-sub")     hint(macro "%subtype")     hint(prosepp "for")
+relation Rectype_ok: context |- rectype : oktypeidx     hint(name "K-rect")    hint(macro "%rectype")     hint(prosepp "for")
 relation Subtype_ok2: context |- subtype : oktypeidxnat hint(name "K-sub2")    hint(macro "%subtypeext")  hint(prosepp "for")
 relation Rectype_ok2: context |- rectype : oktypeidxnat hint(name "K-rec2")    hint(macro "%rectypeext")  hint(prosepp "for")
 relation Deftype_ok: context |- deftype : OK            hint(name "K-def")     hint(macro "%deftype")
@@ -99,13 +100,13 @@ rule Typeuse_ok/typeidx:
   C |- _IDX typeidx : OK
   -- if C.TYPES[typeidx] = dt
 
-rule Typeuse_ok/deftype:
-  C |- deftype : OK
-  -- Deftype_ok: C |- deftype : OK
-
 rule Typeuse_ok/rec:
   C |- REC i : OK
   -- if C.RECS[i] = st
+
+rule Typeuse_ok/deftype:
+  C |- deftype : OK
+  -- Deftype_ok: C |- deftype : OK
 
 
 rule Packtype_ok:
@@ -133,8 +134,9 @@ rule Comptype_ok/array:
   -- Fieldtype_ok: C |- fieldtype : OK
 
 rule Comptype_ok/func:
-  C |- FUNC functype : OK
-  -- Functype_ok: C |- functype : OK
+  C |- FUNC t_1* -> t_2* : OK
+  -- Resulttype_ok: C |- t_1* : OK
+  -- Resulttype_ok: C |- t_2* : OK
 
 
 rule Subtype_ok:
@@ -188,7 +190,7 @@ rule Rectype_ok2/cons:
 
 
 rule Deftype_ok:
-  C |- DEF rectype i : OK
+  C |- _DEF rectype i : OK
   -- Rectype_ok: C |- rectype : OK(x)
   -- if rectype = REC subtype^n
   -- if i < n
@@ -197,10 +199,10 @@ rule Deftype_ok:
 ;; External types
 
 relation Limits_ok: context |- limits : nat         hint(name "K-limits") hint(macro "%limits")  hint(prosepp "within")
-relation Globaltype_ok: context |- globaltype : OK  hint(name "K-global") hint(macro "%globaltype")
-relation Tabletype_ok: context |- tabletype : OK    hint(name "K-table")  hint(macro "%tabletype")
-relation Memtype_ok: context |- memtype : OK        hint(name "K-mem")    hint(macro "%memtype")
 relation Tagtype_ok: context |- tagtype : OK        hint(name "K-tag")    hint(macro "%tagtype")
+relation Globaltype_ok: context |- globaltype : OK  hint(name "K-global") hint(macro "%globaltype")
+relation Memtype_ok: context |- memtype : OK        hint(name "K-mem")    hint(macro "%memtype")
+relation Tabletype_ok: context |- tabletype : OK    hint(name "K-table")  hint(macro "%tabletype")
 relation Externtype_ok: context |- externtype : OK  hint(name "K-extern") hint(macro "%externtype")
 
 
@@ -208,48 +210,42 @@ rule Limits_ok:
   C |- `[n .. m] : k
   -- if n <= m <= k
 
-rule Functype_ok:
-  C |- t_1* -> t_2* : OK
-  -- Resulttype_ok: C |- t_1* : OK
-  -- Resulttype_ok: C |- t_2* : OK
+rule Tagtype_ok:
+  C |- typeuse : OK
+  -- Typeuse_ok: C |- typeuse : OK
+  -- Expand_use: typeuse ~~_C $($(FUNC t_1* -> t_2*))
 
 rule Globaltype_ok:
   C |- MUT? t : OK
   -- Valtype_ok: C |- t : OK
+
+rule Memtype_ok:
+  C |- addrtype limits PAGE : OK
+  -- Limits_ok: C |- limits : $(2^16)
 
 rule Tabletype_ok:
   C |- addrtype limits reftype : OK
   -- Limits_ok: C |- limits : $(2^32 - 1)
   -- Reftype_ok: C |- reftype : OK
 
-rule Memtype_ok:
-  C |- addrtype limits PAGE : OK
-  -- Limits_ok: C |- limits : $(2^16)
 
-rule Tagtype_ok:
-  C |- deftype : OK
-  -- Deftype_ok: C |- deftype : OK
-  -- Expand: deftype ~~ FUNC functype
-
-
-rule Externtype_ok/func:
-  C |- FUNC typeuse : OK
-  -- Typeuse_ok: C |- typeuse : OK
-  -- Expand_use: typeuse ~~_C FUNC functype
+rule Externtype_ok/tag:
+  C |- TAG tagtype : OK
+  -- Tagtype_ok: C |- tagtype : OK
 
 rule Externtype_ok/global:
   C |- GLOBAL globaltype : OK
   -- Globaltype_ok: C |- globaltype : OK
 
-rule Externtype_ok/table:
-  C |- TABLE tabletype : OK
-  -- Tabletype_ok: C |- tabletype : OK
-
 rule Externtype_ok/mem:
   C |- MEM memtype : OK
   -- Memtype_ok: C |- memtype : OK
 
-rule Externtype_ok/tag:
-  C |- TAG typeuse : OK
+rule Externtype_ok/table:
+  C |- TABLE tabletype : OK
+  -- Tabletype_ok: C |- tabletype : OK
+
+rule Externtype_ok/func:
+  C |- FUNC typeuse : OK
   -- Typeuse_ok: C |- typeuse : OK
-  -- Expand_use: typeuse ~~_C FUNC functype
+  -- Expand_use: typeuse ~~_C $($(FUNC t_1* -> t_2*))

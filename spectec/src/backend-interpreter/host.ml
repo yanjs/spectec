@@ -14,25 +14,26 @@ let f32_to_const f = CaseV ("CONST", [ nullary "F32"; Construct.al_of_float32 f 
 let f64_to_const f = CaseV ("CONST", [ nullary "F64"; Construct.al_of_float64 f ])
 
 
-(* TODO: Refactor builtin call logic *)
-let builtin () =
+(* TODO: Refactor call logic *)
+let spectest () =
   (* TODO : Change this into host function instance, instead of current normal function instance *)
   let create_funcinst (name, type_tags) =
     let winstr_tag = String.uppercase_ascii name in
     let code = nullary winstr_tag in
     let ptype = Array.map nullary type_tags in
     let arrow = CaseV ("->", [ listV ptype; listV [||] ]) in
-    let ftype = CaseV ("FUNC", [ arrow ]) in
-    let dt =
-      CaseV ("DEF", [
+    let ftype = CaseV ("FUNC", [ listV ptype; listV [||] ]) in
+    let dtype =
+      CaseV ("_DEF", [
         CaseV ("REC", [
           [| CaseV ("SUB", [some "FINAL"; listV [||]; ftype]) |] |> listV
         ]); natV Z.zero
       ]) in
+    let tidx = CaseV ("", [ natV Z.zero ]) in
     name, StrV [
-      "TYPE", ref (if !Construct.version = 3 then dt else arrow);
+      "TYPE", ref (if !Construct.version <= 2 then arrow else dtype);
       "MODULE", ref (StrV Record.empty); (* dummy module *)
-      "CODE", ref (CaseV ("FUNC", [ ftype; listV [||]; listV [| code |] ]))
+      "CODE", ref (CaseV ("FUNC", [ tidx; listV [||]; listV [| code |] ]))
     ] in
 
   let create_globalinst t v = StrV [
@@ -70,17 +71,17 @@ let builtin () =
   (* Builtin tables *)
   let nulls = CaseV ("REF.NULL", [ nullary "FUNC" ]) |> Array.make 10 in
   let funcref =
-    if !Construct.version = 3 then
-      CaseV ("REF", [some "NULL"; nullary "FUNC"])
-    else
+    if !Construct.version <= 2 then
       nullary "FUNCREF"
+    else
+      CaseV ("REF", [some "NULL"; nullary "FUNC"])
   in
   let mk_ttype nt =
     let args = [ CaseV ("[", [ natV (Z.of_int 10); natV (Z.of_int 20) ]); funcref ] in
-    if !Construct.version = 3 then
-      TupV (CaseV (nt, []) :: args)
-    else
+    if !Construct.version <= 2 then
       TupV args
+    else
+      TupV (CaseV (nt, []) :: args)
   in
   let tables = [
     "table",
@@ -92,10 +93,10 @@ let builtin () =
   let zeros = natV Z.zero |> Array.make 0x10000 in
   let mk_mtype nt =
     let arg = CaseV ("[", [ natV Z.one; natV (Z.of_int 2) ]) in
-    if !Construct.version = 3 then
-      CaseV ("PAGE", [ CaseV (nt, []); arg ])
+    if !Construct.version <= 2 then
+      CaseV ("PAGE", [ arg ])
     else
-      CaseV ("PAGE", [ arg ]);
+      CaseV ("PAGE", [ CaseV (nt, []); arg ])
   in
   let memories = [
     "memory",
@@ -157,7 +158,7 @@ let builtin () =
 
   StrV moduleinst
 
-let is_builtin = function
+let is_host = function
   | "PRINT" | "PRINT_I32" | "PRINT_I64" | "PRINT_F32" | "PRINT_F64" | "PRINT_I32_F32" | "PRINT_F64_F64" -> true
   | _ -> false
 
@@ -207,4 +208,4 @@ let call name =
     let f64 = local 0 |> as_const "F64" |> al_to_float64 |> F64.to_string in
     let f64' = local 1 |> as_const "F64" |> al_to_float64 |> F64.to_string in
     Printf.printf "- print_f64_f64: %s %s\n" f64 f64'
-  | name -> raise (Exception.UnknownFunc ("No builtin function: " ^ name))
+  | name -> raise (Exception.UnknownFunc ("No spectest function: " ^ name))

@@ -82,6 +82,7 @@ let rec free_prem ignore_listN prem =
   let fi = free_iterexp ignore_listN in
   match prem.it with
   | RulePr (_id, _op, e) -> f e
+  | NegPr prem' -> fp prem'
   | IfPr e -> f e
   | LetPr (e1, e2, _ids) -> f e1 + f e2
   | ElsePr -> empty
@@ -121,7 +122,7 @@ let free_rules rules =
 let free_rule_def rd =
   let (_, _, clauses) = rd.it in
   List.fold_left (fun s c ->
-    let lhs, rhs, prems = c in
+    let _, lhs, rhs, prems = c in
     List.fold_left (fun s p -> s + Il.Free.free_prem p) s prems
     |> union (Il.Free.free_exp lhs)
     |> union (Il.Free.free_exp rhs)

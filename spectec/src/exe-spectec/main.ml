@@ -16,6 +16,7 @@ type target =
  | Rocq
 
 type pass =
+  | Else
   | Sub
   | Totalize
   | Unthe
@@ -28,7 +29,7 @@ passers (--all-passes, some targets), we do _not_ want to use the order of
 flags on the command line.
 *)
 let _skip_passes = [ Sub; Unthe ]  (* Not clear how to extend them to indexed types *)
-let all_passes = [ Totalize; Sideconditions ]
+let all_passes = [ Else; Totalize; Sideconditions ]
 
 type mil_pass =
   | MIL_Sub
@@ -70,7 +71,6 @@ module PS = Set.Make(struct type t = pass let compare = compare; end)
 let selected_passes = ref (PS.empty)
 let enable_pass pass = selected_passes := PS.add pass !selected_passes
 
-
 let print_il il =
   Printf.printf "%s\n%!" (Il.Print.string_of_script ~suppress_pos:(!print_no_pos) il)
 
@@ -80,22 +80,32 @@ let print_mil mil =
 (* Il pass metadata *)
 
 let pass_flag = function
+  | Else -> "else"
   | Sub -> "sub"
   | Totalize -> "totalize"
   | Unthe -> "the-elimination"
   | Sideconditions -> "sideconditions"
 
 let pass_desc = function
+  | Else -> "Eliminate the otherwise premise in relations"
   | Sub -> "Synthesize explicit subtype coercions"
   | Totalize -> "Run function totalization"
   | Unthe -> "Eliminate the ! operator in relations"
   | Sideconditions -> "Infer side conditions"
 
 let run_pass : pass -> Il.Ast.script -> Il.Ast.script = function
+  | Else -> Middlend.Else.transform
   | Sub -> Middlend.Sub.transform
   | Totalize -> Middlend.Totalize.transform
   | Unthe -> Middlend.Unthe.transform
   | Sideconditions -> Middlend.Sideconditions.transform
+
+(* MIL passes *)
+module PSMIL = Set.Make(struct type t = mil_pass let compare = compare; end)
+let selected_mil_passes = ref (PSMIL.empty)
+let enable_mil_pass pass = selected_mil_passes := PSMIL.add pass !selected_mil_passes
+
+(* MIL pass metadata *)
 
 let pass_mil_flag = function 
   | MIL_Sub -> "sub"
@@ -111,6 +121,11 @@ let banner () =
   print_endline (name ^ " " ^ version ^ " generator")
 
 let usage = "Usage: " ^ name ^ " [option] [file ...] [-p file ...] [-o file ...]"
+
+let cmd_error msg =
+  flush_all ();
+  prerr_endline (Sys.argv.(0) ^ ": " ^ msg);
+  exit 2
 
 let add_arg source =
   let args =
@@ -132,6 +147,8 @@ let argspec = Arg.align (
   "-o", Arg.Unit (fun () -> file_kind := Output), " Output files";
   "-l", Arg.Set logging, " Log execution steps";
   "-ll", Arg.Set Backend_interpreter.Runner.logging, " Log interpreter execution";
+  "-dl", Arg.String (fun s -> Util.Debug_log.(active := s :: !active)),
+    " Debug-log function";
   "-w", Arg.Unit (fun () -> warn_math := true; warn_prose := true),
     " Warn about unused or multiply used splices";
   "--warn-math", Arg.Set warn_math,
@@ -200,7 +217,8 @@ let () =
     | Prose _ | Splice _ | Interpreter _ ->
       enable_pass Sideconditions;
     | Rocq ->
-      enable_pass Sideconditions; enable_pass Totalize
+      enable_pass Sideconditions; enable_pass Totalize; enable_pass Else;
+      enable_mil_pass MIL_Sub
     | _ when !print_al || !print_al_o <> "" ->
       enable_pass Sideconditions;
     | _ -> ()
@@ -266,23 +284,22 @@ let () =
           | Rocq -> Backend_rocq.Utils.reserved_ids
           | _ -> Mil.Env.StringSet.empty
         ) in
-        let prefix_map, mil = Mil.Translate.transform reserved_ids il in
+        let mil = Il2mil.Translate.transform reserved_ids il in
         if !print_mil_f || !print_all_mil then 
           print_mil mil;
         let transformed_mil = List.fold_left (fun mil' pass ->
-          log ("Running pass " ^ pass_mil_flag pass ^ "...");
-          let mil'' = run_pass_mil pass mil' in
-          if !print_all_mil then 
-            print_mil mil'';
-          mil''
+          if not (PSMIL.mem pass !selected_mil_passes) then mil' else
+          (
+            log ("Running pass " ^ pass_mil_flag pass ^ "...");
+            let mil'' = run_pass_mil pass mil' in
+            if !print_all_mil then 
+              print_mil mil'';
+            mil''
+          )
         ) mil all_mil_passes in
-        let final_mil = Mil.Naming.transform prefix_map transformed_mil in
-        log ("Running pass Naming...");
-        if !print_all_mil then 
-          print_mil final_mil;
         log ("Checking names are unique...");
-        Mil.Env.check_uniqueness final_mil;
-        final_mil
+        Mil.Env.check_uniqueness transformed_mil;
+        transformed_mil
       )
       else []
     in
@@ -302,9 +319,7 @@ let () =
           Backend_ast.Print.output_script oc config il;
           Out_channel.output_string oc "\n"
         )
-      | _ ->
-        prerr_endline "too many output file names";
-        exit 2
+      | _ -> cmd_error "too many output file names"
       )
 
     | Latex ->
@@ -314,9 +329,7 @@ let () =
       (match !odsts with
       | [] -> print_endline (Backend_latex.Gen.gen_string config el)
       | [odst] -> Backend_latex.Gen.gen_file config odst el
-      | _ ->
-        prerr_endline "too many output file names";
-        exit 2
+      | _ -> cmd_error "too many output file names"
       )
 
     | Prose as_plaintext ->
@@ -337,9 +350,7 @@ let () =
             |> Backend_prose.Print.file_of_prose odst
           else
             Backend_prose.Gen.gen_file config_latex config_prose odst el il al
-      | _ ->
-        prerr_endline "too many output file names";
-        exit 2
+      | _ -> cmd_error "too many output file names"
       )
 
     | Splice config ->
@@ -352,9 +363,7 @@ let () =
         | [odst] when Sys.file_exists odst && Sys.is_directory odst ->
           odsts := List.map (fun pdst -> Filename.concat odst pdst) !pdsts
         | _ when List.length !odsts = List.length !pdsts -> ()
-        | _ ->
-          prerr_endline "inconsistent number of input and output file names";
-          exit 2
+        | _ -> cmd_error "inconsistent number of input and output file names"
       );
       log "Prose Generation...";
       let prose = Backend_prose.Gen.gen_prose el il al in
@@ -400,9 +409,14 @@ let () =
     Util.Error.print_error at msg';
     Util.Debug_log.log_exn exn;
     exit 1
+  | Sys_error msg ->
+    flush_all ();
+    prerr_endline msg;
+    exit 2
   | exn ->
     flush_all ();
     prerr_endline
       (Sys.argv.(0) ^ ": uncaught exception " ^ Printexc.to_string exn);
+    prerr_endline "\nBacktrace:";
     Printexc.print_backtrace stderr;
     exit 2

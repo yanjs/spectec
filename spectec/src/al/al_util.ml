@@ -137,6 +137,10 @@ let print_yet at category msg =
 
 (* Helper functions *)
 
+let listv_len = function
+  | ListV arr_ref -> Array.length !arr_ref
+  | v -> fail_value "listv_len" v
+
 let listv_map f = function
   | ListV arr_ref -> ListV (ref (Array.map f !arr_ref))
   | v -> fail_value "listv_map" v
@@ -196,6 +200,12 @@ let context_names = [
   "LABEL_";
   "HANDLER_";
 ]
+
+let rec mk_access ps base =
+  match ps with
+  (* TODO: type *)
+  | h :: t -> accE (base, h) ~note:no_note |> mk_access t
+  | [] -> base
 
 (* Destruct *)
 

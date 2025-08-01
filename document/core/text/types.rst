@@ -120,32 +120,67 @@ Value Types
    \end{array}
 
 
-.. index:: function type, value type, result type
+.. index:: composite type, aggregate type, structure type, array type, function type, field type, storage type, value type, packed type, mutability, result type
+   pair: text format; composite type
+   pair: text format; aggregate type
+   pair: text format; structure type
+   pair: text format; array type
    pair: text format; function type
+   pair: text format; field type
+   pair: text format; storage type
+   pair: text format; packed type
+.. _text-comptype:
+.. _text-aggrtype:
+.. _text-structtype:
+.. _text-arraytype:
+.. _text-functype:
 .. _text-param:
 .. _text-result:
-.. _text-functype:
+.. _text-fieldtype:
+.. _text-storagetype:
+.. _text-packtype:
 
-Function Types
-~~~~~~~~~~~~~~
+Composite Types
+~~~~~~~~~~~~~~~
 
 .. math::
    \begin{array}{llclll@{\qquad\qquad}l}
-   \production{function type} & \Tfunctype_I &::=&
+   \production{composite type} & \Tcomptype_I &::=&
+     \text{(}~\text{struct}~~\X{ft}^\ast{:\,}\Tlist(\Tfield_I)~\text{)}
+       &\Rightarrow& \TSTRUCT~\X{ft}^\ast \\ &&|&
+     \text{(}~\text{array}~~\X{ft}{:}\Tfieldtype_I~\text{)}
+       &\Rightarrow& \TARRAY~\X{ft} \\ &&|&
      \text{(}~\text{func}~~t_1^\ast{:\,}\Tlist(\Tparam_I)~~t_2^\ast{:\,}\Tlist(\Tresult_I)~\text{)}
-       &\Rightarrow& [t_1^\ast] \to [t_2^\ast] \\
+       &\Rightarrow& \TFUNC~[t_1^\ast] \Tarrow [t_2^\ast] \\
    \production{parameter} & \Tparam_I &::=&
      \text{(}~\text{param}~~\Tid^?~~t{:}\Tvaltype_I~\text{)}
        &\Rightarrow& t \\
    \production{result} & \Tresult_I &::=&
      \text{(}~\text{result}~~t{:}\Tvaltype_I~\text{)}
        &\Rightarrow& t \\
+   \production{field} & \Tfield_I &::=&
+     \text{(}~\text{field}~~\Tid^?~~\X{ft}{:}\Tfieldtype_I~\text{)}
+       &\Rightarrow& \X{ft} \\
+   \production{field type} & \Tfieldtype_I &::=&
+     \X{st}{:}\Bstoragetype
+       &\Rightarrow& \X{st} \\ &&|&
+     \text{(}~\text{mut}~~\X{st}{:}\Bstoragetype~\text{)}
+       &\Rightarrow& \TMUT~\X{st} \\
+   \production{storage type} & \Tstoragetype_I &::=&
+     t{:}\Tvaltype_I
+       &\Rightarrow& t \\ &&|&
+     t{:}\Tpacktype
+       &\Rightarrow& t \\
+   \production{packed type} & \Tpacktype &::=&
+     \text{i8}
+       &\Rightarrow& \I8 \\ &&|&
+     \text{i16}
+       &\Rightarrow& \I16 \\
    \end{array}
 
 .. note::
    The optional identifier names for parameters in a function type only have documentation purpose.
    They cannot be referenced from anywhere.
-
 
 Abbreviations
 .............
@@ -162,81 +197,13 @@ Multiple anonymous parameters or results may be combined into a single declarati
      (\text{(}~~\text{result}~~\Tvaltype~~\text{)})^\ast \\
    \end{array}
 
-
-.. index:: aggregate type, value type, structure type, array type, field type, storage type, packed type, mutability
-   pair: text format; aggregate type
-   pair: text format; structure type
-   pair: text format; array type
-   pair: text format; field type
-   pair: text format; storage type
-   pair: text format; packed type
-.. _text-aggrtype:
-.. _text-structtype:
-.. _text-arraytype:
-.. _text-fieldtype:
-.. _text-storagetype:
-.. _text-packtype:
-
-Aggregate Types
-~~~~~~~~~~~~~~~
-
-.. math::
-   \begin{array}{llclll@{\qquad\qquad}l}
-   \production{array type} & \Tarraytype_I &::=&
-     \text{(}~\text{array}~~\X{ft}{:}\Tfieldtype_I~\text{)}
-       &\Rightarrow& \X{ft} \\
-   \production{structure type} & \Tstructtype_I &::=&
-     \text{(}~\text{struct}~~\X{ft}^\ast{:\,}\Tlist(\Tfield_I)~\text{)}
-       &\Rightarrow& \X{ft}^\ast \\
-   \production{field} & \Tfield_I &::=&
-     \text{(}~\text{field}~~\Tid^?~~\X{ft}{:}\Tfieldtype_I~\text{)}
-       &\Rightarrow& \X{ft} \\
-   \production{field type} & \Tfieldtype_I &::=&
-     \X{st}{:}\Bstoragetype
-       &\Rightarrow& \MCONST~\X{st} \\ &&|&
-     \text{(}~\text{mut}~~\X{st}{:}\Bstoragetype~\text{)}
-       &\Rightarrow& \MVAR~\X{st} \\
-   \production{storage type} & \Tstoragetype_I &::=&
-     t{:}\Tvaltype_I
-       &\Rightarrow& t \\ &&|&
-     t{:}\Tpacktype
-       &\Rightarrow& t \\
-   \production{packed type} & \Tpacktype &::=&
-     \text{i8}
-       &\Rightarrow& \I8 \\ &&|&
-     \text{i16}
-       &\Rightarrow& \I16 \\
-   \end{array}
-
-Abbreviations
-.............
-
-Multiple anonymous structure fields may be combined into a single declaration:
+Similarly, multiple anonymous structure fields may be combined into a single declaration:
 
 .. math::
    \begin{array}{llclll}
    \production{field} &
      \text{(}~~\text{field}~~\Tfieldtype^\ast~~\text{)} &\equiv&
      (\text{(}~~\text{field}~~\Tfieldtype~~\text{)})^\ast \\
-   \end{array}
-
-
-.. index:: composite type, structure type, array type, function type
-   pair: text format; composite type
-.. _text-comptype:
-
-Composite Types
-~~~~~~~~~~~~~~~
-
-.. math::
-   \begin{array}{llclll@{\qquad\qquad}l}
-   \production{composite type} & \Tcomptype_I &::=&
-     \X{at}{:}\Tarraytype_I
-       &\Rightarrow& \TARRAY~\X{at} \\ &&|&
-     \X{st}{:}\Tstructtype_I
-       &\Rightarrow& \TSTRUCT~\X{at} \\ &&|&
-     \X{ft}{:}\Tfunctype_I
-       &\Rightarrow& \TFUNC~\X{ft} \\
    \end{array}
 
 
@@ -321,37 +288,23 @@ Limits
 
 .. math::
     \begin{array}{llclll}
-    \production{limits} & \Tlimits &::=&
-      n{:}\Tu64 &\Rightarrow& \{ \LMIN~n, \LMAX~\epsilon \} \\ &&|&
-      n{:}\Tu64~~m{:}\Tu64 &\Rightarrow& \{ \LMIN~n, \LMAX~m \} \\
+    \production{limits} & \Tlimits_N &::=&
+      n{:}\Tu64 &\Rightarrow& [ n\,{..}\,2^N ] \\ &&|&
+      n{:}\Tu64~~m{:}\Tu64 &\Rightarrow& [ n\,{..}\,m ] \\
     \end{array}
 
 
-.. index:: memory type, limits, page size
-   pair: text format; memory type
-.. _text-memtype:
+.. index:: tag type, type use
+   pair: text format; tag type
+.. _text-tagtype:
 
-Memory Types
-~~~~~~~~~~~~
-
-.. math::
-   \begin{array}{llclll@{\qquad\qquad}l}
-   \production{memory type} & \Tmemtype_I &::=&
-     \X{at}{:}\Taddrtype~~\X{lim}{:}\Tlimits &\Rightarrow& \X{at}~\X{lim} \\
-   \end{array}
-
-
-.. index:: table type, reference type, limits
-   pair: text format; table type
-.. _text-tabletype:
-
-Table Types
-~~~~~~~~~~~
+Tag Types
+~~~~~~~~~
 
 .. math::
-   \begin{array}{llclll}
-   \production{table type} & \Ttabletype_I &::=&
-     \X{at}{:}\Taddrtype~~\X{lim}{:}\Tlimits~~\X{et}{:}\Treftype_I &\Rightarrow& \X{at}~\X{lim}~\X{et} \\
+   \begin{array}{llcl}
+   \production{tag} & \Ttagtype_I &::=&
+     x,I'{:}\Ttypeuse_I \Rightarrow\quad x \\
    \end{array}
 
 
@@ -366,6 +319,57 @@ Global Types
 .. math::
    \begin{array}{llclll}
    \production{global type} & \Tglobaltype_I &::=&
-     t{:}\Tvaltype &\Rightarrow& \MCONST~t \\ &&|&
-     \text{(}~\text{mut}~~t{:}\Tvaltype_I~\text{)} &\Rightarrow& \MVAR~t \\
+     t{:}\Tvaltype_I &\Rightarrow& t \\ &&|&
+     \text{(}~\text{mut}~~t{:}\Tvaltype_I~\text{)} &\Rightarrow& \TMUT~t \\
+   \end{array}
+
+
+.. index:: memory type, limits, page size
+   pair: text format; memory type
+.. _text-memtype:
+
+Memory Types
+~~~~~~~~~~~~
+
+.. math::
+   \begin{array}{llclll@{\qquad\qquad}l}
+   \production{memory type} & \Tmemtype_I &::=&
+     \X{at}{:}\Taddrtype~~\X{lim}{:}\Tlimits_{|\X{at}|/64\cdot\F{Ki}} &\Rightarrow& \X{at}~\X{lim}~\PAGE \\
+   \end{array}
+
+
+.. index:: table type, reference type, limits
+   pair: text format; table type
+.. _text-tabletype:
+
+Table Types
+~~~~~~~~~~~
+
+.. math::
+   \begin{array}{llclll}
+   \production{table type} & \Ttabletype_I &::=&
+     \X{at}{:}\Taddrtype~~\X{lim}{:}\Tlimits_{|\X{at}|}~~\X{et}{:}\Treftype_I &\Rightarrow& \X{at}~\X{lim}~\X{et} \\
+   \end{array}
+
+
+.. index:: external type, tag type, global type, memory type, table type, function type
+   pair: text format; external type
+.. _text-externtype:
+
+External Types
+~~~~~~~~~~~~~~
+
+.. math::
+   \begin{array}{llclll}
+   \production{external type} & \Texterntype_I &::=&
+     \text{(}~\text{tag}~~\Tid^?~~\X{tt}{:}\Ttagtype~\text{)}
+       &\Rightarrow& \XTTAG~\X{tt} \\ &&|&
+     \text{(}~\text{global}~~\Tid^?~~\X{gt}{:}\Tglobaltype_I~\text{)}
+       &\Rightarrow& \XTGLOBAL~\X{gt} \\ &&|&
+     \text{(}~\text{memory}~~\Tid^?~~\X{mt}{:}\Tmemtype_I~\text{)}
+       &\Rightarrow& \XTMEM~~\X{mt} \\ &&|&
+     \text{(}~\text{table}~~\Tid^?~~\X{tt}{:}\Ttabletype_I~\text{)}
+       &\Rightarrow& \XTTABLE~\X{tt} \\ &&|&
+     \text{(}~\text{func}~~\Tid^?~~x,I'{:}\Ttypeuse_I~\text{)}
+       &\Rightarrow& \XTFUNC~x \\
    \end{array}

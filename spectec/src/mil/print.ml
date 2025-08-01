@@ -1,4 +1,5 @@
 open Ast
+open Utils
 
 let parens s = "(" ^ s ^ ")"
 let square_parens s = "[" ^ s ^ "]"
@@ -8,22 +9,6 @@ let curly_parens s = "{" ^ s ^ "}"
 let empty_name s = match s with
   | "" -> "NO_NAME"
   | _ -> s
-
-let remove_iter_from_type t =
-  match t with
-    | T_app ({it = T_type_basic T_list; _}, [t']) -> t'.it
-    | T_app ({it = T_type_basic T_opt; _}, [t']) -> t'.it
-    | t' -> t'
-
-let get_id t = 
-  match t with
-    | T_app ({it = T_ident id; _}, _) -> id
-    | _ -> assert false
-
-let is_dependent_type t =
-  match t with
-    | T_app ({it = T_ident _; _}, args) -> args <> []
-    | _ -> false 
 
 let string_of_list_prefix prefix delim str_func ls = 
   match ls with
@@ -99,6 +84,8 @@ let string_of_basic_type_term t =
     | T_anytype -> "Type"
     | T_prop -> "Proposition"
 
+let string_of_prefixed_ident (prefixes, id) = String.concat "" (prefixes @ [id])
+
 let rec string_of_term t = string_of_term' t.it
 and string_of_term' t = 
   match t with 
@@ -107,10 +94,10 @@ and string_of_term' t =
     | T_ident id -> id
     | T_list terms -> square_parens (String.concat "; " (List.map string_of_term terms))
     | T_lambda (bs, term) -> parens ("fun" ^ string_of_list_prefix " " " " string_of_binder bs ^ " => " ^ string_of_term term)
-    | T_record_fields fields -> "{| " ^ String.concat "; " (List.map (fun (id, t) -> id ^ " := " ^ string_of_term t) fields ) ^ " |}"
-    | T_caseapp (id, []) -> empty_name id  
-    | T_caseapp (id, args) -> parens (empty_name id ^ string_of_list_prefix " " " " string_of_term args)
-    | T_dotapp (id, arg) -> parens (empty_name id ^ " " ^ string_of_term arg)
+    | T_record_fields fields -> "{| " ^ String.concat "; " (List.map (fun (prefixed_id, t) -> string_of_prefixed_ident prefixed_id ^ " := " ^ string_of_term t) fields ) ^ " |}"
+    | T_caseapp (prefixed_id, []) -> string_of_prefixed_ident prefixed_id  
+    | T_caseapp (prefixed_id, args) -> parens (string_of_prefixed_ident prefixed_id ^ string_of_list_prefix " " " " string_of_term args)
+    | T_dotapp (prefixed_id, arg) -> parens (string_of_prefixed_ident prefixed_id ^ " " ^ string_of_term arg)
     | T_app (base_term, []) -> empty_name (string_of_term base_term) 
     | T_app (base_term, args) -> parens (empty_name (string_of_term base_term) ^ string_of_list_prefix " " " " string_of_term args)
     | T_app_infix (infix_op, term1, term2) -> parens (string_of_term term1 ^ string_of_term infix_op ^ string_of_term term2)
@@ -119,7 +106,7 @@ and string_of_term' t =
     | T_tupletype terms -> parens (String.concat " * " (List.map string_of_term' terms))
     | T_arrowtype terms -> parens (String.concat " -> " (List.map string_of_term' terms))
     | T_cast (term, _, typ) -> parens (string_of_term term ^ " : " ^ string_of_term' typ)
-    | T_record_update (t1, id, t3) -> parens ("record_update " ^ string_of_term t1 ^ " " ^ id ^ " " ^ string_of_term t3)
+    | T_record_update (t1, prefixed_id, t3) -> parens ("record_update " ^ string_of_term t1 ^ " " ^ string_of_prefixed_ident prefixed_id ^ " " ^ string_of_term t3)
     | T_default -> "default_val"
     | T_unsupported str -> comment_parens ("Unsupported term: " ^ str)
 
@@ -163,7 +150,7 @@ let rec string_of_function_body f =
     | F_default -> "default_term" 
 
 let string_of_inductive_type_entries entries = 
-  List.map (fun (id, bs') -> empty_name id ^ string_of_list_prefix " " " " string_of_binder bs') entries
+  List.map (fun (prefixed_id, bs') -> string_of_prefixed_ident prefixed_id ^ string_of_list_prefix " " " " string_of_binder bs') entries
 
 let string_of_family_type_entries _id entries =
   List.map (fun (match_terms, term) -> string_of_list_prefix " " ", " string_of_term match_terms ^ " => " ^ string_of_term term) entries
@@ -171,17 +158,16 @@ let string_of_family_type_entries _id entries =
 let rec string_of_def ?(suppress_unsup = false) (d : mil_def) =
   let region = ";; " ^ Util.Source.string_of_region d.at ^ "\n" in 
   let endnewline = "\n\n" in
-
   (match d.it with
     | TypeAliasD (id, binds, term) -> region ^ "type " ^ id ^ string_of_list_prefix " " " " string_of_binder binds ^ " = " ^ string_of_term term ^ endnewline
-    | RecordD (id, record_entry) -> region ^ "record " ^ id ^ " = " ^ curly_parens ("\n\t" ^ String.concat ",\n\t" (List.map (fun (id, term) -> 
-        id ^ " : " ^ string_of_term term
+    | RecordD (id, record_entry) -> region ^ "record " ^ id ^ " = " ^ curly_parens ("\n\t" ^ String.concat ",\n\t" (List.map (fun (prefixed_id, term) -> 
+        string_of_prefixed_ident prefixed_id ^ " : " ^ string_of_term' term
       ) record_entry) ^ "\n") ^ endnewline
     | InductiveD (id, bs, inductive_type_entries) -> region ^ "inductive " ^ id ^ string_of_list_prefix " " " " string_of_binder bs ^ " : Type =\n\t| " ^
       String.concat "\n\t| " (string_of_inductive_type_entries inductive_type_entries) ^ endnewline
     | DefinitionD (id, bs, rt, clauses) -> region ^ "definition " ^ id ^ string_of_list_prefix " " " " string_of_binder bs ^ " : " ^ string_of_term' rt ^ " =\n\t" ^
-      "match " ^ String.concat ", " (grab_id_of_binders bs) ^ " with\n\t\t| " ^
-      String.concat "\n\t\t| " (List.map (fun (match_terms, f_b) -> string_of_list_prefix " " ", " string_of_term match_terms ^ " => " ^ string_of_function_body f_b) clauses) ^ endnewline
+      "match " ^ String.concat ", " (grab_id_of_binders bs) ^ " with\n\t\t|" ^
+      String.concat "\n\t\t|" (List.map (fun (match_terms, f_b) -> string_of_list_prefix " " ", " string_of_term match_terms ^ " => " ^ string_of_function_body f_b) clauses) ^ endnewline
     | GlobalDeclarationD (id, rt, (_, f_b)) -> region ^ "definition " ^ id ^ " : " ^ string_of_term' rt ^ " := " ^ string_of_function_body f_b ^ endnewline
     | MutualRecD defs -> region ^ String.concat "" (List.map (string_of_def ~suppress_unsup) defs)
     | AxiomD (id, bs, rt) -> region ^ "axiom " ^ id ^ string_of_list_prefix " " " " string_of_binder bs ^ " : " ^ string_of_term' rt ^ endnewline
@@ -191,7 +177,7 @@ let rec string_of_def ?(suppress_unsup = false) (d : mil_def) =
       region ^ "relation " ^ id ^ " : " ^ string_of_list_suffix " -> bool" " -> " string_of_term rel_args ^ " := \n\t| " ^ 
       String.concat "\n\t| " (List.map (fun ((case_id, binds), premises, terms) -> 
           empty_name (case_id) ^ " : " ^ string_of_list "forall " ", " " " string_of_binder binds ^
-          string_of_list_suffix " -> " " -> " string_of_premise premises ^ id ^ 
+          string_of_list "\n\t\t" " ->\n\t\t" " ->\n\t\t" string_of_premise premises ^ id ^ 
           string_of_list_prefix " " " " string_of_term terms
       
       ) relation_type_entries) ^ endnewline

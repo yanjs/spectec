@@ -189,7 +189,7 @@ and string_of_sym g =
   | EpsG -> "eps"
   | SeqG gs -> "{" ^ concat " " (List.map string_of_sym gs) ^ "}"
   | AltG gs -> "(" ^ concat " | " (List.map string_of_sym gs) ^ ")"
-  | RangeG (g1, g2) -> string_of_sym g1 ^ " | ... | " ^ string_of_sym g2
+  | RangeG (g1, g2) -> "(" ^ string_of_sym g1 ^ " | ... | " ^ string_of_sym g2 ^ ")"
   | IterG (g1, iter) -> string_of_sym g1 ^ string_of_iterexp iter
   | AttrG (e, g1) -> string_of_exp e ^ ":" ^ string_of_sym g1
 
@@ -200,6 +200,7 @@ and string_of_prem prem =
   match prem.it with
   | RulePr (id, mixop, e) ->
     string_of_id id ^ ": " ^ string_of_mixop mixop ^ string_of_exp_args e
+  | NegPr prem' -> "~ " ^ string_of_prem prem'
   | IfPr e -> "if " ^ string_of_exp e
   | LetPr (e1, e2, ids) ->
     let ids' = List.map (fun x -> x $ no_region) ids in

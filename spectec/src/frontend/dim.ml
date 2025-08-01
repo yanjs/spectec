@@ -14,9 +14,17 @@ let error at msg = Error.error at "dimension" msg
 
 module Env = Map.Make(String)
 
+type outer = id list
 type ctx = iter list
 type env = ctx Env.t
-type renv = ((region * ctx * [`Impl | `Expl]) list) Env.t
+type renv = (region * ctx * [`Impl | `Expl]) list Env.t
+
+let new_env outer =
+  List.fold_left (fun env id ->
+    Env.add id.it [(id.at, [], `Expl)] env) Env.empty outer |> ref
+
+let localize outer env =
+  List.fold_left (fun env id -> Env.remove id.it env) env outer
 
 
 (* Solving constraints *)
@@ -220,10 +228,16 @@ and check_sym env ctx g =
   | UnparenG _ -> assert false
 
 and check_prod env ctx prod =
-  let (g, e, prems) = prod.it in
-  check_sym env ctx g;
-  check_exp env ctx e;
-  iter_nl_list (check_prem env ctx) prems
+  match prod.it with
+  | SynthP (g, e, prems) ->
+    check_sym env ctx g;
+    check_exp env ctx e;
+    iter_nl_list (check_prem env ctx) prems
+  | RangeP (g1, e1, g2, e2) ->
+    check_sym env ctx g1;
+    check_exp env ctx e1;
+    check_sym env ctx g2;
+    check_exp env ctx e2
 
 and check_gram env ctx gram =
   let (_dots1, prods, _dots2) = gram.it in
@@ -262,7 +276,7 @@ and check_param env ctx p =
     check_typ env ctx t
 
 let check_def d : env =
-  let env = ref Env.empty in
+  let env = new_env [] in
   match d.it with
   | FamD (_id, ps, _hints) ->
     List.iter (check_param env []) ps;
@@ -298,16 +312,16 @@ let check_def d : env =
   | SepD | HintD _ -> Env.empty
 
 
-let check_prod prod : env =
-  let env = ref Env.empty in
+let check_prod outer prod : env =
+  let env = new_env outer in
   check_prod env [] prod;
-  check_env env
+  localize outer (check_env env)
 
-let check_typdef t prems : env =
-  let env = ref Env.empty in
+let check_typdef outer t prems : env =
+  let env = new_env outer in
   check_typ env [] t;
   iter_nl_list (check_prem env []) prems;
-  check_env env
+  localize outer (check_env env)
 
 
 (* Annotating iterations *)
@@ -543,6 +557,9 @@ and annot_prem env prem : Il.Ast.prem * occur =
     | RulePr (id, op, e) ->
       let e', occur = annot_exp env e in
       RulePr (id, op, e'), occur
+    | NegPr prem1 ->
+      let prem1', occur = annot_prem env prem1 in
+      NegPr prem1', occur
     | IfPr e ->
       let e', occur = annot_exp env e in
       IfPr e', occur

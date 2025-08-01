@@ -118,6 +118,7 @@ and typcase (op, (bs, t, prs), hs) = mixop op; binds bs; typ t; prems prs; hints
 
 and exp e =
   visit_exp e;
+  typ e.note; 
   match e.it with
   | VarE x -> varid x
   | BoolE b -> bool b
@@ -175,6 +176,7 @@ and prem pr =
   visit_prem pr;
   match pr.it with
   | RulePr (x, op, e) -> relid x; mixop op; exp e
+  | NegPr pr1 -> prem pr1
   | IfPr e -> exp e
   | ElsePr -> ()
   | IterPr (pr1, it) -> prem pr1; iterexp it

@@ -1,5 +1,4 @@
 open Prose
-open Eq
 
 open Il
 open Xl
@@ -265,10 +264,10 @@ let ctx_to_instr frees expr =
     ctxs := Map.add s var !ctxs;
     [ ContextS (var, expr) ], Some var
 
-(* Hardcoded convention: "The rules implicitly assume a given context C" *)
+(* Hardcoded convention: "The rules implicitly assume a given context C or store S" *)
 let extract_context frees c =
   match c.it with
-  | Al.Ast.VarE "C" -> [], None
+  | Al.Ast.VarE ("C" | "s") -> [], None
   | Al.Ast.ExtE ({ it = VarE _; _ }, _ps, _e, _dir) -> ctx_to_instr frees c
   | _ -> [], Some c
 
@@ -380,7 +379,10 @@ let extract_triplet_rule rule =
 let collect_non_trivial frees m exp =
   match exp.it with
   | Ast.CallE (_, _) ->
-    let fresh = (gen_new_var frees "t") $ no_region in
+    let name = Al.Al_util.typ_to_var_name exp.note in
+    (* HARDCODE: t: valtype *)
+    let name = if name = "valtype" then "t" else name in
+    let fresh = (gen_new_var frees name) $ no_region in
     let var = Ast.VarE fresh $$ exp.at % exp.note in
     m := Map.add fresh.it (var, exp) !m;
     var
@@ -398,9 +400,9 @@ let preprocess_exp frees m exp =
   transform_exp transformer exp
 
 let preprocess_rule m rule =
-  let frees = (Free.free_rule rule).varid in
   { rule with it = match rule.it with
     | Ast.RuleD (id, bs, ops, exp, prems) ->
+      let frees = Free.(union (free_rule rule) (free_list bound_bind bs)).varid in
       Ast.RuleD (id, bs, ops, preprocess_exp frees m exp, prems)}
 
 let postprocess_rules m rule =
@@ -558,46 +560,6 @@ let prose_of_rel rel = match get_rel_kind rel with
 
 let prose_of_rels = List.concat_map prose_of_rel
 
-(** Postprocess of generated prose **)
-let unify_either stmts =
-  let f stmt =
-    match stmt with
-    | EitherS sss ->
-      let unified, bodies = List.fold_left (fun (commons, stmtss) s ->
-        let pairs = List.map (List.partition (eq_stmt s)) stmtss in
-        let fsts = List.map fst pairs in
-        let snds = List.map snd pairs in
-        if List.for_all (fun l -> List.length l = 1) fsts then
-          s :: commons, snds
-        else
-          commons, stmtss
-      ) ([], sss) (List.hd sss) in
-      let unified = List.rev unified in
-      unified @ [ EitherS bodies ]
-    | _ -> [stmt]
-  in
-  let rec walk stmts = List.concat_map walk' stmts
-  and walk' stmt =
-    f stmt
-    |> List.map (function
-      | IfS (e, sl) -> IfS (e, walk sl)
-      | ForallS (vars, sl) -> ForallS (vars, walk sl)
-      | EitherS sll -> EitherS (List.map walk sll)
-      | s -> s
-    )
-  in
-  walk stmts
-
-let postprocess_prose defs =
-  List.map (fun def ->
-    match def with
-    | RuleD (anchor, i, il) ->
-      let new_il = unify_either il in
-      RuleD (anchor, i, new_il)
-    | AlgoD _ -> def
-  ) defs
-
-
 (** Entry for generating validation prose **)
 let gen_validation_prose () =
   !Langs.validation_il |> prose_of_rels
@@ -669,7 +631,7 @@ let gen_prose el il al =
   let execution_prose = gen_execution_prose () in
 
   validation_prose @ execution_prose
-  |> postprocess_prose
+  |> Postprocess.postprocess_prose
 
 (** Main entry for generating stringified prose **)
 let gen_string cfg_latex cfg_prose el il al =

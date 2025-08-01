@@ -62,6 +62,57 @@ let both_non_empty cond1 cond2 =
   | Some e1, Some e2 -> Eq.eq_expr e1 e2
   | _ -> false
 
+let eq_nat_cond cond1 cond2 =
+  let is_nat e =
+    match e.note.it with
+    | Il.Ast.NumT `NatT -> true
+    | Il.Ast.VarT (id, _) -> id.it = "uN" || String.ends_with ~suffix:"idx" id.it
+    | _ -> false
+  in
+  let is_zero cond =
+    match cond.it with
+    | BinE (op, e, { it = NumE (`Nat z); _ }) when is_nat e ->
+      if op = `EqOp && z = Z.zero
+      || op = `LeOp && z = Z.zero
+      || op = `LtOp && z = Z.one then
+        Some e
+      else
+        None
+    | BinE (op, { it = NumE (`Nat z); _ }, e) when is_nat e ->
+      if op = `EqOp && z = Z.zero
+      || op = `GeOp && z = Z.zero
+      || op = `GtOp && z = Z.one then
+        Some e
+      else None
+    | _ -> None
+  in
+  let is_pos cond =
+    match cond.it with
+    | BinE (op, e, { it = NumE (`Nat z); _ }) when is_nat e ->
+      if op = `NeOp && z = Z.zero
+      || op = `GtOp && z = Z.zero
+      || op = `GeOp && z = Z.one then
+        Some e
+      else
+        None
+    | BinE (op, { it = NumE (`Nat z); _ }, e) when is_nat e ->
+      if op = `NeOp && z = Z.zero
+      || op = `LtOp && z = Z.zero
+      || op = `LeOp && z = Z.one then
+        Some e
+      else
+        None
+    | _ -> None
+  in
+
+  (match is_zero cond1, is_zero cond2 with
+  | Some e1, Some e2 -> Eq.eq_expr e1 e2
+  | _ -> false)
+  ||
+  (match is_pos cond1, is_pos cond2 with
+  | Some e1, Some e2 -> Eq.eq_expr e1 e2
+  | _ -> false)
+
 let diff_case cond1 cond2 =
   match cond1.it, cond2.it with
   | IsCaseOfE (e1, a1), IsCaseOfE (e2, a2) ->
@@ -73,6 +124,7 @@ let eq_cond cond1 cond2 =
   Eq.eq_expr cond1 cond2
   || both_empty cond1 cond2
   || both_non_empty cond1 cond2
+  || eq_nat_cond cond1 cond2
 
 let conflicts cond1 cond2 =
   eq_cond (neg cond1) cond2
@@ -108,6 +160,14 @@ let atom_of_case e =
   match e.it with
   | CaseE ((atom :: _) :: _, _) -> atom
   | _ -> Error.error e.at "prose transformation" "expected a CaseE"
+
+let rec replace_names binds instr =
+  match binds with
+  | [] -> instr
+  | (new_name, old_name) :: binds' ->
+    let instrs = replace_name new_name old_name instr in
+    assert (List.length instrs = 1);
+    replace_names binds' (List.hd instrs)
 
 (* AL -> AL transpilers *)
 
@@ -166,6 +226,71 @@ let merge instrs1 instrs2 =
 
 let merge_blocks blocks = List.fold_right merge blocks []
 
+let is_single_if block =
+  match block with
+  | [{it = IfI (_, _, []); _}] -> true
+  | _ -> false
+
+let rec extract_cond block =
+  match block with
+  | [{it = IfI (c, b, []); _}] -> c :: extract_cond b
+  | _ -> []
+
+let extract_common_cond conds =
+  let first_cond = List.hd conds in
+  List.find_opt (fun c ->
+    List.for_all (List.exists (eq_cond c)) (List.tl conds)
+  ) first_cond
+
+let rec remove_cond c block =
+  match block with
+  | [{it = IfI (c', b, []); at; _}] ->
+    if eq_cond c c' then
+      b
+    else
+      [ifI (c', remove_cond c b, []) ~at]
+  | _ -> assert false
+
+let extract_common_cond_allow_neg conds =
+  let first_cond = List.hd conds in
+  List.find_opt (fun c ->
+    List.for_all (List.exists (fun c' -> eq_cond c c' || eq_cond c (neg c'))) (List.tl conds)
+  ) first_cond
+
+let rec remove_cond_allow_neg c block =
+  match block with
+  | [{it = IfI (c', b, []); at; _}] ->
+    if eq_cond c c' then
+      Either.Left b
+    else if eq_cond c (neg c') then
+      Either.Right b
+    else
+      let f b = [ifI (c', b, []) ~at] in
+      remove_cond_allow_neg c b
+      |> Either.map ~left:f ~right:f
+  | _ -> assert false
+
+
+(* Merge disjoint blocks, automatically inferring and inserting the appropriate else branch *)
+let rec merge_disjoint_ifs blocks =
+  if List.length blocks > 1 && List.for_all is_single_if blocks then
+    let conds = List.map extract_cond blocks in
+    let at = List.map (fun b -> List.map (fun i -> i.at) b |> over_region) blocks |> over_region in
+    (* If there is a condition that appear in all if-blocks, extract it as the first cond *)
+    match extract_common_cond conds with
+    | Some c ->
+      [ifI (c, merge_disjoint_ifs (List.map (remove_cond c) blocks), []) ~at]
+    | None ->
+      (* If there is a condition whose own version or negated version appear in all if-blocks, extract it as the first cond *)
+      match extract_common_cond_allow_neg conds with
+      | Some c ->
+        let then_blocks, else_blocks = List.partition_map (remove_cond_allow_neg c) blocks in
+        [ifI (c, merge_disjoint_ifs then_blocks, merge_disjoint_ifs else_blocks) ~at]
+      | None ->
+        List.concat blocks
+  else
+    List.concat blocks
+
 (* Enhance readability of AL *)
 
 let rec unify_if instrs =
@@ -187,8 +312,30 @@ let rec unify_if instrs =
         let body = unify_if (common @ own_body1 @ own_body2) in
         let at = over_region [ at1; at2 ] in
         ifI (c1, body, []) ~at:at :: rest
+      | { it = IfI (c', [{it = IfI (c1, body1, []); _}], []); at = at1; _ }, { it = IfI (c2, body2, []); at = at2; _ } :: rest
+        when Eq.eq_expr c1 c2 ->
+        let i = ifI (c', body1, []) ~at:at1 in
+        let body = unify_if (i :: body2) in
+        let at = over_region [ at1; at2 ] in
+        ifI (c1, body, []) ~at:at :: rest
       | _ -> new_i :: il)
     instrs []
+
+let extract_last_ifs il =
+  let rec extract_first_ifs acc il =
+    match il with
+    | [] -> List.rev il, acc
+    | hd :: tl ->
+      match hd.it with
+      | IfI _ -> extract_first_ifs ([hd] :: acc) tl
+      | _ -> List.rev il, acc
+  in
+  extract_first_ifs [] (List.rev il)
+
+(* Unify more than 3 ifs at once, by extracting the common conditions *)
+let unify_multi_if instrs =
+  let hd, ifs = extract_last_ifs instrs in
+  hd @ merge_disjoint_ifs ifs
 
 let rec infer_else instrs =
   List.fold_right
@@ -206,6 +353,11 @@ let rec infer_else instrs =
         when eq_cond c1 (neg c2) ->
         let at = over_region [ at1; at2 ] in
         ifI (c1, then_body1 @ then_body2, else_body1 @ else_body2) ~at:at :: rest
+      | { it = IfI (c1, body1, []); at = at1; _ }, { it = IfI (c3 ,[{it = IfI (c2, body2, []); at = at2; _ }], []); _} :: rest
+        when eq_cond c1 (neg c2) ->
+        let at = over_region [ at1; at2 ] in
+        let body3 = [ifI (c3, body2, []) ~at:at2] in
+        ifI (c1, body1, body3) ~at :: rest
       | _ -> new_i :: il)
     instrs []
 
@@ -221,6 +373,7 @@ let swap_if instr =
   | IfI (c, il, []) -> ifI (c, il, []) ~at:at
   | IfI (c, [], il) -> ifI (neg c, il, []) ~at:at
   | IfI (_, _, il2) when (match il2 with | [{it = IfI _; _}] -> true | _ -> false) -> instr
+  | IfI ({it = BinE (`EqOp, _, {it = NumE _; _}); _}, _, _) -> instr
   | IfI (c, il1, il2) when count_instrs il1 > count_instrs il2 -> ifI (neg c, il2, il1) ~at:at
   | _ -> instr
 
@@ -303,6 +456,13 @@ let merge_three_branches i =
   | IfI (e1, il1, [ { it = IfI (e2, il2, il3); at = at2; _ } ]) when Eq.eq_instrs il1 il3 ->
     let at = over_region [ at1; at2 ] in
     ifI (binE (`AndOp, neg e1, e2) ~note:boolT, il2, il1) ~at:at
+  | IfI (e1, [ { it = IfI (e2, il1, il2); at = at2; _ } ], il3) when Eq.eq_instrs il2 il3 && il2 <> [] ->
+    let from_same_prem = e1.at <> no_region && e1.at.left.line = e2.at.left.line in
+    if from_same_prem then
+      let at = over_region [ at1; at2 ] in
+      ifI (binE (`AndOp, e1, e2) ~note:boolT, il1, il2) ~at:at
+    else
+      i
   | _ -> i
 
 let remove_dead_assignment il =
@@ -373,6 +533,45 @@ let remove_redundant_assignment il =
     |> List.concat
   in
   remove_redundant_assignment' [] il
+
+(* Remove trivial assignment(a simple variable renaming) happens *)
+let remove_trivial_assignment il =
+  let rec remove_trivial_assignment' binds il =
+    List.fold_left_map
+      (fun acc instr ->
+        let instr = replace_names acc instr in
+        let at = instr.at in
+        match instr.it with
+        | IfI (e, il1, il2) ->
+          let il1' = remove_trivial_assignment' acc il1 in
+          let il2' = remove_trivial_assignment' acc il2 in
+          acc, [ifI (e, il1', il2') ~at:at]
+        | LetI ({it = VarE x1; _}, {it = VarE x2; _}) ->
+            (x1, x2) :: acc, []
+        | _ ->
+          acc, [instr]
+      ) binds il
+    |> snd
+    |> List.concat
+  in
+  remove_trivial_assignment' [] il
+
+(* Remove all instructions before the `trap` instruction. *)
+let rec remove_pre_trap il =
+  let il =
+    match (List.rev il) with
+    | {it = TrapI; _} as hd :: _ -> [hd]
+    | _ -> il
+  in
+
+  il
+  |> List.map (fun i ->
+    match i.it with
+    | IfI (c, il1, il2) ->
+      let i' = IfI (c, remove_pre_trap il1, remove_pre_trap il2) in
+      {i with it = i'}
+    | _ -> i
+  )
 
 let remove_sub e =
   let e' =
@@ -563,7 +762,10 @@ let rec enhance_readability instrs =
     instrs
     |> remove_dead_assignment
     |> remove_redundant_assignment
+    |> remove_trivial_assignment
+    |> remove_pre_trap
     |> unify_if
+    |> unify_multi_if
     |> infer_else
     |> List.concat_map remove_unnecessary_branch
     |> remove_nop []
@@ -595,12 +797,6 @@ let flatten_if instrs =
   in
   let walker = { base_walker with walk_instr = walk_instr } in
   List.concat_map (walker.walk_instr walker) instrs
-
-let rec mk_access ps base =
-  match ps with
-  (* TODO: type *)
-  | h :: t -> accE (base, h) ~note:Al.Al_util.no_note |> mk_access t
-  | [] -> base
 
 let is_store expr = match expr.note.it with
   | Il.Ast.VarT (id, _) when id.it = "store" -> true
@@ -978,17 +1174,19 @@ let handle_frame params instrs =
   | None   -> handle_unframed_algo instrs
 
 (* Applied for reduction rules: infer assert from if *)
-let count_if instrs =
+let count_non_trapping_if instrs =
   let f instr =
     match instr.it with
+    | IfI (_, [{it = TrapI; _}], _) -> false
     | IfI _ -> true
     | _ -> false in
   List.filter f instrs |> List.length
 let rec infer_assert instrs =
-  if count_if instrs = 1 then
+  if count_non_trapping_if instrs = 1 then
     let hd, tl = Lib.List.split_last instrs in
     match tl.it with
     | IfI (c, il1, []) -> hd @ assertI c ~at:c.at :: infer_assert il1
+    | IfI (c, il1, il2) -> hd @ [ifI (c, infer_assert il1, infer_assert il2) ~at:c.at]
     | _ -> instrs
   else instrs
 

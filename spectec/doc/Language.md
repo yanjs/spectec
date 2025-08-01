@@ -182,7 +182,7 @@ In a first approximation,
 an atom is either an uppercase identifier,
 or one of various recognised *symbolic* atoms,
 such as `|-`, `:`, or `->`,
-or pairs of maching brackets escaped with `` ` ``.
+or pairs of matching brackets escaped with `` ` ``.
 Some symbolic atoms have infix operator status
 (with hard-coded "natural" precedences),
 affecting the way they are parsed;
@@ -1144,13 +1144,14 @@ SpecTec allows the definition of *attribute grammars*:
 
 ```
 def ::=
-  "grammar" gramid params ":" typ "=" gram      grammar definition
+  "grammar" gramid params (":" typ)? "=" gram      grammar definition
 
 gram ::=
   "|"? prod+"|"
 
 prod ::=
-  sym "=>" exp ("--" premise)*
+  sym ("=>" exp)? ("--" premise)*
+  sym "=>" exp "|" "..." "|" sym "=>" exp
 
 sym ::=
   gramid args
@@ -1171,7 +1172,11 @@ given by a list of *productions*.
 Each production in turn is defined by a left-hand side,
 which is the symbol sequence to parse,
 and a right-hand side that computes the attribute synthesised by this production.
-The type of this attribute has to be declared with the grammar.
+The type of this attribute has to be declared with the grammar;
+when omitted it defaults to `()`.
+The right-hand sides of productions can be omitted as well,
+in which case they return the synthesised attribute of the left-hand side.
+Either all or none of a grammars right-hand sides must be omitted.
 
 Possible symbols include basic terminal *tokens*,
 which are either text literals (for textual grammars),
@@ -1187,6 +1192,12 @@ Furthermore, they may contain nested alternatives separated by `|`.
 A special form of alternation defines a numeric range using the notation `n | ... | m`;
 in that case, both limit symbols must be numeric tokens.
 
+As a special short-hand,
+grammars can be given as a range `production | ... | production`.
+In that case,
+both left-hand and right-hand sides are restricted to numeric literals,
+which both must have the same distance between first and last case.
+
 Grammars can be parameterised.
 Accordingly, grammar identifiers may have corresponding arguments.
 
@@ -1199,15 +1210,15 @@ Any variables occurring in the pattern are instantiated accordingly and can be u
 However, bindings occurring inside a nested alternative are ignored.
 
 **Example:**
-Consider the following grammar for formulas over binary numbers
+Consider the following grammar for formulas over hexadecimal numbers
 ```
 grammar digit : nat =
-  | "0" => 0
-  | "1" => 1
+  | "0" => 0 | ... | "9" => 9
+  | "A" => 10 | ... | "F" => 15
 
 grammar number : nat =
   | d:digit => d
-  | n:number d:digit => $(2*n + d)
+  | n:number d:digit => $(16*n + d)
 
 grammar formula : nat =
   | n:number => n

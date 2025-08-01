@@ -75,7 +75,7 @@ and is_bine expr = match expr.it with
   | _ -> false
 
 let (let*) = Option.bind
-  
+
 let find_section env link =
   let ans = Macro.find_section env.macro link in
   ans
@@ -113,6 +113,12 @@ let match_link env e =
   match try_inject_link env text link with
   | Some ref -> ref
   | None -> inject_link text "match"
+
+let get_context_var e =
+  match e.it with
+  | Al.Ast.CaseE (_, [_; {it = Al.Ast.VarE x; _}]) when x <> "_" -> x (* HARDCODE for frame *)
+  | Al.Ast.CaseE (mixop, _) -> mixop |> List.hd |> List.hd |> Atom.to_string |> (fun s -> String.sub s 0 1)
+  | _ -> assert false (* It is expected that the context is a CaseE *)
 
 (* Translation from Al inverse call exp to Al binary exp *)
 let e2a e = Al.Ast.ExpA e $ e.at
@@ -248,29 +254,33 @@ and al_to_el_expr expr =
       let* elel = al_to_el_exprs el in
       Some (El.Ast.TupE elel)
     | Al.Ast.CallE (id, al) ->
-      (match Prose_util.find_relation id with
-      | Some _ ->
+      (match Prose_util.extract_call_hint id with
+      | Some {it = TextE _; _} -> (* Use customized prose hint for this call *)
         None
       | _ ->
-        let elid = id $ no_region in
-        let* elal = al_to_el_args al in
-        (* Unwrap parenthsized args *)
-        let elal = List.map
-          (fun elarg ->
-            let elarg = match elarg with
-            | El.Ast.ExpA exp ->
-              let exp = match exp.it with
-              | ParenE exp' -> exp'
-              | _ -> exp
+        match Prose_util.find_relation id with
+        | Some _ ->
+          None
+        | _ ->
+          let elid = id $ no_region in
+          let* elal = al_to_el_args al in
+          (* Unwrap parenthsized args *)
+          let elal = List.map
+            (fun elarg ->
+              let elarg = match elarg with
+              | El.Ast.ExpA exp ->
+                let exp = match exp.it with
+                | ParenE exp' -> exp'
+                | _ -> exp
+                in
+                El.Ast.ExpA exp
+              | _ -> elarg
               in
-              El.Ast.ExpA exp
-            | _ -> elarg
-            in
-            (ref elarg) $ no_region
-          )
-          elal
-        in
-        Some (El.Ast.CallE (elid, elal))
+              (ref elarg) $ no_region
+            )
+            elal
+          in
+          Some (El.Ast.CallE (elid, elal))
       )
     | Al.Ast.CatE (e1, e2) ->
       let* ele1 = al_to_el_expr e1 in
@@ -303,11 +313,6 @@ and al_to_el_expr expr =
       let* elp = al_to_el_path pl in
       let* ele2 = al_to_el_expr e2 in
       Some (El.Ast.UpdE (ele1, elp, ele2))
-    | Al.Ast.ExtE (e1, pl, e2, _) ->
-      let* ele1 = al_to_el_expr e1 in
-      let* elp = al_to_el_path pl in
-      let* ele2 = al_to_el_expr e2 in
-      Some (El.Ast.ExtE (ele1, elp, ele2))
     | Al.Ast.StrE r ->
       let* elexpfield = al_to_el_record r in
       Some (El.Ast.StrE elexpfield)
@@ -335,49 +340,48 @@ and al_to_el_expr expr =
       Some (El.Ast.IterE (ele, eliter))
     | Al.Ast.CaseE _  when Al.Valid.sub_typ expr.note Al.Al_util.evalctxT -> None
     | Al.Ast.CaseE (op, el) ->
-      (* Current rules for omitting parenthesis around a CaseE:
-        1) Has no argument
-        2) Is infix notation
-        3) Is bracketed -> render into BrackE
-        4) Is argument of CallE -> add first, omit later at CallE *)
-      let atom_of atom = atom $$ no_region % (Atom.info "") in
-      let find_brace_opt mixop =
-        let s = Mixop.to_string mixop in
-        let first = String.get s 1 in
-        let last = String.get s (String.length s - 2) in
-        match first, last with
-        | '(', ')' -> Some (atom_of Atom.LParen, atom_of Atom.RParen)
-        | '[', ']' -> Some (atom_of Atom.LBrack, atom_of Atom.RBrack)
-        | '{', '}' -> Some (atom_of Atom.LBrace, atom_of Atom.RBrace)
-        | _ -> None
-      in
-      let elal = mixop_to_el_exprs op in
-      let* elel = al_to_el_exprs el in
-      let eles = case_to_el_exprs elal elel in
-      (* HARDCODE: rendering oktypeidx *)
-      let eles = match Mixop.to_string op, eles with
-      | "OK", [arg1; arg2] -> [arg1; El.Ast.ParenE arg2 $ no_region]
-      | _ -> eles
-      in
-      let ele = El.Ast.SeqE eles in
-      (match elal, elel with
-      | _, [] -> Some ele
-      | None :: Some _ :: _, _ -> Some ele
+      (match Prose_util.extract_case_hint expr.note op with
+      | Some {it = TextE _; _} -> None
       | _ ->
-        (match find_brace_opt op with
-        | Some (lbr, rbr) ->
-          (* Split braces of el expressions *)
-          let _, eles = Util.Lib.List.split_hd eles in
-          let eles, _ = Util.Lib.List.split_last eles in
-          let eles = 
-            (match eles with
-            | [e1; { it = El.Ast.AtomE atom; _ }; e2] when atom.it = Xl.Atom.Dot2 ->
-              (* HARDCODE: postprocess limits to infix notation *)
-              El.Ast.InfixE (e1, atom, e2)
-            | _ -> El.Ast.SeqE eles 
-            ) in
-          Some (El.Ast.BrackE (lbr, eles $ no_region, rbr))
-        | None -> Some (El.Ast.ParenE (ele $ no_region))
+        (* Current rules for omitting parenthesis around a CaseE:
+          1) Has no argument
+          2) Is infix notation
+          3) Is bracketed -> render into BrackE
+          4) Is argument of CallE -> add first, omit later at CallE *)
+        let atom_of atom = atom $$ no_region % (Atom.info "") in
+        let find_brace_opt mixop =
+          let s = Mixop.to_string mixop in
+          let first = String.get s 1 in
+          let last = String.get s (String.length s - 2) in
+          match first, last with
+          | '(', ')' -> Some (atom_of Atom.LParen, atom_of Atom.RParen)
+          | '[', ']' -> Some (atom_of Atom.LBrack, atom_of Atom.RBrack)
+          | '{', '}' -> Some (atom_of Atom.LBrace, atom_of Atom.RBrace)
+          | _ -> None
+        in
+        let elal = mixop_to_el_exprs op in
+        let* elel = al_to_el_exprs el in
+        let eles = case_to_el_exprs elal elel in
+        let ele = El.Ast.SeqE eles in
+        (match elal, elel with
+        | _, [] -> Some ele
+        | None :: Some _ :: _, _ -> Some ele
+        | _ ->
+          (match find_brace_opt op with
+          | Some (lbr, rbr) ->
+            (* Split braces of el expressions *)
+            let _, eles = Util.Lib.List.split_hd eles in
+            let eles, _ = Util.Lib.List.split_last eles in
+            let eles =
+              (match eles with
+              | [e1; { it = El.Ast.AtomE atom; _ }; e2] when atom.it = Xl.Atom.Dot2 ->
+                (* HARDCODE: postprocess limits to infix notation *)
+                El.Ast.InfixE (e1, atom, e2)
+              | _ -> El.Ast.SeqE eles
+              ) in
+            Some (El.Ast.BrackE (lbr, eles $ no_region, rbr))
+          | None -> Some (El.Ast.ParenE (ele $ no_region))
+          )
         )
       )
     | Al.Ast.OptE (Some e) ->
@@ -578,9 +582,7 @@ and render_expr' env expr =
     let se = render_expr env e in
     let sts =
       Prose_util.find_case_typ (Il.Print.string_of_typ_name e.note) a
-      |> List.map (render_el_typ env)
-      |> List.filter (fun s -> s <> "")
-      |> String.concat " "
+      |> render_el_typ env
     in
     sprintf "%s is not some %s" se sts
   | Al.Ast.UnE (`NotOp, { it = Al.Ast.IsDefinedE e; _ }) ->
@@ -624,9 +626,14 @@ and render_expr' env expr =
     let se1 = render_expr env e1 in
     let sps = render_paths env ps in
     let se2 = render_expr env e2 in
+    let prep =
+      match e1.it with
+      | ExtE _ -> "and"
+      | _ -> "with"
+    in
     (match dir with
-    | Al.Ast.Front -> sprintf "%s with %s prepended by %s" se1 sps se2
-    | Al.Ast.Back -> sprintf "%s with %s appended by %s" se1 sps se2)
+    | Al.Ast.Front -> sprintf "%s %s %s prepended by %s" se1 prep sps se2
+    | Al.Ast.Back -> sprintf "%s %s %s appended by %s" se1 prep sps se2)
   | Al.Ast.CallE (("concat_" | "concatn_" as id), al) ->
     (* HARDCODE: rendering of concat_ *)
     let args = List.map (render_arg env) al in
@@ -636,28 +643,31 @@ and render_expr' env expr =
     | _ -> error expr.at "Invalid arity for function " ^ id;
     )
   | Al.Ast.CallE (id, al) ->
-    (* HARDCODE: relation call *)
     let args = List.map (render_arg env) al in
-    if id = "Eval_expr" then
-      (match args with
-      | [arg] ->
-        sprintf "the result of :ref:`evaluating <exec-expr>` %s" arg
-      | _ -> error expr.at (Printf.sprintf "Invalid arity for relation call: %d ([ %s ])" (List.length args) (String.concat " " args));
-      )
-    else if id = "Expand" || id = "Expand_use" then
-      (match args with
-      | [arg1] ->
-        sprintf "the :ref:`expansion <aux-expand-deftype>` of %s" arg1
-      | _ -> error expr.at "Invalid arity for relation call";
-      )
-    else if String.ends_with ~suffix:"_type" id || String.ends_with ~suffix:"_ok" id then
-      (match args with
-      | [arg1; arg2] ->
-        sprintf "%s is :ref:`valid <valid-val>` with type %s" arg1 arg2
-      | [arg] -> sprintf "the type of %s" arg
-      | _ -> error expr.at "Invalid arity for relation call";
-      )
-    else error expr.at ("Not supported relation call: " ^ id);
+    (match Prose_util.extract_call_hint id with
+    | Some {it = TextE template; _} -> Prose_util.apply_prose_hint template args
+    | _ ->
+      (* HARDCODE: relation call *)
+      if id = "Eval_expr" then
+        match args with
+        | [arg] ->
+          sprintf "the result of :ref:`evaluating <exec-expr>` %s" arg
+        | _ -> error expr.at (Printf.sprintf "Invalid arity for relation call: %d ([ %s ])" (List.length args) (String.concat " " args))
+      else if id = "Expand" || id = "Expand_use" then
+        (match args with
+        | [arg1] ->
+          sprintf "the :ref:`expansion <aux-expand-deftype>` of %s" arg1
+        | _ -> error expr.at "Invalid arity for relation call";
+        )
+      else if String.ends_with ~suffix:"_type" id || String.ends_with ~suffix:"_ok" id then
+        (match args with
+        | [arg1; arg2] ->
+          sprintf "%s is :ref:`valid <valid-val>` with type %s" arg1 arg2
+        | [arg] -> sprintf "the type of %s" arg
+        | _ -> error expr.at "Invalid arity for relation call";
+        )
+      else error expr.at ("Not supported relation call: " ^ id)
+    )
   | Al.Ast.InvCallE (id, nl, al) ->
     let lhs_variable =
       if id = "lsizenn" || id = "lsizenn1" || id = "lsizenn2" then
@@ -687,7 +697,7 @@ and render_expr' env expr =
       (render_expr env erhs)
   | Al.Ast.CaseE (mixop, [ arity; arg ]) when Al.Valid.sub_typ expr.note Al.Al_util.evalctxT ->
     let atom_name = mixop |> List.hd |> List.hd |> Atom.to_string in
-    let control_frame_var = String.sub atom_name 0 1 in
+    let context_var = get_context_var expr in
     let rendered_arity =
       match arity.it with
       | NumE (`Nat z) when z = Z.zero -> ""
@@ -713,11 +723,18 @@ and render_expr' env expr =
     let space_opt = if (rendered_arg ^ rendered_arity) = "" then "" else " " in
     let and_opt = if rendered_arg <> "" && rendered_arity <> "" then " and " else "" in
     sprintf "%s%s%s%s%s"
-      control_frame_var
+      context_var
       space_opt
       rendered_arity
       and_opt
       rendered_arg
+  | Al.Ast.CaseE (mixop, es) ->
+    (match Prose_util.extract_case_hint expr.note mixop with
+    | Some {it = TextE template; _} ->
+      let args = List.map (render_expr env) es in
+      Prose_util.apply_prose_hint template args
+    | _ -> error expr.at (Printf.sprintf "Cannot render %s" (Al.Print.string_of_expr expr))
+    )
   | Al.Ast.MemE (e1, {it = ListE es; _}) ->
     let se1 = render_expr env e1 in
     let se2 = render_list (render_expr env) "; " es in
@@ -756,7 +773,7 @@ and render_expr' env expr =
       let render_iters env iters = List.map (render_iter env) iters |> String.concat ", and corresponding " in
       sprintf "for all %s, %s" (render_iters env iters) se)
   | Al.Ast.GetCurStateE -> "the current state"
-  | Al.Ast.GetCurContextE None -> "the topmost control frame"
+  | Al.Ast.GetCurContextE None -> failwith "Unreachable" (*TODO: Refactor*)
   | Al.Ast.GetCurContextE (Some a) ->
     sprintf "the topmost %s" (render_atom env a)
   | Al.Ast.ChooseE e ->
@@ -772,9 +789,7 @@ and render_expr' env expr =
     let se = render_expr env e in
     let sts =
       Prose_util.find_case_typ (Il.Print.string_of_typ_name e.note) a
-      |> List.map (render_el_typ env)
-      |> List.filter (fun s -> s <> "")
-      |> String.concat " "
+      |> render_el_typ env
     in
     sprintf "%s is some %s" se sts
   | Al.Ast.HasTypeE (e, t) ->
@@ -789,16 +804,20 @@ and render_expr' env expr =
     let se = render_expr env e in
     sprintf "%s is %s" se vref
   | Al.Ast.TopValueE (Some e) ->
-    let value =
-      (
+    let ty =
       match type_with_link env e with
-      | Some vtref when String.ends_with ~suffix:"type>`" vtref ->
-        let se = render_expr env e in
-        sprintf "a value of %s %s" vtref se
-      | Some vtref -> sprintf "a %s" vtref
-      | None -> "value type"
-      )
+      | Some tyref -> tyref
+      | None -> Il.Print.string_of_typ_name e.note
     in
+
+    let value =
+      if String.ends_with ~suffix:"type" ty || String.ends_with ~suffix:"type>`" ty then
+        let se = render_expr env e in
+        sprintf "a value of %s %s" ty se
+      else
+        sprintf "a %s" ty
+    in
+
     sprintf "%s is on the top of the stack" value
   | Al.Ast.TopValueE None -> "a value is on the top of the stack"
   | Al.Ast.TopValuesE e ->
@@ -861,8 +880,8 @@ let render_context env e1 e2 =
   | _ -> assert false
 
 let render_pp_hint = function
-  | Some text -> " " ^ text ^ " "
-  | None -> " with "
+  | Some text -> text
+  | None -> "with"
 
 let rec render_single_stmt ?(with_type=true) env stmt  =
   let render_hd_expr = if with_type then render_expr_with_type else render_expr in
@@ -872,9 +891,9 @@ let rec render_single_stmt ?(with_type=true) env stmt  =
       (render_expr env lhs)
       (render_expr env e)
     | LetS (e1, e2) ->
-      sprintf "let %s be %s"
-        (render_expr env e1)
-        (render_expr_with_type env e2)
+      sprintf "%s is %s"
+        (render_expr_with_type env e1)
+        (render_expr env e2)
     | CondS e ->
       sprintf "%s"
         (render_expr env e)
@@ -912,7 +931,7 @@ let rec render_single_stmt ?(with_type=true) env stmt  =
         (render_hd_expr env e)
         (if always then "always " else "")
         vref
-        (if es = [] then "" else prep ^ render_list (render_expr_with_type env) " and " es)
+        (if es = [] || prep = "" then "" else " " ^ prep ^ " " ^ render_list (render_expr_with_type env) " and " es)
     | MatchesS (e1, e2) when Al.Eq.eq_expr e1 e2 ->
       sprintf "%s %s only itself"
         (render_hd_expr env e1)
@@ -933,6 +952,10 @@ let rec render_single_stmt ?(with_type=true) env stmt  =
       sprintf "%s %s defaultable"
         (render_hd_expr env e)
         (render_prose_cmpop_eps cmpop)
+    | IsConcatS (e1, e2) ->
+      sprintf "%s is the concatenation of all such %s"
+        (render_expr env e1)
+        (render_expr env e2)
     | ContextS (e1, e2) -> render_context env e1 e2
     | RelS (s, es) ->
       let args = List.map (render_expr_with_type env) es in
@@ -1001,7 +1024,7 @@ let render_control_frame_binding env expr =
   | Ast.CaseE (mixop, [ arity; arg ]) ->
     let atom = mixop |> List.hd |> List.hd in
     let atom_name = Atom.to_string atom in
-    let control_frame_var = String.sub atom_name 0 1 in
+    let context_var = get_context_var expr in
     let control_frame_name, rendered_arg =
       match atom_name with
       | "LABEL_" ->
@@ -1030,7 +1053,7 @@ let render_control_frame_binding env expr =
     let space_opt = if (rendered_arg ^ rendered_arity) = "" then "" else " " in
     let and_opt = if rendered_arg <> "" && rendered_arity <> "" then " and " else "" in
     sprintf "Let %s be %s%s%s%s%s."
-      control_frame_var
+      context_var
       control_frame_name
       space_opt
       rendered_arity
@@ -1041,6 +1064,31 @@ let render_control_frame_binding env expr =
     |> Print.string_of_expr
     |> sprintf "Invalid control frame: %s"
     |> failwith
+
+let render_perform env fname args =
+  (
+    (* Use prose hint if it exists *)
+    let* hint = Prose_util.extract_call_hint fname in
+    let* args' = List.fold_left (fun acc a ->
+      let* acc' = acc in
+      let* ea = match a.it with | Al.Ast.ExpA e -> Some e | _ -> None in
+      let* a' = al_to_el_expr ea in
+      Some (acc' @ [a'])
+    ) (Some []) args in
+    let hint' = Prose_util.fill_hole args' hint in
+    match hint'.it with
+    | El.Ast.SeqE es ->
+      let ss = List.map (fun e ->
+        match e.it with
+        | El.Ast.TextE s -> s
+        | _ -> render_el_exp env e
+      ) es in
+      Some (String.concat " " ss)
+    | _ -> None
+  )
+  |> Option.value ~default:(
+    "Perform " ^ (render_expr env (Al.Al_util.callE (fname, args) ~at:no_region ~note:Al.Al_util.no_note))
+  )
 
 let rec render_instr env algoname index depth instr =
   match instr.it with
@@ -1186,29 +1234,32 @@ let rec render_instr env algoname index depth instr =
   | Al.Ast.PopI ({ it = Al.Ast.CaseE (mixop, _); _ } as expr)
   when Al.Valid.sub_typ expr.note Al.Al_util.evalctxT ->
     let atom = mixop |> List.hd |> List.hd in
-    let atom_name = Atom.to_string atom in
     let control_frame_kind = render_atom env atom in
-    let control_frame_var = String.sub atom_name 0 1 in
+    let context_var = get_context_var expr in
     sprintf "%s Pop the %s %s from the stack."
       (render_order index depth)
       control_frame_kind
-      control_frame_var
+      context_var
   | Al.Ast.PopI e ->
     sprintf "%s Pop %s %s from the stack." (render_order index depth)
       (render_stack_prefix e) (render_expr env e)
   | Al.Ast.PopAllI e ->
     sprintf "%s Pop all values %s from the top of the stack." (render_order index depth)
       (render_expr env e)
+  (* HARDCODE: lsize *)
+  | Al.Ast.LetI (e1, {it = Al.Ast.InvCallE (id, _, [{it = ExpA a; _}]); _}) when String.starts_with ~prefix:"lsize" id  ->
+    let instr' = Al.Ast.LetI ({a with it = Al.Ast.CallE (id, [Al.Ast.ExpA e1 $ e1.at])}, a) in
+    render_instr env algoname index depth {instr with it = instr'}
   | Al.Ast.LetI (e1, e2) ->
     (match e1.it with
     (* NOTE: This assumes that the first argument of control frame is arity *)
     | Al.Ast.CaseE (mixop, [ arity; arg ] ) when Al.Valid.sub_typ e1.note Al.Al_util.evalctxT ->
       let atom_name = mixop |> List.hd |> List.hd |> Atom.to_string in
-      let control_frame_var = String.sub atom_name 0 1 in
+      let context_var = get_context_var e1 in
       let rendered_let =
         sprintf "%s Let %s be %s."
           (render_order index depth)
-          control_frame_var
+          context_var
           (render_expr env e2) in
       (* XXX: It could introduce dead assignment *)
       let rendered_arity =
@@ -1219,7 +1270,7 @@ let rec render_instr env algoname index depth instr =
             (repeat indent depth)
             (render_order index depth)
             s
-            control_frame_var in
+            context_var in
       (* XXX: It could introduce dead assignment *)
       let rendered_arg =
         match atom_name with
@@ -1228,7 +1279,7 @@ let rec render_instr env algoname index depth instr =
             (repeat indent depth)
             (render_order index depth)
             (render_expr env arg)
-            control_frame_var
+            context_var
         | _ -> "" in
       rendered_let ^ rendered_arity ^ rendered_arg
     | _ ->
@@ -1267,7 +1318,7 @@ let rec render_instr env algoname index depth instr =
         (match elhs.it with
         | CallE (_, [_; { it = Al.Ast.ExpA e'; _}; n]) ->
           (match e'.it with
-          | Al.Ast.IterE (e'', _) -> 
+          | Al.Ast.IterE (e'', _) ->
             "", sprintf "the result for which each %s has length %s, and %s is %s"
               (render_expr env e'')
               (render_arg env n)
@@ -1333,7 +1384,7 @@ let rec render_instr env algoname index depth instr =
       let type_desc = (
         if String.starts_with ~prefix:":math:" rhs then (
           match type_with_link env e1 with
-          | Some s -> 
+          | Some s ->
             "the " ^ s ^ " "
           | None -> ""
         )
@@ -1377,7 +1428,7 @@ let rec render_instr env algoname index depth instr =
   | Al.Ast.ExecuteSeqI e ->
     sprintf "%s Execute the sequence %s." (render_order index depth) (render_expr env e)
   | Al.Ast.PerformI (n, es) ->
-    sprintf "%s Perform %s." (render_order index depth) (render_expr env (Al.Al_util.callE (n, es) ~at:no_region ~note:Al.Al_util.no_note))
+    sprintf "%s %s." (render_order index depth) (render_perform env n es)
   | Al.Ast.ExitI a ->
     sprintf "%s Exit from %s." (render_order index depth) (render_atom env a)
   | Al.Ast.ReplaceI (e1, p, e2) ->

@@ -94,9 +94,10 @@ let get_export name modulename =
     (fun export -> al_to_string (strv_access "NAME" export) = name)
 
 let get_externaddr import =
-  import.it.module_name
+  let Ast.Import (module_name, item_name, _) = import.it in
+  module_name
   |> Utf8.encode
-  |> get_export (Utf8.encode import.it.Ast.item_name)
+  |> get_export (Utf8.encode item_name)
   |> strv_access "ADDR"
 
 let textual_to_module textual =
@@ -255,8 +256,8 @@ let run_wast name script =
     else script
   in
 
-  (* Intialize builtin *)
-  Register.add "spectest" (Builtin.builtin ());
+  (* Intialize spectest *)
+  Register.add "spectest" (Host.spectest ());
 
   let result =
     script
@@ -269,8 +270,8 @@ let run_wast name script =
 (** Wasm runner **)
 
 let run_wasm' args module_ =
-  (* Intialize builtin *)
-  Register.add "spectest" (Builtin.builtin ());
+  (* Intialize spectest *)
+  Register.add "spectest" (Host.spectest ());
 
   (* Instantiate *)
   module_

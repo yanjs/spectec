@@ -544,9 +544,11 @@ and valid_sym env g : typ =
     let ps, t, _ = Env.find_gram env id in
     let s = valid_args env as_ ps Subst.empty g.at in
     Subst.subst_typ s t
-  | NumG n ->
+  | NumG _ ->
+(*
     if n < 0x00 || n > 0xff then
       error g.at "byte value out of range";
+*)
     NumT `NatT $ g.at
   | TextG _ -> TextT $ g.at
   | EpsG -> TupT [] $ g.at
@@ -561,7 +563,7 @@ and valid_sym env g : typ =
     let t2 = valid_sym env g2 in
     equiv_typ env t1 (NumT `NatT $ g1.at) g.at;
     equiv_typ env t2 (NumT `NatT $ g2.at) g.at;
-    TupT [] $ g.at
+    NumT `NatT $ g.at
   | IterG (g1, iterexp) ->
     let iter, env' = valid_iterexp ~side:`Lhs env iterexp g.at in
     let t1 = valid_sym env' g1 in
@@ -581,6 +583,7 @@ and valid_prem env prem =
     let mixop', t, _rules = Env.find_rel env id in
     assert (Mixop.eq mixop mixop');
     valid_expmix env mixop e (mixop, t) e.at
+  | NegPr prem' -> valid_prem env prem'
   | IfPr e ->
     valid_exp env e (BoolT $ e.at)
   | LetPr (e1, e2, ids) ->

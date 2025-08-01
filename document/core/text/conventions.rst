@@ -53,6 +53,8 @@ In order to distinguish symbols of the textual syntax from symbols of the abstra
 
 * Productions are written :math:`\T{sym} ::= T_1 \Rightarrow A_1 ~|~ \dots ~|~ T_n \Rightarrow A_n`, where each :math:`A_i` is the attribute that is synthesized for :math:`\T{sym}` in the given case, usually from attribute variables bound in :math:`T_i`.
 
+* Large productions may be split into multiple definitions, indicated by ending the first one with explicit ellipses, :math:`\T{sym} ::= T_1 \Rightarrow A_1 ~|~ \dots`, and starting continuations with ellipses, :math:`\T{sym} ::= \dots ~|~ T_2 \Rightarrow A_2`.
+
 * Some productions are augmented by side conditions in parentheses, which restrict the applicability of the production. They provide a shorthand for a combinatorial expansion of the production into many separate cases.
 
 * If the same meta variable or non-terminal symbol appears multiple times in a production (in the syntax or in an attribute), then all those occurrences must have the same instantiation.
@@ -78,11 +80,11 @@ In order to distinguish symbols of the textual syntax from symbols of the abstra
    .. math::
       \begin{array}{llclll}
       \production{limits} & \Tlimits &::=&
-        n{:}\Tu32 &\Rightarrow& \{ \LMIN~n, \LMAX~\epsilon \} \\ &&|&
-        n{:}\Tu32~~m{:}\Tu32 &\Rightarrow& \{ \LMIN~n, \LMAX~m \} \\
+        n{:}\Tu64 &\Rightarrow& [ n\,{..}\, 2^64-1 ] \\ &&|&
+        n{:}\Tu64~~m{:}\Tu64 &\Rightarrow& [ n\,{..}\, m ] \\
       \end{array}
 
-   The variables :math:`n` and :math:`m` name the attributes of the respective |Tu32| nonterminals, which in this case are the actual :ref:`unsigned integers <syntax-uint>` those parse into.
+   The variables :math:`n` and :math:`m` name the attributes of the respective |Tu64| nonterminals, which in this case are the actual :ref:`unsigned integers <syntax-uint>` those parse into.
    The attribute of the complete production then is the abstract syntax for the limit, expressed in terms of the former values.
 
 
@@ -121,12 +123,12 @@ It is convenient to define identifier contexts as :ref:`records <notation-record
    \production{identifier context} & I &::=&
      \begin{array}[t]{l@{~}ll}
      \{ & \ITYPES & (\name^?)^\ast, \\
-        & \IFUNCS & (\name^?)^\ast, \\
-        & \ITABLES & (\name^?)^\ast, \\
-        & \IMEMS & (\name^?)^\ast, \\
-        & \IGLOBALS & (\name^?)^\ast, \\
         & \ITAGS & (\Tname^?)^\ast, \\
+        & \IGLOBALS & (\name^?)^\ast, \\
+        & \IMEMS & (\name^?)^\ast, \\
+        & \ITABLES & (\name^?)^\ast, \\
         & \IELEM & (\name^?)^\ast, \\
+        & \IFUNCS & (\name^?)^\ast, \\
         & \IDATA & (\name^?)^\ast, \\
         & \ILOCALS & (\name^?)^\ast, \\
         & \ILABELS & (\name^?)^\ast, \\

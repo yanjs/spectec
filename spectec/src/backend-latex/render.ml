@@ -1071,6 +1071,28 @@ Printf.eprintf "[render_atom %s @ %s] id=%s def=%s macros: %s (%s)\n%!"
     ) |> fst
 
 
+let render_text s =
+    let buf = Buffer.create (String.length s) in
+    for i = 0 to String.length s - 1 do
+      match s.[i] with
+      | '#' -> Buffer.add_string buf "\\#"
+      | '$' -> Buffer.add_string buf "\\$"
+      | '%' -> Buffer.add_string buf "\\%"
+      | '&' -> Buffer.add_string buf "\\&"
+      | '_' -> Buffer.add_string buf "\\_"
+      | '{' -> Buffer.add_string buf "\\{"
+      | '}' -> Buffer.add_string buf "\\}"
+      | '[' -> Buffer.add_string buf "{[}"
+      | ']' -> Buffer.add_string buf "{]}"
+      | '\\' -> Buffer.add_string buf "\\backslash{}"
+      | '^' ->  Buffer.add_string buf "\\hat{~~}"
+      | '`' ->  Buffer.add_string buf "\\grave{~~}"
+      | '~' ->  Buffer.add_string buf "\\tilde{~~}"
+      | c -> Buffer.add_char buf c
+    done;
+    Buffer.contents buf
+
+
 (* Operators *)
 
 let render_unop = function
@@ -1228,7 +1250,7 @@ and render_exp env e =
     let atom = {it = Atom.Atom (Z.to_string n); at = e.at; note = Atom.info "nat"} in
     render_atom (without_macros true env) atom
   | NumE _ -> assert false
-  | TextE t -> "\\mbox{\\texttt{`" ^ t ^ "'}}"
+  | TextE t -> "\\mbox{`$\\mathtt{" ^ render_text t ^ "}$'}"
   | CvtE (e1, _) -> render_exp env e1
   | UnE (op, e2) -> "{" ^ render_unop op ^ render_exp env e2 ^ "}"
   | BinE (e1, `PowOp, ({it = ParenE e2; _ } | e2)) ->
@@ -1469,7 +1491,7 @@ and render_sym env g : string =
       "%X"
     in "\\mathrm{U{+}" ^ Z.format fmt n ^ "}"
   | NumG (`AtomOp, n) -> "\\mathtt{" ^ Z.to_string n ^ "}"
-  | TextG t -> "\\mbox{\\texttt{`" ^ t ^ "'}}"
+  | TextG t -> "\\mbox{`$\\mathtt{" ^ render_text t ^ "}$'}"
   | EpsG -> "\\epsilon"
   | SeqG gs -> render_sym_seq env gs
   | AltG gs -> render_syms " ~|~ " env gs
@@ -1479,6 +1501,8 @@ and render_sym env g : string =
   | TupG gs -> "(" ^ concat ", " (List.map (render_sym env) gs) ^ ")"
   | IterG (g1, iter) -> "{" ^ render_sym env g1 ^ render_iter env iter ^ "}"
   | ArithG e -> render_exp env e
+  | AttrG ({it = VarE (id, []); _}, g1) when id.it = "<implicit-prod-result>" ->
+    render_sym env g1
   | AttrG (e, g1) -> render_exp env e ^ "{:}" ^ render_sym env g1
   | FuseG (g1, g2) ->
     "{" ^ render_sym env g1 ^ "}" ^ "{" ^ render_sym env g2 ^ "}"
@@ -1505,24 +1529,34 @@ and render_sym_seq env = function
     " \\\\[0.8ex]\n  &&& " ^ s
 
 and render_prod env prod : row list =
-  let (g, e, prems) = prod.it in
-  match e.it, prems with
-  | (TupE [] | ParenE {it = SeqE []; _}), [] ->
-    [Row [Col (render_sym env g)]]
-  | _ when not env.config.display ->
-    prefix_rows_hd
-      [Col (render_sym env g ^ " ~\\Rightarrow~ " ^ render_exp env e)]
-      (render_conditions env prems)
-  | _ ->
-    prefix_rows_hd
-      ( Col (render_sym env g) ::
-        Col "\\quad\\Rightarrow\\quad{}" ::
-        if g.at.right.line = e.at.left.line then
-          Col (render_exp env e) :: []
-        else
-          Br `Narrow :: Col (render_exp env e) :: []
-      )
-      (render_conditions env prems)
+  match prod.it with
+  | SynthP (g, e, prems) ->
+    (match e.it, prems with
+    | (TupE [] | ParenE {it = SeqE []; _}), [] ->
+      [Row [Col (render_sym env g)]]
+    | VarE (id, []), _ when id.it = "<implicit-prod-result>" ->
+      prefix_rows_hd
+        [Col (render_sym env g)]
+        (render_conditions env prems)
+    | _ when not env.config.display ->
+      prefix_rows_hd
+        [Col (render_sym env g ^ " ~\\Rightarrow~ " ^ render_exp env e)]
+        (render_conditions env prems)
+    | _ ->
+      prefix_rows_hd
+        ( Col (render_sym env g) ::
+          Col "\\quad\\Rightarrow\\quad{}" ::
+          if g.at.right.line = e.at.left.line then
+            Col (render_exp env e) :: []
+          else
+            Br `Narrow :: Col (render_exp env e) :: []
+        )
+        (render_conditions env prems)
+    )
+  | RangeP (g1, e1, g2, e2) ->
+    render_prod env (SynthP (g1, e1, []) $ g1.at) @
+    prefix_rows_hd [Col "\\ldots"] [] @
+    render_prod env (SynthP (g2, e2, []) $ g2.at)
 
 and render_gram env gram : table =
   let (dots1, prods, dots2) = gram.it in
