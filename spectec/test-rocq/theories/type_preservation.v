@@ -1,15 +1,15 @@
 
 From Stdlib Require Import String List Unicode.Utf8 NArith Arith.
 From RecordUpdate Require Import RecordSet.
+Require Import Stdlib.Program.Equality.
 
 Declare Scope wasm_scope.
 Open Scope wasm_scope.
 Import RecordSetNotations.
-From WasmSpectec Require Import wasm helper_lemmas helper_tactics typing_lemmas.
-From mathcomp Require Import ssreflect ssrfun ssrnat ssrbool seq.
+From WasmSpectec Require Import wasm helper_lemmas helper_tactics typing_lemmas subtyping.
+From mathcomp Require Import ssreflect ssrfun ssrnat ssrbool seq eqtype.
 Import ListNotations.
 
-(*
 Lemma inst_t_context_local_empty: forall s i C,
 	Module_instance_ok s i C ->
     C_LOCALS C = [].
@@ -24,32 +24,82 @@ Proof.
 	move => s i C HMInst. inversion HMInst => //=.
 Qed.
 
-Lemma Step_pure__unreachable_preserves : forall v_S v_C  v_func_type,
-	Admin_instrs_ok v_S v_C [(AI_UNREACHABLE )] v_func_type ->
+Notation "tf1 :-> tf2" :=
+(mk_functype (mk_list _ tf1) (mk_list _ tf2)) (at level 40).
+
+Ltac destruct_functypes :=
+    repeat match goal with
+    | v_ft: functype |- _ =>
+		let v_ft1 := fresh v_ft in
+		let v_ft2 := fresh v_ft in
+        destruct v_ft as [[v_ft1] [v_ft2]]
+    end.
+
+Lemma Step_pure__unreachable_preserves : forall v_S v_C v_ft,
+	Admin_instrs_ok v_S v_C [(AI_UNREACHABLE )] v_ft ->
 	Step_pure [(AI_UNREACHABLE )] [(AI_TRAP )] ->
-	Admin_instrs_ok v_S v_C [(AI_TRAP )] v_func_type.
+	Admin_instrs_ok v_S v_C [(AI_TRAP )] v_ft.
 Proof.
-	move => v_S v_C v_func_type HType HReduce.
-	destruct v_func_type as [tf1 tf2].
-	apply (AIs_ok_seq v_S v_C [] (AI_TRAP) tf1 tf2 tf1).
+	move => v_S v_C v_ft HType HReduce.
+	destruct_functypes.
+	apply (AIs_ok_seq v_S v_C [] (AI_TRAP) v_ft0 v_ft1 v_ft0).
 	- apply admin_weakening_empty_both. apply AIs_ok_empty.
 	- apply AI_ok_trap.
 Qed.
 
-Lemma Step_pure__nop_preserves : forall v_S v_C  v_func_type,
-	Admin_instrs_ok v_S v_C [(AI_NOP )] v_func_type ->
-	Step_pure [(AI_NOP )] [] ->
-	Admin_instrs_ok v_S v_C [] v_func_type.
+Lemma Nop_typing: forall v_S v_C t1s t2s,
+    Admin_instr_ok v_S v_C AI_NOP (t1s :-> t2s) ->
+    (t1s <ts? t2s).
 Proof.
-	move => v_S v_C v_func_type HType HReduce.
-	destruct v_func_type as [tf1 tf2].
-	apply_composition_typing_single HType; subst.
-	apply AIs_ok_frame.
-	apply Nop_typing in H4_comp; subst.
-	apply admin_weakening_empty_both.
-	apply AIs_ok_empty.
+	move => v_S v_C t1s t2s HType.
+	dependent induction HType.
+	- destruct v_instr; try discriminate; subst.
+	  inversion H; subst.
+	  by apply resulttype_sub_refl.
+	- apply resulttype_sub_app.
+	  apply resulttype_sub_refl.
+	  by eapply IHHType.
 Qed.
 
+Lemma Step_pure__nop_preserves : forall v_S v_C v_ft,
+	Admin_instrs_ok v_S v_C [(AI_NOP )] v_ft ->
+	Step_pure [(AI_NOP )] [] ->
+	Admin_instrs_ok v_S v_C [] v_ft.
+Proof.
+	move => v_S v_C v_ft HType _.
+	destruct_functypes.
+	dependent induction HType; subst.
+	- destruct_list_eq x; subst.
+	  apply ais_empty_typing.
+	  eapply resulttype_sub_trans.
+	  eapply ais_empty_typing; eauto.
+	  eapply Nop_typing; eauto.
+	- eapply AIs_ok_frame.
+	  apply IHHType; auto.
+	- destruct v_instr. discriminate.
+	  simpl in x.
+	  destruct_list_eq x; subst.
+	  destruct i; try discriminate; clear x_head.
+	  apply map_eq_nil in x_body; subst.
+	  dependent induction H.
+	  + destruct_list_eq x; subst.
+	    apply ais_empty_typing.
+		eapply resulttype_sub_trans.
+		eapply instrs_empty_typing; eauto.
+		eapply Nop_typing.
+		eapply (AI_ok_instr v_S) in H0; eauto.
+	  + specialize (IHInstrs_ok _ _ erefl erefl).
+	    eapply ais_empty_typing.
+	    eapply resulttype_sub_trans.
+		eapply H0.
+		eapply resulttype_sub_trans.
+		eapply ais_empty_typing; eauto.
+		eapply H1.
+	  + eapply AIs_ok_frame.
+	    eapply IHInstrs_ok; eauto.
+Qed.
+
+(*
 Lemma Step_pure__drop_preserves : forall v_S v_C (v_val : val) v_func_type,
 	Admin_instrs_ok v_S v_C [(v_val : admininstr);(AI_DROP )] v_func_type ->
 	Step_pure [(v_val : admininstr);(AI_DROP )] [] ->
@@ -2146,7 +2196,7 @@ Theorem t_pure_preservation: forall v_s v_minst v_ais v_ais' v_C loc lab ret tf,
 Proof.
 	move => v_s v_minst v_ais v_ais' v_C loc lab ret tf HInstType HType HReduce.
 	inversion HReduce; subst.
-	- eapply Step_pure__unreachable_preserves; eauto.
+	- destruct tf as [[ts1] [ts2]]. eapply Step_pure__unreachable_preserves; eauto.
 	- eapply Step_pure__nop_preserves; eauto.
 	- eapply Step_pure__drop_preserves; eauto.
 	- eapply Step_pure__select_true_preserves; eauto.

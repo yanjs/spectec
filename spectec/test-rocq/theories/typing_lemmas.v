@@ -6,7 +6,7 @@ Declare Scope wasm_scope.
 Open Scope wasm_scope.
 Import ListNotations.
 Import RecordSetNotations.
-From WasmSpectec Require Import wasm helper_lemmas helper_tactics.
+From WasmSpectec Require Import wasm helper_lemmas helper_tactics subtyping.
 From mathcomp Require Import ssreflect ssrfun ssrnat ssrbool seq.
 
 Definition fun_nat__u32 : nat -> u32 := mk_uN 32.
@@ -58,6 +58,17 @@ Definition fun_idx__nat : idx -> nat := fun x => match x with
 	end.
 Coercion fun_nat__idx : nat >-> idx.
 Coercion fun_idx__nat : idx >-> nat.
+
+Definition fun_res_list__list :
+forall T, res_list T -> list T := fun _ x => match x with
+	| mk_list l => l
+end.
+Definition fun_list__res_list : forall T, list T -> res_list T := fun T => mk_list T.
+Coercion fun_res_list__list : res_list >-> list.
+Coercion fun_list__res_list : list >-> res_list.
+
+Definition functype_from_lists (t1s t2s : list valtype) : functype :=
+  mk_functype t1s t2s.
 
 
 Definition upd_label C labs :=
@@ -183,26 +194,29 @@ Proof.
 		- induction v. apply mk_Val_ok.
 		- rewrite H2. by apply IHv_t1.
 Qed.
-*)
-
+*) *)
+(*
 Lemma instrs_empty_same_type: forall C t1 t2,
 	Instrs_ok C [] (mk_functype t1 t2) ->
 	t1 = t2.
 Proof.
 	move => C t t2 H. gen_ind_subst H => //.
-	- (* Seq *) symmetry in Enil. apply app_cons_not_nil in Enil. exfalso. apply Enil. 
+	- (* Seq *) symmetry in Enil. apply app_cons_not_nil in Enil. exfalso. apply Enil.
+	- (* Sub *)
+	    eapply IHInstrs_ok; eauto.
+		reflexivity.
 	- (* Frame *) f_equal. by eapply IHInstrs_ok.
-Qed. 
+Qed.
 
 Lemma admin_empty_same_type: forall v_S C t1 t2,
-	Admin_instrs_ok v_S C [] (mk_functype t1 t2) ->
+	Admin_instrs_ok v_S C [] (functype_from_lists t1 t2) ->
 	t1 = t2.
 Proof.
 	move => v_S C t t2 H. gen_ind_subst H => //.
 		- (* Seq *) symmetry in Enil. apply app_cons_not_nil in Enil. exfalso. apply Enil. 
 		- (* Frame *) f_equal. by eapply IHAdmin_instrs_ok.
 		- (* Instrs *) apply (instrs_empty_same_type C). apply map_eq_nil in Enil. subst. apply H.
-Qed. 
+Qed.
 
 Lemma val_is_same_as_admin_const: forall v_S v_C (v : val) ts,
 	Admin_instr_ok v_S v_C (v : admininstr) ts ->
@@ -211,105 +225,188 @@ Proof.
 	move => v_S v_C val ts HType.
 	induction val.
 	exists v_valtype, v_val_. done.
-Qed.
+Qed. *)
+
+
+Notation "tf1 :-> tf2" :=
+(mk_functype (mk_list _ tf1) (mk_list _ tf2)) (at level 40).
 
 Lemma admin_weakening_empty_both: forall v_S v_C v_ais ts,
-    Admin_instrs_ok v_S v_C v_ais (mk_functype [::] [::]) ->
-    Admin_instrs_ok v_S v_C v_ais (mk_functype ts ts).
+    Admin_instrs_ok v_S v_C v_ais ( nil :-> nil ) ->
+    Admin_instrs_ok v_S v_C v_ais ( ts :-> ts ).
 Proof.
   move => v_S v_C v_ais ts HType.
-  assert (Admin_instrs_ok v_S v_C v_ais (mk_functype (ts ++ [::]) (ts ++ [::]))); first by apply AIs_ok_frame.
+  assert (Admin_instrs_ok v_S v_C v_ais ((ts ++ []) :-> (ts ++ []))); first by apply AIs_ok_frame.
   by rewrite cats0 in H.
 Qed.
 
+(*
 Lemma instrs_weakening_empty_both: forall v_C v_ais ts,
-    Instrs_ok v_C v_ais (mk_functype [::] [::]) ->
-    Instrs_ok v_C v_ais (mk_functype ts ts).
+    Instrs_ok v_C v_ais (functype_from_lists [::] [::]) ->
+    Instrs_ok v_C v_ais (functype_from_lists ts ts).
 Proof.
   move => v_C v_ais ts HType.
-  assert (Instrs_ok v_C v_ais (mk_functype (ts ++ [::]) (ts ++ [::]))); first by apply instrs_frame.
+  assert (Instrs_ok v_C v_ais (functype_from_lists (ts ++ [::]) (ts ++ [::]))); first by apply instrs_frame.
   by rewrite cats0 in H.
 Qed.
 
 Lemma admin_instrs_weakening_empty_1: forall v_S v_C instrs ts t2s,
-    Admin_instrs_ok v_S v_C instrs (mk_functype [::] t2s) ->
-    Admin_instrs_ok v_S v_C instrs (mk_functype ts (ts ++ t2s)).
+    Admin_instrs_ok v_S v_C instrs (functype_from_lists [::] t2s) ->
+    Admin_instrs_ok v_S v_C instrs (functype_from_lists ts (ts ++ t2s)).
 Proof.
   move => v_S v_C instrs ts t2s HType.
-  assert (Admin_instrs_ok v_S v_C instrs (mk_functype (ts ++ [::]) (ts ++ t2s))); first by apply AIs_ok_frame.
+  assert (Admin_instrs_ok v_S v_C instrs (functype_from_lists (ts ++ [::]) (ts ++ t2s))); first by apply AIs_ok_frame.
   by rewrite cats0 in H.
 Qed.
 
 Lemma instrs_weakening_empty_1: forall v_C instrs ts t2s,
-    Instrs_ok v_C instrs (mk_functype [::] t2s) ->
-    Instrs_ok v_C instrs (mk_functype ts (ts ++ t2s)).
+    Instrs_ok v_C instrs (functype_from_lists [::] t2s) ->
+    Instrs_ok v_C instrs (functype_from_lists ts (ts ++ t2s)).
 Proof.
   move => v_C instrs ts t2s HType.
-  assert (Instrs_ok v_C instrs (mk_functype (ts ++ [::]) (ts ++ t2s))); first by apply instrs_frame.
+  assert (Instrs_ok v_C instrs (functype_from_lists (ts ++ [::]) (ts ++ t2s))); first by apply instrs_frame.
   by rewrite cats0 in H.
 Qed.
 
 Lemma admin_instr_weakening_empty_1: forall v_S v_C instr ts t2s,
-    Admin_instr_ok v_S v_C instr (mk_functype [::] t2s) ->
-    Admin_instr_ok v_S v_C instr (mk_functype ts (ts ++ t2s)).
+    Admin_instr_ok v_S v_C instr (functype_from_lists [::] t2s) ->
+    Admin_instr_ok v_S v_C instr (functype_from_lists ts (ts ++ t2s)).
 Proof.
   move => v_S v_C instr ts t2s HType.
-  assert (Admin_instr_ok v_S v_C instr (mk_functype (ts ++ [::]) (ts ++ t2s))); first by apply AI_ok_weakening.
+  assert (Admin_instr_ok v_S v_C instr (functype_from_lists (ts ++ [::]) (ts ++ t2s))); first by apply AI_ok_weakening.
   by rewrite cats0 in H.
 Qed.
 
 Lemma admin_instr_weakening_empty_2: forall v_S v_C instr ts t1s,
-    Admin_instr_ok v_S v_C instr (mk_functype t1s []) ->
-    Admin_instr_ok v_S v_C instr (mk_functype (ts ++ t1s) (ts)).
+    Admin_instr_ok v_S v_C instr (functype_from_lists t1s []) ->
+    Admin_instr_ok v_S v_C instr (functype_from_lists (ts ++ t1s) (ts)).
 Proof.
   move => v_S v_C instr ts t1s HType.
-  assert (Admin_instr_ok v_S v_C instr (mk_functype (ts ++ t1s) (ts ++ []))); first by apply AI_ok_weakening.
+  assert (Admin_instr_ok v_S v_C instr (functype_from_lists (ts ++ t1s) (ts ++ []))); first by apply AI_ok_weakening.
   by rewrite cats0 in H.
 Qed.
+*)
 
-Lemma composition_typing_single: forall v_C v_ais v_ai t1s t2s,
-   	Instrs_ok v_C (@app _ v_ais [v_ai]) (mk_functype t1s t2s) ->
-    exists ts t1s' t2s' t3s, t1s = @app _ ts t1s' /\
-                             t2s = @app _ ts t2s' /\
-                             Instrs_ok v_C v_ais (mk_functype t1s' t3s) /\
-                             Instr_ok v_C v_ai (mk_functype t3s t2s').
+Lemma instrs_composition_typing_single: forall v_C v_instrs v_instr t1s t2s,
+	Instrs_ok v_C (v_instrs ++ [v_instr]) ( t1s :-> t2s ) ->
+	exists t3s, Instrs_ok v_C v_instrs ( t1s :-> t3s ) /\
+				Instrs_ok v_C [v_instr] ( t3s :-> t2s ).
 Proof.
-	move => v_C v_ais v_ai t1s t2s HType. 
-	gen_ind_subst HType => //.
-		+ (* Empty *) apply empty_append in H1; destruct H1. discriminate.
-		+ (* Seq *) apply split_append_last in Eapp; destruct Eapp; subst.
-			by exists [], t1s, t2s, v_t_2.
-		+ (* Frame *) edestruct IHHType; eauto.
-			destruct H as [t1s' [t2s' [t3s' [H1 [H2 [H3 H4]]]]]]. subst.
-			exists (@app _ v_t x), t1s', t2s', t3s'.
-			by repeat split => //=; rewrite <- app_assoc; reflexivity.
+	move => v_C v_instrs v_instr t1s t2s HType.
+	dependent induction HType.
+	- destruct_list_eq x.
+	- destruct_list_eq x; subst.
+	  exists v_t_2.
+	  split; auto.
+	  eapply (instrs_ok_seq _ [] v_instr v_t_2 t2s v_t_2).
+	  + rewrite -(cats0 v_t_2).
+	    eapply (instrs_ok_frame _ _ v_t_2 [] []).
+		apply instrs_ok_empty.
+	  + auto.
+	- specialize (IHHType _ _ _ _ erefl erefl) as [t3s [H1 H2]].
+	  exists t3s.
+	  split;
+	  eapply instrs_ok_sub; eauto;
+      apply resulttype_sub_refl.
+	- specialize (IHHType _ _ _ _ erefl erefl) as [t3s [H1 H2]].
+	  exists (v_t ++ t3s).
+	  split;
+	  eapply instrs_ok_frame; eauto.
 Qed.
 
-Lemma admin_composition_typing_single: forall v_S v_C v_ais v_ai t1s t2s,
-    Admin_instrs_ok v_S v_C (@app _ v_ais [v_ai]) (mk_functype t1s t2s) ->
-    exists ts t1s' t2s' t3s, t1s = @app _ ts t1s' /\
-                             t2s = @app _ ts t2s' /\
-                             Admin_instrs_ok v_S v_C v_ais (mk_functype t1s' t3s) /\
-                             Admin_instr_ok v_S v_C v_ai (mk_functype t3s t2s').
+Lemma ais_composition_typing_single: forall v_S v_C v_ais v_ai t1s t2s,
+	Admin_instrs_ok v_S v_C (v_ais ++ [v_ai]) ( t1s :-> t2s ) ->
+	exists t3s, Admin_instrs_ok v_S v_C v_ais ( t1s :-> t3s ) /\
+				Admin_instrs_ok v_S v_C [v_ai] ( t3s :-> t2s ).
 Proof.
 	move => v_S v_C v_ais v_ai t1s t2s HType.
-	gen_ind_subst HType.
-	    + (* Empty *) apply empty_append in H2; destruct H2. discriminate.
-		+ (* Seq *) apply split_append_last in H3; destruct H3; subst.
-			by exists [], t1s, t2s, v_t_2.
-		+ (* Frame *) edestruct IHHType; eauto.
-			destruct H as [t1s' [t2s' [t3s' [H1 [H2 [H3 H4]]]]]]. subst.
-			exists (@app _ v_t x), t1s', t2s', t3s'.
-			by repeat split => //=; rewrite <- app_assoc; reflexivity.
-		+ (* Instrs *) apply map_eq_app in H3; destruct H3 as [l1 [l2 [H4 [H5 H6]]]]. 
-			apply map_eq_cons in H6; destruct H6 as [a [t1 [H7 [H8 H9]]]].
-			apply map_eq_nil in H9.
-			subst. apply composition_typing_single in H; destruct H as [ts [t1s' [t2s' [t3s [H1 [H2 [H3 H4]]]]]]].
-			exists ts, t1s', t2s', t3s. repeat split => //.
-			eapply AIs_ok_instrs; eauto.
-			eapply AI_ok_instr; eauto.
+	dependent induction HType.
+	- destruct_list_eq x.
+	- exists v_t_2.
+	  destruct_list_eq x; subst.
+	  split.
+	  + auto.
+	  + assert ( [v_ai] = [] ++ [v_ai] ). { by rewrite cat0s. }
+	    assert ( v_t_2 = v_t_2 ++ [] ). { by rewrite cats0. }
+	    rewrite H0.
+	    eapply (AIs_ok_seq) with (v_t_2 := v_t_2).
+		* rewrite H1.
+		  eapply AIs_ok_frame. by apply AIs_ok_empty.
+		* auto.
+	- specialize (IHHType _ _ _ _ erefl erefl) as [t3s [H1 H2]].
+	  exists (v_t ++ t3s).
+	  split; by eapply AIs_ok_frame.
+	- move: v_ais v_ai x t1s t2s H.
+	  induction v_instr using rev_ind;
+	  move => v_ais v_ai H t1s t2s Hinstr.
+	  + inversion H.
+	    destruct_list_eq H1.
+	  + rewrite map_last in H.
+	    destruct_list_eq H; subst.
+		apply instrs_composition_typing_single in Hinstr as [t3s [H1 H2]].
+	    exists t3s.
+		split.
+		* eapply AIs_ok_instrs; auto.
+		* assert ([ (x: admininstr)] =
+		  ListDef.map [eta fun_coec_instr__admininstr] [ x]).
+		  { auto. }
+		  rewrite H.
+		  eapply AIs_ok_instrs.
+		  auto.
 Qed.
 
+Lemma instrs_empty_typing : forall v_C t1s t2s,
+	Instrs_ok v_C ([]) ( t1s :-> t2s ) <->
+	( t1s <ts? t2s ).
+Proof.
+  move => v_C t1s t2s.
+  split.
+  - move => Hempty.
+    dependent induction Hempty; subst.
+	+ apply resulttype_sub_refl.
+	+ destruct_list_eq x.
+	+ eapply resulttype_sub_trans.
+	apply H.
+	eapply resulttype_sub_trans.
+	apply IHHempty; auto.
+	apply H0.
+	eapply resulttype_sub_app.
+	apply resulttype_sub_refl.
+	apply IHHempty; auto.
+  - move: t1s.
+    move => t1s H.
+	eapply (instrs_ok_sub _ _ _ _ t2s t2s).
+	+ rewrite -(cats0 t2s).
+	  apply instrs_ok_frame.
+	  apply instrs_ok_empty.
+	  apply H.
+	  apply resulttype_sub_refl.
+Qed.
+
+Lemma ais_empty_typing : forall v_S v_C t1s t2s,
+	Admin_instrs_ok v_S v_C ([]) ( t1s :-> t2s ) <->
+	( t1s <ts? t2s ).
+Proof.
+  move => v_S v_C t1s t2s.
+  split.
+  - move => Hempty.
+	dependent induction Hempty; subst.
+	+ apply resulttype_sub_refl.
+	+ destruct_list_eq x.
+	+ eapply resulttype_sub_app.
+	  apply resulttype_sub_refl.
+	  apply IHHempty; auto.
+	+ destruct v_instr.
+	  * by apply instrs_empty_typing in H.
+	  * discriminate.
+  - move => Hsub.
+	assert ([] = (ListDef.map [eta fun_coec_instr__admininstr] [])). { auto. }
+	rewrite H.
+    apply AIs_ok_instrs.
+	by apply instrs_empty_typing.
+Qed.
+
+(*
 Ltac apply_instrs_composition_typing_single H := 
 	let ts1 := fresh "ts1_comp" in
     let ts2 := fresh "ts2_comp" in
@@ -335,41 +432,9 @@ Ltac apply_composition_typing_single H :=
 	rewrite -> app_left_single_nil in H;
     apply admin_composition_typing_single in H; destruct H as [ts1 [ts2 [ts3 [ts4 [H1 [H2 [H3 H4]]]]]]];
 	try apply admin_empty_same_type in H3.
-	
-Lemma admin_composition_typing: forall v_S v_C v_ais1 v_ais2 t1s t2s,
-	Admin_instrs_ok v_S v_C (v_ais1 ++ v_ais2) (mk_functype t1s t2s) ->
-    exists ts t1s' t2s' t3s, t1s = ts ++ t1s' /\
-                             t2s = ts ++ t2s' /\
-                             Admin_instrs_ok v_S v_C v_ais1 (mk_functype t1s' t3s) /\
-                             Admin_instrs_ok v_S v_C v_ais2 (mk_functype t3s t2s').
-Admitted.
-(* Proof.
-	move => v_S v_C v_ais1 v_ais2.
-	remember (rev v_ais2) as v_ais2'.
-	assert (v_ais2 = rev v_ais2'); first by (rewrite Heqv_ais2'; symmetry; apply revK).
-	generalize dependent v_ais1.
-	clear Heqv_ais2'. subst.
-	induction v_ais2' => //=; move => v_ais1 t1s t2s HType.
-	- unfold rev in HType; simpl in HType. subst.
-	  rewrite cats0 in HType.
-	  exists [::], t1s, t2s, t2s.
-	  repeat split => //=.
-	  apply admin_weakening_empty_both.
-	  by apply AIs_ok_empty.
-	- rewrite rev_cons in HType.
-	  rewrite -cats1 in HType. subst.
-	  rewrite catA in HType.
-	  apply admin_composition_typing_single in HType.
-	  destruct HType as [ts' [t1s' [t2s' [t3s' [H1 [H2 [H3 H4]]]]]]]. subst.
-	  apply IHv_ais2' in H3.
-	  destruct H3 as [ts2 [t1s2 [t2s2 [t3s2 [H5 [H6 [H7 H8]]]]]]]. subst.
-	  exists ts', (ts2 ++ t1s2), t2s', (ts2 ++ t3s2).
-	  repeat split => //.
-	  + by apply AIs_ok_frame.
-	  + rewrite rev_cons. rewrite -cats1.
-		eapply AIs_ok_seq; split; eauto.
-		by apply AIs_ok_frame.
-Qed. *)
+*)
+
+(*
 
 Ltac apply_composition_typing_and_single H :=
 	let ts1 := fresh "ts1_comp" in
@@ -383,7 +448,7 @@ Ltac apply_composition_typing_and_single H :=
 	try rewrite -cat1s in H; subst;
     apply admin_composition_typing in H; destruct H as [ts1 [ts2 [ts3 [ts4 [H1 [H2 [H3 H4]]]]]]];
 	apply_composition_typing_single H3.
-	
+
 Ltac apply_composition_typing H :=
 	let ts1 := fresh "ts1_comp" in
 	let ts2 := fresh "ts2_comp" in
@@ -402,7 +467,7 @@ Lemma admin_instrs_ok_eq: forall v_S v_C v_ai tf,
 Proof.
 	split; move => H; destruct tf as [ts1 ts2].
 	- (* -> *)
-		assert (Admin_instrs_ok v_S v_C [] (mk_functype [] [])). { apply AIs_ok_empty. }
+		assert (Admin_instrs_ok v_S v_C [] (functype_from_lists [] [])). { apply AIs_ok_empty. }
 		apply admin_weakening_empty_both with (ts := ts1) in H0.
 		apply (AIs_ok_seq v_S v_C [] v_ai ts1 ts2 ts1); eauto.
 	- (* <- *) 
@@ -411,9 +476,9 @@ Proof.
 Qed.
 
 Lemma admin_composition': forall v_S v_C v_ais1 v_ais2 t1s t2s t3s,
-	Admin_instrs_ok v_S v_C v_ais1 (mk_functype t1s t2s) ->
-	Admin_instrs_ok v_S v_C v_ais2 (mk_functype t2s t3s) ->
-	Admin_instrs_ok v_S v_C (v_ais1 ++ v_ais2) (mk_functype t1s t3s).
+	Admin_instrs_ok v_S v_C v_ais1 (functype_from_lists t1s t2s) ->
+	Admin_instrs_ok v_S v_C v_ais2 (functype_from_lists t2s t3s) ->
+	Admin_instrs_ok v_S v_C (v_ais1 ++ v_ais2) (functype_from_lists t1s t3s).
 Admitted.
 (* Proof.
 	move => v_S v_C v_ais1 v_ais2.
@@ -430,7 +495,7 @@ Admitted.
 Qed. *)
 
 Lemma AI_const_typing: forall v_S v_C v_t v_v t1s t2s,
-    Admin_instr_ok v_S v_C (AI_CONST v_t v_v) (mk_functype t1s t2s) ->
+    Admin_instr_ok v_S v_C (AI_CONST v_t v_v) (functype_from_lists t1s t2s) ->
     t2s = @app _ t1s [v_t].
 Admitted.
 (* Anomaly "File "tactics/tactics.ml", line 2172, characters 16-22: Assertion failed."
@@ -449,7 +514,7 @@ Ltac apply_const_typing_to_val H :=
 	apply AI_const_typing in H.
 
 Lemma Nop_typing: forall v_S v_C t1s t2s,
-    Admin_instr_ok v_S v_C AI_NOP (mk_functype t1s t2s) ->
+    Admin_instr_ok v_S v_C AI_NOP (functype_from_lists t1s t2s) ->
     t1s = t2s.
 Proof.
 	move => v_S v_C t1s t2s HType.
@@ -459,7 +524,7 @@ Proof.
 Qed.
 
 Lemma Drop_typing: forall v_S v_C t1s t2s,
-    Admin_instr_ok v_S v_C (AI_DROP) (mk_functype t1s t2s) ->
+    Admin_instr_ok v_S v_C (AI_DROP) (functype_from_lists t1s t2s) ->
     exists t, t1s = t2s ++ [t].
 Proof.
 	move => v_S v_C t1s t2s HType.
@@ -470,7 +535,7 @@ Proof.
 Qed.
 
 Lemma Unop_typing: forall v_S v_C v_t v_op t1s t2s,
-    Admin_instr_ok v_S v_C (AI_UNOP v_t v_op) (mk_functype t1s t2s) ->
+    Admin_instr_ok v_S v_C (AI_UNOP v_t v_op) (functype_from_lists t1s t2s) ->
     t1s = t2s /\ exists ts, t1s = @app _ ts [v_t].
 Admitted. (*
 Proof.
@@ -485,7 +550,7 @@ Proof.
 Qed. *)
 
 Lemma Binop_typing: forall v_S v_C v_t v_op t1s t2s,
-	Admin_instr_ok v_S v_C (AI_BINOP v_t v_op) (mk_functype t1s t2s) ->
+	Admin_instr_ok v_S v_C (AI_BINOP v_t v_op) (functype_from_lists t1s t2s) ->
     t1s = t2s ++ [v_t] /\ exists ts, t2s = ts ++ [v_t].
 Admitted. (*
 Proof.
@@ -501,7 +566,7 @@ Proof.
 Qed. *)
 
 Lemma Testop_typing : forall v_S v_C v_t v_testop ts1 ts2,
-	Admin_instr_ok v_S v_C (AI_TESTOP v_t v_testop) (mk_functype ts1 ts2) ->
+	Admin_instr_ok v_S v_C (AI_TESTOP v_t v_testop) (functype_from_lists ts1 ts2) ->
 	exists ts, ts1 = ts ++ [v_t] /\ ts2 = ts ++ [I32].
 Admitted. (*
 Proof.
@@ -515,7 +580,7 @@ Proof.
 Qed. *)
 
 Lemma Select_typing: forall v_S v_C t1s t2s,
-	Admin_instr_ok v_S v_C (AI_SELECT) (mk_functype t1s t2s) ->
+	Admin_instr_ok v_S v_C (AI_SELECT) (functype_from_lists t1s t2s) ->
     exists ts t, t1s = ts ++ [t; t; I32] /\ t2s = ts ++ [t].
 Proof.
 	move => v_S v_C t1s t2s HType.
@@ -528,7 +593,7 @@ Qed.
 
 (*
 Lemma Val_Const_list_typing: forall v_S v_C v_vals t1s t2s,
-    Admin_instrs_ok v_S v_C (map fun_coec_val__admininstr v_vals) (mk_functype t1s t2s) ->
+    Admin_instrs_ok v_S v_C (map fun_coec_val__admininstr v_vals) (functype_from_lists t1s t2s) ->
     t2s = t1s ++ (List.map typeof v_vals).
 Proof.
 	move => v_S v_C v_vals.
@@ -546,11 +611,11 @@ Qed.
 *)
 
 Lemma If_typing: forall v_S v_C t1s v_ais1 v_ais2 ts ts',
-	Admin_instr_ok v_S v_C (AI_IFELSE t1s v_ais1 v_ais2) (mk_functype ts ts') ->
+	Admin_instr_ok v_S v_C (AI_IFELSE t1s v_ais1 v_ais2) (functype_from_lists ts ts') ->
 	exists ts0,
    	ts = ts0 ++ [I32] /\ ts' = ts0 ++ t1s /\
-				Instrs_ok (upd_label v_C ([t1s] ++ C_LABELS v_C)) (v_ais1) (mk_functype [] t1s) /\
-                Instrs_ok (upd_label v_C ([t1s] ++ C_LABELS v_C)) (v_ais2) (mk_functype [] t1s).
+				Instrs_ok (upd_label v_C ([t1s] ++ C_LABELS v_C)) (v_ais1) (functype_from_lists [] t1s) /\
+                Instrs_ok (upd_label v_C ([t1s] ++ C_LABELS v_C)) (v_ais2) (functype_from_lists [] t1s).
 Admitted.
 (* Proof.
 	move => v_S v_C t1s v_ais1 v_ais2 ts ts' HType.
@@ -569,7 +634,7 @@ Qed. *)
 
 
 Lemma Br_if_typing: forall v_S v_C ts1 ts2 v_memaddr, 
-	Admin_instr_ok v_S v_C (AI_BR_IF (fun_nat__u32 v_memaddr)) (mk_functype ts1 ts2) ->
+	Admin_instr_ok v_S v_C (AI_BR_IF (fun_nat__u32 v_memaddr)) (functype_from_lists ts1 ts2) ->
     exists ts (ts' : resulttype), ts2 = ts ++ ts' /\ ts1 = ts2 ++ [I32] /\ (v_memaddr < List.length (C_LABELS v_C))%coq_nat
 	/\ lookup_total (C_LABELS v_C) v_memaddr = ts'.
 Admitted.
@@ -585,7 +650,7 @@ Admitted.
 Qed. *)
 
 Lemma Br_table_typing: forall v_S v_C ts1 ts2 ids i0,
-    Admin_instr_ok v_S v_C (AI_BR_TABLE ids i0) (mk_functype ts1 ts2) ->
+    Admin_instr_ok v_S v_C (AI_BR_TABLE ids i0) (functype_from_lists ts1 ts2) ->
     exists ts1' (ts : resulttype) , ts1 = ts1' ++ ts ++ [I32] /\
                         List.Forall (fun i => (fun_labelidx__nat i < length (C_LABELS v_C))%coq_nat) (ids) /\
 						(i0 < length (C_LABELS v_C))%coq_nat /\
@@ -604,7 +669,7 @@ Admitted.
 Qed. *)
 
 Lemma Relop_typing: forall v_S v_C v_t v_op t1s t2s,
-    Admin_instr_ok v_S v_C (AI_RELOP v_t v_op) (mk_functype t1s t2s) ->
+    Admin_instr_ok v_S v_C (AI_RELOP v_t v_op) (functype_from_lists t1s t2s) ->
     exists ts, t1s = ts ++ [v_t; v_t] /\ t2s = ts ++ [I32].
 Admitted. (*
 Proof.
@@ -617,7 +682,7 @@ Proof.
 Qed. *)
 
 Lemma Cvtop_typing: forall v_S v_C t1 t2 v_op t1s t2s,
-    Admin_instr_ok v_S v_C (AI_CVTOP t2 t1 v_op) (mk_functype t1s t2s) ->
+    Admin_instr_ok v_S v_C (AI_CVTOP t2 t1 v_op) (functype_from_lists t1s t2s) ->
     exists ts, t1s = ts ++ [t1] /\ t2s = ts ++ [t2].
 Proof.
 	move => v_S v_C t1 t2 v_op t1s t2s HType.
@@ -630,7 +695,7 @@ Proof.
 Qed.
 
 Lemma Local_tee_typing: forall v_S v_C v_memaddr ts1 ts2,
-    Admin_instr_ok v_S v_C (AI_LOCAL_TEE v_memaddr) (mk_functype ts1 ts2) ->
+    Admin_instr_ok v_S v_C (AI_LOCAL_TEE v_memaddr) (functype_from_lists ts1 ts2) ->
     exists ts t, ts1 = ts2 /\ ts1 = ts ++ [t] /\ (fun_u32__nat v_memaddr < length (C_LOCALS v_C))%coq_nat /\
                 lookup_total (C_LOCALS v_C) (fun_u32__nat v_memaddr) = t.
 Admitted.
@@ -648,11 +713,11 @@ Admitted.
 Qed. *)
 
 Lemma Label_typing: forall v_S v_C n v_instrs v_admininstrs ts1 ts2,
-    Admin_instr_ok v_S v_C (AI_LABEL_ n v_instrs v_admininstrs) (mk_functype ts1 ts2) ->
+    Admin_instr_ok v_S v_C (AI_LABEL_ n v_instrs v_admininstrs) (functype_from_lists ts1 ts2) ->
     exists (ts : resulttype) (ts2' : option valtype), ts2 = ts1 ++ ts2' /\
-					Instrs_ok v_C v_instrs (mk_functype ts ts2') /\
+					Instrs_ok v_C v_instrs (functype_from_lists ts ts2') /\
 					fun_optionSize ts = n /\
-                    Admin_instrs_ok v_S (upd_label v_C ([ts] ++ (C_LABELS v_C))) v_admininstrs (mk_functype [] ts2').
+                    Admin_instrs_ok v_S (upd_label v_C ([ts] ++ (C_LABELS v_C))) v_admininstrs (functype_from_lists [] ts2').
 Admitted.
 (* Proof.
 	move => v_S v_C n v_instrs v_admininstrs ts1 ts2 HType.
@@ -663,7 +728,7 @@ Admitted.
 Qed. *)
 
 Lemma Frame_typing: forall v_S v_C n v_F v_ais t1s t2s,
-    Admin_instr_ok v_S v_C (AI_FRAME_ n v_F v_ais) (mk_functype t1s t2s) ->
+    Admin_instr_ok v_S v_C (AI_FRAME_ n v_F v_ais) (functype_from_lists t1s t2s) ->
     exists (ts : resulttype), t2s = t1s ++ ts /\
                Thread_ok v_S (Some ts) v_F v_ais ts /\ 
 			   (n = (fun_optionSize ts)). 
@@ -677,7 +742,7 @@ Proof.
 Qed.
 
 Lemma Set_local_typing: forall v_S C i t1s t2s,
-    Admin_instr_ok v_S C (AI_LOCAL_SET (fun_nat__u32 i)) (mk_functype t1s t2s) ->
+    Admin_instr_ok v_S C (AI_LOCAL_SET (fun_nat__u32 i)) (functype_from_lists t1s t2s) ->
     exists t, lookup_total (C_LOCALS C) i = t /\
     t1s = t2s ++ [t] /\
     (i < length (C_LOCALS C))%coq_nat.
@@ -693,7 +758,7 @@ Admitted.
 Qed. *)
 
 Lemma Get_local_typing: forall v_S v_C i t1s t2s,
-    Admin_instr_ok v_S v_C (AI_LOCAL_GET i) (mk_functype t1s t2s) ->
+    Admin_instr_ok v_S v_C (AI_LOCAL_GET i) (functype_from_lists t1s t2s) ->
     exists t, lookup_total (C_LOCALS v_C) i = t /\
     t2s = t1s ++ [::t] /\
     (i < length (C_LOCALS v_C))%coq_nat.
@@ -710,9 +775,9 @@ Qed. *)
 
 
 Lemma Get_global_typing: forall v_S v_C (i: globalidx) t1s t2s,
-    Admin_instr_ok v_S v_C (AI_GLOBAL_GET i) (mk_functype t1s t2s) ->
+    Admin_instr_ok v_S v_C (AI_GLOBAL_GET i) (functype_from_lists t1s t2s) ->
     exists mut t, (lookup_total (C_GLOBALS v_C) i) = mk_globaltype mut t /\
-    t2s = t1s ++ [::t] /\
+    t2s = t1s ++ [t] /\
     (i < length (C_GLOBALS v_C))%coq_nat.
 Admitted.
 (* Proof.
@@ -726,7 +791,7 @@ Admitted.
 Qed. *)
 
 Lemma Set_global_typing: forall v_S v_C i t1s t2s,
-	Admin_instr_ok v_S v_C (AI_GLOBAL_SET (fun_nat__u32 i)) (mk_functype t1s t2s) ->
+	Admin_instr_ok v_S v_C (AI_GLOBAL_SET (fun_nat__u32 i)) (functype_from_lists t1s t2s) ->
     exists t, lookup_total (C_GLOBALS v_C) i = mk_globaltype (some MUT) t /\
     t1s = t2s ++ [t] /\
     (i < length (C_GLOBALS v_C))%coq_nat.
@@ -741,7 +806,7 @@ Admitted.
 Qed. *)
 
 Lemma Return_typing: forall v_S v_C t1s t2s,
-    Admin_instr_ok v_S v_C (AI_RETURN) (mk_functype t1s t2s) ->
+    Admin_instr_ok v_S v_C (AI_RETURN) (functype_from_lists t1s t2s) ->
     exists (ts : resulttype) ts', t1s = ts' ++ ts /\
                    C_RETURN v_C = Some ts.
 Proof.
@@ -754,7 +819,7 @@ Qed.
 
 (*
 Lemma Const_list_typing_empty: forall v_S v_C v_vals,
-    Admin_instrs_ok v_S v_C (map fun_coec_val__admininstr v_vals) (mk_functype [::] (List.map typeof v_vals)).
+    Admin_instrs_ok v_S v_C (map fun_coec_val__admininstr v_vals) (functype_from_lists [::] (List.map typeof v_vals)).
 Admitted.
 Proof.
 	move => v_S v_C.
@@ -768,13 +833,13 @@ Proof.
 			apply (AIs_ok_seq v_S v_C [] (AI_CONST v_valtype v_val_) [] [v_valtype] []).
 			split.
 			- apply AIs_ok_empty.
-			- apply (AI_ok_instr v_S v_C (instr__CONST v_valtype v_val_) (mk_functype [] [v_valtype])); subst.
+			- apply (AI_ok_instr v_S v_C (instr__CONST v_valtype v_val_) (functype_from_lists [] [v_valtype])); subst.
 				apply Instr_ok__const.
 		- by apply admin_instrs_weakening_empty_1.
 Qed. *)
 
 Lemma Break_typing: forall n v_S v_C t1s t2s,
-	Admin_instr_ok v_S v_C (AI_BR (fun_nat__u32 n)) (mk_functype t1s t2s) ->
+	Admin_instr_ok v_S v_C (AI_BR (fun_nat__u32 n)) (functype_from_lists t1s t2s) ->
 	exists ts ts0, 
 				(n < length (C_LABELS v_C))%coq_nat /\
 				lookup_total (C_LABELS v_C) n = ts /\
@@ -795,7 +860,7 @@ Admitted.
 Qed. *)
 
 Lemma CALL_ADDR_typing: forall v_S v_C a t1s t2s,
-    Admin_instr_ok v_S v_C (AI_CALL_ADDR a) (mk_functype t1s t2s) ->
+    Admin_instr_ok v_S v_C (AI_CALL_ADDR a) (functype_from_lists t1s t2s) ->
     exists v_funcinst, lookup_total (FUNCS v_S) a = v_funcinst.
 Admitted.
 (* Proof.
@@ -840,13 +905,13 @@ Lemma fold_append: forall v_C v_t v_func v_glob v_tab v_mem v_local v_lab v_ret,
 Proof. reflexivity. Qed.
 
 Lemma CALL_ADDR_invoke_typing: forall v_S v_C v_a t1s t2s v_t_1 (v_t_2 : resulttype) v_mm v_func v_x v_t v_instrs,
-    Admin_instr_ok v_S v_C (AI_CALL_ADDR v_a) (mk_functype t1s t2s) ->
-	((lookup_total (FUNCS v_S) v_a) = {| FUNC_TYPE := (mk_functype v_t_1 v_t_2); FUNC_MODULE := v_mm; CODE := v_func |}) ->
+    Admin_instr_ok v_S v_C (AI_CALL_ADDR v_a) (functype_from_lists t1s t2s) ->
+	((lookup_total (FUNCS v_S) v_a) = {| FUNC_TYPE := (functype_from_lists v_t_1 v_t_2); FUNC_MODULE := v_mm; CODE := v_func |}) ->
 	(v_func = (FUNC v_x (List.map (fun v_t => (LOCAL v_t)) (v_t)) v_instrs)) ->
 	Store_ok v_S ->
     exists ts' C', t1s = ts' ++ v_t_1 /\ t2s = ts' ++ v_t_2 /\
 	Module_instance_ok v_S v_mm C' /\
-	Instrs_ok (upd_local_label_return C' ((v_t_1 ++ v_t) ++ (C_LOCALS C')) (_append ([v_t_2]) (C_LABELS C')) (_append (Some v_t_2) (C_RETURN C'))) v_instrs (mk_functype [::] v_t_2).
+	Instrs_ok (upd_local_label_return C' ((v_t_1 ++ v_t) ++ (C_LOCALS C')) (_append ([v_t_2]) (C_LABELS C')) (_append (Some v_t_2) (C_RETURN C'))) v_instrs (functype_from_lists [::] v_t_2).
 Admitted.
 (* Proof.
 	move => v_S v_C v_a t1s t2s v_t_1 v_t_2 v_mm v_func v_x v_t v_instrs HType Hfinst HFunc HST.
@@ -894,7 +959,7 @@ Qed.
 
 (*
 Lemma Load_typing: forall v_S v_C t v_memop v_ww_sx t1s t2s,
-    Admin_instr_ok v_S v_C (AI_LOAD t v_ww_sx v_memop) (mk_functype t1s t2s) ->
+    Admin_instr_ok v_S v_C (AI_LOAD t v_ww_sx v_memop) (functype_from_lists t1s t2s) ->
     exists ts v_n v_sx v_inn v_mt, t1s = ts ++ [I32] /\ t2s = ts ++ [t] /\
 	(v_ww_sx = option_zipWith (fun (v : nat) (s : sx) => (loadop_  v s)) v_n v_sx ) /\
 	(0 < (List.length (C_MEMS v_C)))%coq_nat /\ ((v_n = None) <-> (v_sx = (None : option sx))) 
@@ -917,7 +982,7 @@ Admitted.
 Qed. *) *)
 
 Lemma Store_typing: forall v_S v_C t v_ww v_memop t1s t2s,
-    Admin_instr_ok v_S v_C (AI_STORE t v_ww v_memop) (mk_functype t1s t2s) ->
+    Admin_instr_ok v_S v_C (AI_STORE t v_ww v_memop) (functype_from_lists t1s t2s) ->
 	exists v_n v_mt v_inn,
     t1s = t2s ++ [::I32; t] /\
 	(0 < (List.length (C_MEMS v_C)))%coq_nat 
@@ -937,7 +1002,7 @@ Admitted.
 Qed. *)
 
 Lemma Memory_size_typing: forall v_S v_C t1s t2s,
-    Admin_instr_ok v_S v_C (AI_MEMORY_SIZE) (mk_functype t1s t2s) ->
+    Admin_instr_ok v_S v_C (AI_MEMORY_SIZE) (functype_from_lists t1s t2s) ->
 	exists v_mt, 
 	(0 < (List.length (C_MEMS v_C)))%coq_nat /\ 
 	((lookup_total (C_MEMS v_C) 0) = v_mt) /\
@@ -953,7 +1018,7 @@ Admitted.
 Qed. *)
 
 Lemma Grow_memory_typing: forall v_S v_C t1s t2s,
-    Admin_instr_ok v_S v_C (AI_MEMORY_GROW) (mk_functype t1s t2s) ->
+    Admin_instr_ok v_S v_C (AI_MEMORY_GROW) (functype_from_lists t1s t2s) ->
 	exists v_mt ts, 
 	(0 < (List.length (C_MEMS v_C)))%coq_nat /\ 
 	((lookup_total (C_MEMS v_C) 0) = v_mt) /\
@@ -969,9 +1034,9 @@ Admitted.
 Qed. *)
 		
 Lemma Block_typing: forall v_S v_C t2s v_instrs tn tm,
-    Admin_instr_ok v_S v_C (AI_BLOCK t2s v_instrs) (mk_functype tn tm) ->
+    Admin_instr_ok v_S v_C (AI_BLOCK t2s v_instrs) (functype_from_lists tn tm) ->
     exists ts, tn = ts /\ tm = ts ++ t2s /\
-		Instrs_ok (upd_label v_C ([t2s] ++ (C_LABELS v_C))) v_instrs (mk_functype [] t2s).
+		Instrs_ok (upd_label v_C ([t2s] ++ (C_LABELS v_C))) v_instrs (functype_from_lists [] t2s).
 Proof.
 	move => v_S v_C t2s v_instrs tn tm HType.
 	gen_ind_subst HType => //=.
@@ -984,9 +1049,9 @@ Proof.
 Qed.
 
 Lemma Loop_typing: forall v_S v_C t2s v_instrs tn tm,
-    Admin_instr_ok v_S v_C (AI_LOOP t2s v_instrs) (mk_functype tn tm) ->
+    Admin_instr_ok v_S v_C (AI_LOOP t2s v_instrs) (functype_from_lists tn tm) ->
     exists ts, tn = ts /\ tm = ts ++ t2s /\
-		Instrs_ok (upd_label v_C ([None] ++ (C_LABELS v_C))) v_instrs (mk_functype [] t2s).
+		Instrs_ok (upd_label v_C ([None] ++ (C_LABELS v_C))) v_instrs (functype_from_lists [] t2s).
 Admitted.
 (* Proof.
 	move => v_S v_C t2s v_instrs tn tm HType.
@@ -1000,9 +1065,9 @@ Admitted.
 Qed. *)
 
 Lemma Call_typing: forall j v_S v_C t1s t2s,
-    Admin_instr_ok v_S v_C (AI_CALL j) (mk_functype t1s t2s) ->
+    Admin_instr_ok v_S v_C (AI_CALL j) (functype_from_lists t1s t2s) ->
     exists ts t1s' (t2s' : option valtype), (fun_u32__nat j < length (C_FUNCS v_C))%coq_nat /\
-    lookup_total (C_FUNCS v_C) (fun_u32__nat j) = mk_functype t1s' t2s' /\
+    lookup_total (C_FUNCS v_C) (fun_u32__nat j) = functype_from_lists t1s' t2s' /\
                          t1s = ts ++ t1s' /\
                          t2s = ts ++ t2s'.
 Admitted.
@@ -1018,10 +1083,10 @@ Admitted.
 Qed. *)
 
 Lemma Call_indirect_typing: forall v_S i v_C t1s t2s,
-    Admin_instr_ok v_S v_C (AI_CALL_INDIRECT i) (mk_functype t1s t2s) ->
+    Admin_instr_ok v_S v_C (AI_CALL_INDIRECT i) (functype_from_lists t1s t2s) ->
     exists tn (tm : option valtype) ts,
     (fun_u32__nat i < length (C_TYPES v_C))%coq_nat /\
-    lookup_total (C_TYPES v_C) (fun_u32__nat i) = mk_functype tn tm /\
+    lookup_total (C_TYPES v_C) (fun_u32__nat i) = functype_from_lists tn tm /\
     t1s = ts ++ tn ++ [I32] /\ t2s = ts ++ tm.
 Admitted.
 (* Proof.

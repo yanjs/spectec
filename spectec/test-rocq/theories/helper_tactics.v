@@ -154,3 +154,123 @@ Ltac removeinstSimpler H :=
 	let H1 := fresh "HLength" in
 	eapply length_app_nil in H as H1; eauto;
 	rewrite H1 in H; rewrite <- app_right_nil in H.
+
+Lemma app_cat : forall {A : Type} (xs ys: seq A),
+  (xs ++ ys)%list = xs ++ ys.
+Proof. auto. Qed.
+
+Lemma list_cons_eq : forall {A : Type} (x y : A) (xs ys : seq A),
+  [x] ++ xs = [y] ++ ys -> x = y /\ xs = ys.
+Proof.
+  move => A x y xs ys H.
+  injection H as H.
+  by split.
+Qed.
+
+Lemma list_rcons_eq : forall {A : Type} (xs ys : seq A) (x y: A),
+  xs ++ [x] = ys ++ [y] ->
+  xs = ys /\ x = y.
+Proof.
+	move => A xs ys x y H.
+	have Hsizeeq : size xs = size ys.
+    {
+	  rewrite !cats1 in H.
+	  apply (f_equal size) in H.
+	  rewrite !size_rcons in H.
+	  by injection H as H. }
+	split.
+	- apply (f_equal (take (size xs))) in H.
+	  rewrite !take_cat !Hsizeeq !ltnn !subnn !take0 in H.
+	  by rewrite !cats0 in H.
+	- apply (f_equal (drop (size xs))) in H.
+	  rewrite !drop_cat !Hsizeeq !ltnn !subnn !drop0 in H.
+	  by inversion H.
+Qed.
+
+Ltac destruct_list_eq_right H :=
+  match type of H with
+  (* Case 1: Extract from right xs ++ [x] = ys ++ [y] *)
+  | @eq (seq _) (?xs ++ [?x]) (?ys ++ [?y]) =>
+    let H0 := fresh H "_body" in
+    let H1 := fresh H "_tail" in
+    move: (list_rcons_eq _ _ _ _ H) => [H0 H1];
+    clear H
+  (* Case 3: Nil from right xs ++ [x] = [y] *)
+  | @eq (seq _) (?xs ++ [?x]) ([?y]) =>
+	rewrite -(cat0s [y]) in H; destruct_list_eq_right H
+  (* Case 5: Nil from right [x] = ys ++ [y] *)
+  | @eq (seq _) ([?x]) (?ys ++ ?[y]) =>
+	symmetry in H; destruct_list_eq_right H
+  | _ => idtac
+  end.
+
+Ltac destruct_list_eq_left H :=
+  match type of H with
+  (* Case 2: Extract from left [x] ++ xs = [y] ++ ys *)
+  | @eq (seq _) ([?x] ++ ?xs) ([?y] ++ ?ys) =>
+    let H0 := fresh H "_body" in
+    let H1 := fresh H "_head" in
+    move: (list_cons_eq _ _ _ _ H) => [H1 H0]; clear H
+  (* Case 4: Nil from left [x] ++ xs = [y] *)
+  | @eq (seq _) ([?x] ++ ?xs) ([?y]) =>
+  rewrite -(cats0 [y]) in H; destruct_list_eq_left H
+  (* Case 6: Nil from left [x] = [y] ++ ys *)
+  | @eq (seq _) ([?x]) ([?y] ++ ?ys) =>
+  symmetry in H; destruct_list_eq_left H
+  | _ => idtac
+  end.
+
+Ltac repeat_cat_assoc_right H :=
+  repeat rewrite (catA) in H.
+
+Ltac repeat_cat_assoc_left H :=
+  repeat rewrite -(catA) in H.
+
+Ltac rewrite_cons_cat H :=
+  match type of H with
+  | @eq (seq _) (?x :: ?xs) (?y :: ?ys) =>
+    rewrite -[x :: xs]cat1s in H;
+    rewrite -[y :: ys]cat1s in H
+  | @eq (seq _) (?x :: ?xs) (_) =>
+    rewrite -[x :: xs]cat1s in H
+  | @eq (seq _) (_) (?y :: ?ys) =>
+    rewrite -[y :: ys]cat1s in H
+  | _ => idtac
+  end.
+
+Ltac discriminate_empty_list H :=
+  match type of H with
+  | [] = [_] =>
+    discriminate H
+  | [_] = [] =>
+    discriminate H
+  | _ => idtac
+  end.
+
+Ltac destruct_empty_list H :=
+  match type of H with
+  | [] = ?a ++ ?b =>
+    let H1 := fresh H in
+    let H2 := fresh H in
+    apply empty_append in H as [H1 H2];
+    clear H;
+    destruct_empty_list H1;
+    destruct_empty_list H2
+  | _ = [] =>
+    symmetry in H; destruct_empty_list H
+  | [] = [_] =>
+    discriminate H
+  | _ => idtac
+  end.
+
+Ltac destruct_list_eq H :=
+  try (rewrite !app_cat in H);
+  try destruct_empty_list H;
+  (* Try destruct from right *)
+  try (repeat_cat_assoc_right H;
+  destruct_list_eq_right H);
+  (* Try destruct from left *)
+  try (rewrite_cons_cat H;
+  repeat_cat_assoc_left H;
+  destruct_list_eq_left H);
+  try destruct_empty_list H.
