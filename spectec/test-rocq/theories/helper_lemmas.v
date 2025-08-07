@@ -1,7 +1,5 @@
-From Coq Require Import String List Unicode.Utf8.
+From Stdlib Require Import String List Unicode.Utf8 NArith Arith.
 From RecordUpdate Require Import RecordSet.
-Require Import NArith.
-Require Import Arith.
 Import ListNotations.
 Import RecordSetNotations.
 From WasmSpectec Require Import wasm.
@@ -71,7 +69,7 @@ Proof.
 	move => A l l' l1' l2' HLength HApp.
 
 	apply f_equal with (f := fun t => length t) in HApp.
-	rewrite List.app_length in HApp.
+	rewrite List.length_app in HApp.
 	rewrite <- HLength in HApp.
 	symmetry in HApp.
 	generalize dependent l2'.
@@ -106,7 +104,7 @@ Proof.
 	move => A l l' l1' l2' HLength HLength2 HApp.
 
 	apply f_equal with (f := fun t => List.length t) in HApp.
-	rewrite List.app_length in HApp.
+	rewrite List.length_app in HApp.
 	rewrite <- HLength in HApp.
 	rewrite <- HLength2 in HApp.
 	apply length_same_split_zero in HApp.
@@ -120,7 +118,7 @@ Lemma length_app_nil: forall {A : Type} (l' l1' l2': list A),
 Proof.
 	move => A l' l1' l2' HLength HApp.
 	apply f_equal with (f := fun t => List.length t) in HApp.
-	rewrite List.app_length in HApp.
+	rewrite List.length_app in HApp.
 	rewrite <- HLength in HApp.
 	apply length_same_split_zero in HApp.
 	rewrite <- List.length_zero_iff_nil => //=.
@@ -561,7 +559,7 @@ Proof.
 		simpl in HApp. injection HApp as ?.
 		simpl in HLength. injection HLength as ?.
 		apply f_equal with (f := fun t => List.length t) in H0 as ?.
-		rewrite app_length in H2. simpl in H2.
+		rewrite length_app in H2. simpl in H2.
 		rewrite H2 in H1.
 		rewrite <- addnC in H1.
 		rewrite addSn in H1.
@@ -572,7 +570,7 @@ Proof.
 		apply f_equal with (f := fun t => List.length t) in HApp as ?.
 		simpl in H.
 		injection H as H.
-		rewrite app_length in H. simpl in H.
+		rewrite length_app in H. simpl in H.
 		simpl in HLength. injection HLength as ?.
 		rewrite H0 in H.
 		rewrite <- addnC in H.

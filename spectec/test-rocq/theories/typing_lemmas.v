@@ -59,6 +59,7 @@ Definition fun_idx__nat : idx -> nat := fun x => match x with
 Coercion fun_nat__idx : nat >-> idx.
 Coercion fun_idx__nat : idx >-> nat.
 
+
 Definition upd_label C labs :=
 	C <| C_LABELS := labs |>.
 
@@ -77,6 +78,9 @@ Definition upd_label_local_return C loc lab ret :=
 Definition upd_local_label_return C loc lab ret := 
 	upd_return (upd_label (upd_local C loc) lab) ret.
 
+
+(*
+
 Ltac fold_upd_context :=
 	lazymatch goal with
 	| |- context [upd_local (upd_return ?C ?ret) ?loc] =>
@@ -94,13 +98,15 @@ Proof.
 Qed.
 
 Lemma upd_label_is_same_as_append: forall v_C lab,
-	upd_label v_C (_append lab (C_LABELS v_C)) = _append {| C_TYPES := []; C_FUNCS := []; C_GLOBALS := []; C_TABLES := []; C_MEMS := []; C_LOCALS := []; C_LABELS := lab; C_RETURN := None |} v_C.
+	upd_label v_C (_append lab (C_LABELS v_C)) = _append {| C_TYPES := []; C_FUNCS := []; C_GLOBALS := []; C_TABLES := []; C_MEMS := []; C_ELEMS := [];
+	C_DATAS := []; C_LOCALS := []; C_LABELS := lab; C_RETURN := None |} v_C.
 Proof.
 	move => v_C lab. reflexivity.
 Qed.
 
 Lemma upd_local_is_same_as_append: forall v_C loc,
-	upd_local v_C (_append loc (C_LOCALS v_C))  = _append {| C_TYPES := []; C_FUNCS := []; C_GLOBALS := []; C_TABLES := []; C_MEMS := []; C_LOCALS := loc; C_LABELS := []; C_RETURN := None |} v_C.
+	upd_local v_C (_append loc (C_LOCALS v_C))  = _append {| C_TYPES := []; C_FUNCS := []; C_GLOBALS := []; C_TABLES := []; C_MEMS := []; C_ELEMS := [];
+	C_DATAS := []; C_LOCALS := loc; C_LABELS := []; C_RETURN := None |} v_C.
 Proof.
 	move => v_C loc. reflexivity.
 Qed.
@@ -112,7 +118,8 @@ Proof. reflexivity. Qed.
 
 
 Lemma upd_return_is_same_as_append: forall v_C ret,
-	upd_return v_C (_append ret (C_RETURN v_C)) = _append {| C_TYPES := []; C_FUNCS := []; C_GLOBALS := []; C_TABLES := []; C_MEMS := []; C_LOCALS := []; C_LABELS := []; C_RETURN := ret |} v_C.
+	upd_return v_C (_append ret (C_RETURN v_C)) = _append {| C_TYPES := []; C_FUNCS := []; C_GLOBALS := []; C_TABLES := []; C_MEMS := []; C_ELEMS := [];
+	C_DATAS := []; C_LOCALS := []; C_LABELS := []; C_RETURN := ret |} v_C.
 Proof.
 	move => v_C ret. reflexivity.
 Qed.
@@ -141,6 +148,7 @@ Proof.
 		rewrite <- Heqlab => //=. 
 Qed.
 
+(*
 Definition typeof (v_val : val): valtype :=
 	match v_val with
 		| VAL_CONST t _ => t
@@ -175,6 +183,7 @@ Proof.
 		- induction v. apply mk_Val_ok.
 		- rewrite H2. by apply IHv_t1.
 Qed.
+*)
 
 Lemma instrs_empty_same_type: forall C t1 t2,
 	Instrs_ok C [] (mk_functype t1 t2) ->
@@ -517,6 +526,7 @@ Proof.
 	exists (v_t ++ x), x0. by repeat split => //=; rewrite <- app_assoc.
 Qed.
 
+(*
 Lemma Val_Const_list_typing: forall v_S v_C v_vals t1s t2s,
     Admin_instrs_ok v_S v_C (map fun_coec_val__admininstr v_vals) (mk_functype t1s t2s) ->
     t2s = t1s ++ (List.map typeof v_vals).
@@ -533,6 +543,7 @@ Proof.
 	  repeat rewrite <- app_assoc.  
 	  by f_equal.
 Qed.
+*)
 
 Lemma If_typing: forall v_S v_C t1s v_ais1 v_ais2 ts ts',
 	Admin_instr_ok v_S v_C (AI_IFELSE t1s v_ais1 v_ais2) (mk_functype ts ts') ->
@@ -741,10 +752,11 @@ Proof.
 		exists x, (v_t ++ x0). by repeat split => //=; try rewrite <- app_assoc.
 Qed.
 
+(*
 Lemma Const_list_typing_empty: forall v_S v_C v_vals,
     Admin_instrs_ok v_S v_C (map fun_coec_val__admininstr v_vals) (mk_functype [::] (List.map typeof v_vals)).
 Admitted.
-(* Proof.
+Proof.
 	move => v_S v_C.
 	induction v_vals => //=.
 	- apply AIs_ok_empty.
@@ -1022,3 +1034,4 @@ Admitted.
 		edestruct IHHType as [ts [t1s'' [t2s'' [? [? [? ?]]]]]] => //=; subst.
 		exists ts, t1s'', (v_t ++ t2s''). repeat split => //=; by rewrite <- app_assoc.
 Qed. *)
+*)

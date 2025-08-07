@@ -1,7 +1,5 @@
-From Coq Require Import String List Unicode.Utf8.
+From Stdlib Require Import String List Unicode.Utf8 NArith Arith.
 From RecordUpdate Require Import RecordSet.
-Require Import NArith.
-Require Import Arith.
 
 Declare Scope wasm_scope.
 Open Scope wasm_scope.
@@ -125,7 +123,7 @@ Ltac gen_ind_subst H :=
   subst;
   gen_ind_post.
 
-
+(*
 Ltac admin_instrs_ok_dependent_ind H :=
 let Ht := type of H in
 lazymatch Ht with
@@ -145,6 +143,7 @@ lazymatch Ht with
 	generalize dependent tf;
 	induction H
 end.
+*)
 
 Ltac removeinst2 H :=
     let H1 := fresh "HLength" in

@@ -9,6 +9,7 @@ From WasmSpectec Require Import wasm helper_lemmas helper_tactics typing_lemmas.
 From mathcomp Require Import ssreflect ssrfun ssrnat ssrbool seq.
 Import ListNotations.
 
+(*
 Lemma inst_t_context_local_empty: forall s i C,
 	Module_instance_ok s i C ->
     C_LOCALS C = [].
@@ -2135,6 +2136,7 @@ Admitted.
 	destruct Heqc2 as [? [? ?]]; subst => //).
 	eapply IHHReduce; eauto.
 Qed. *)
+*)
 
 Theorem t_pure_preservation: forall v_s v_minst v_ais v_ais' v_C loc lab ret tf,
     Module_instance_ok v_s v_minst v_C ->
