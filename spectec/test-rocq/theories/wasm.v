@@ -4931,10 +4931,10 @@ with
 (* Inductive Relations Definition at: ../specification/wasm-2.0/6-typing.spectec:137.1-137.91 *)
 Instrs_ok: context -> (list instr) -> functype -> Prop :=
 	| instrs_ok_empty : forall (v_C : context), Instrs_ok v_C [] (mk_functype (mk_list _ []) (mk_list _ []))
-	| instrs_ok_seq : forall (v_C : context) (v_instr_1 : instr) (v_instr_2 : (list instr)) (v_t_1 : (list valtype)) (v_t_3 : (list valtype)) (v_t_2 : (list valtype)), 
-		(Instr_ok v_C v_instr_1 (mk_functype (mk_list _ v_t_1) (mk_list _ v_t_2))) ->
-		(Instrs_ok v_C v_instr_2 (mk_functype (mk_list _ v_t_2) (mk_list _ v_t_3))) ->
-		Instrs_ok v_C ([v_instr_1] ++ v_instr_2) (mk_functype (mk_list _ v_t_1) (mk_list _ v_t_3))
+	| instrs_ok_seq : forall (v_C : context) (v_instr_1 : (list instr)) (v_instr_2 : instr) (v_t_1 : (list valtype)) (v_t_3 : (list valtype)) (v_t_2 : (list valtype)), 
+		(Instrs_ok v_C v_instr_1 (mk_functype (mk_list _ v_t_1) (mk_list _ v_t_2))) ->
+		(Instr_ok v_C v_instr_2 (mk_functype (mk_list _ v_t_2) (mk_list _ v_t_3))) ->
+		Instrs_ok v_C (v_instr_1 ++ [v_instr_2]) (mk_functype (mk_list _ v_t_1) (mk_list _ v_t_3))
 	| instrs_ok_sub : forall (v_C : context) (v_instr : (list instr)) (v_t'_1 : (list valtype)) (v_t'_2 : (list valtype)) (v_t_1 : (list valtype)) (v_t_2 : (list valtype)), 
 		(Instrs_ok v_C v_instr (mk_functype (mk_list _ v_t_1) (mk_list _ v_t_2))) ->
 		(Resulttype_sub (mk_list _ v_t'_1) (mk_list _ v_t_1)) ->
