@@ -6475,14 +6475,14 @@ Inductive Admin_instr_ok: store -> context -> admininstr -> functype -> Prop :=
 		(Instr_ok v_C v_instr v_functype) ->
 		Admin_instr_ok v_S v_C (v_instr : admininstr) v_functype
 	| AI_ok_trap : forall (v_S : store) (v_C : context) (v_t_1 : (list valtype)) (v_t_2 : (list valtype)), Admin_instr_ok v_S v_C AI_TRAP (mk_functype (mk_list _ v_t_1) (mk_list _ v_t_2))
-	| AI_ok_call_addr : forall (v_S : store) (v_C : context) (v_funcaddr : funcaddr) (v_t_1 : (list valtype)) (v_t_2 : (option valtype)), 
-		(Externaddrs_ok v_S (EXTADDR_FUNC v_funcaddr) (EXT_FUNC (mk_functype (mk_list _ v_t_1) (mk_list _ (option_to_list v_t_2))))) ->
-		Admin_instr_ok v_S v_C (AI_CALL_ADDR v_funcaddr) (mk_functype (mk_list _ v_t_1) (mk_list _ (option_to_list v_t_2)))
-	| AI_ok_label : forall (v_S : store) (v_C : context) (v_n : n) (v_instr : (list instr)) (v_admininstr : (list admininstr)) (v_t_2 : (option valtype)) (v_t_1 : (option valtype)), 
-		(Instrs_ok v_C v_instr (mk_functype (mk_list _ (option_to_list v_t_1)) (mk_list _ (option_to_list v_t_2)))) ->
-		(Admin_instrs_ok v_S ({| C_TYPES := []; C_FUNCS := []; C_GLOBALS := []; C_TABLES := []; C_MEMS := []; C_ELEMS := []; C_DATAS := []; C_LOCALS := []; C_LABELS := [(mk_list _ (option_to_list v_t_1))]; C_RETURN := None |} @@ v_C) v_admininstr (mk_functype (mk_list _ []) (mk_list _ (option_to_list v_t_2)))) ->
+	| AI_ok_call_addr : forall (v_S : store) (v_C : context) (v_funcaddr : funcaddr) (v_t_1 : (list valtype)) (v_t_2 : (list valtype)), 
+		(Externaddrs_ok v_S (EXTADDR_FUNC v_funcaddr) (EXT_FUNC (mk_functype (mk_list _ v_t_1) (mk_list _ v_t_2)))) ->
+		Admin_instr_ok v_S v_C (AI_CALL_ADDR v_funcaddr) (mk_functype (mk_list _ v_t_1) (mk_list _ v_t_2))
+	| AI_ok_label : forall (v_S : store) (v_C : context) (v_n : n) (v_instr : (list instr)) (v_admininstr : (list admininstr)) (v_t_2 : (list valtype)) (v_t_1 : (option valtype)), 
+		(Instrs_ok v_C v_instr (mk_functype (mk_list _ (option_to_list v_t_1)) (mk_list _ v_t_2))) ->
+		(Admin_instrs_ok v_S ({| C_TYPES := []; C_FUNCS := []; C_GLOBALS := []; C_TABLES := []; C_MEMS := []; C_ELEMS := []; C_DATAS := []; C_LOCALS := []; C_LABELS := [(mk_list _ (option_to_list v_t_1))]; C_RETURN := None |} @@ v_C) v_admininstr (mk_functype (mk_list _ []) (mk_list _ v_t_2))) ->
 		(v_n = (fun_optionSize v_t_1)) ->
-		Admin_instr_ok v_S v_C (AI_LABEL_ v_n v_instr v_admininstr) (mk_functype (mk_list _ []) (mk_list _ (option_to_list v_t_2)))
+		Admin_instr_ok v_S v_C (AI_LABEL_ v_n v_instr v_admininstr) (mk_functype (mk_list _ []) (mk_list _ v_t_2))
 	| AI_ok_frame : forall (v_S : store) (v_C : context) (v_n : n) (v_F : frame) (v_admininstr : (list admininstr)) (v_t : (option valtype)), 
 		(Thread_ok v_S (Some (mk_list _ (option_to_list v_t))) v_F v_admininstr (mk_list _ (option_to_list v_t))) ->
 		(v_n = (fun_optionSize v_t)) ->

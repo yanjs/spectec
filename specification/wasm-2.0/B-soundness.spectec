@@ -195,13 +195,13 @@ rule Admin_instr_ok/trap:
   S; C |- TRAP : t_1* -> t_2*
 
 rule Admin_instr_ok/call_addr:
-  S; C |- CALL_ADDR funcaddr : t_1* -> t_2?
-  -- Externaddrs_ok: S |- FUNC funcaddr: FUNC (t_1* -> t_2?)
+  S; C |- CALL_ADDR funcaddr : t_1* -> t_2*
+  -- Externaddrs_ok: S |- FUNC funcaddr: FUNC (t_1* -> t_2*)
 
 rule Admin_instr_ok/label:
-  S; C |- LABEL_ n `{instr*} admininstr* : eps -> t_2?
-  -- Instrs_ok: C |- instr*: t_1? -> t_2?
-  -- Admin_instrs_ok: S; $($(C, LABELS (t_1?))) |- admininstr*: eps -> t_2?
+  S; C |- LABEL_ n `{instr*} admininstr* : eps -> t_2*
+  -- Instrs_ok: C |- instr*: t_1? -> t_2*
+  -- Admin_instrs_ok: S; $($(C, LABELS (t_1?))) |- admininstr*: eps -> t_2*
   -- if $(n = $optionSize(t_1?))
 
 rule Admin_instr_ok/frame:
