@@ -357,7 +357,7 @@ Qed.
 
 Lemma instrs_empty_typing : forall v_C t1s t2s,
 	Instrs_ok v_C ([]) ( t1s :-> t2s ) <->
-	( t1s <ts? t2s ).
+	( t1s <ts: t2s ).
 Proof.
   move => v_C t1s t2s.
   split.
@@ -385,7 +385,7 @@ Qed.
 
 Lemma ais_empty_typing : forall v_S v_C t1s t2s,
 	Admin_instrs_ok v_S v_C ([]) ( t1s :-> t2s ) <->
-	( t1s <ts? t2s ).
+	( t1s <ts: t2s ).
 Proof.
   move => v_S v_C t1s t2s.
   split.

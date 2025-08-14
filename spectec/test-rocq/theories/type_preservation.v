@@ -35,31 +35,115 @@ Ltac destruct_functypes :=
         destruct v_ft as [[v_ft1] [v_ft2]]
     end.
 
-Lemma Step_pure__unreachable_preserves : forall v_S v_C v_ft,
-	Admin_instrs_ok v_S v_C [(AI_UNREACHABLE )] v_ft ->
-	Step_pure [(AI_UNREACHABLE )] [(AI_TRAP )] ->
-	Admin_instrs_ok v_S v_C [(AI_TRAP )] v_ft.
-Proof.
-	move => v_S v_C v_ft HType HReduce.
-	destruct_functypes.
-	apply (AIs_ok_seq v_S v_C [] (AI_TRAP) v_ft0 v_ft1 v_ft0).
-	- apply admin_weakening_empty_both. apply AIs_ok_empty.
-	- apply AI_ok_trap.
-Qed.
-
+Ltac destruct_disjunctions :=
+	repeat match goal with
+	| H: ?x \/ ?y |- _ =>
+		let H1 := fresh H in
+		let H2 := fresh H in
+		destruct H as [H1 | H2]
+	| _ : _ |- _ => idtac
+	end.
 
 Definition ai_principal_typing (v_S: store) (v_C: context) v_ai v_ft : Prop :=
 match v_ai with
-| AI_UNREACHABLE => True
-| AI_NOP => v_ft = ([] :-> [])
-| AI_DROP => exists t1s, v_ft = (t1s :-> [])
-| AI_TRAP => True
-| _ => True
+	| AI_NOP => v_ft = ([] :-> [])
+	| AI_UNREACHABLE => True
+	| AI_DROP => exists t1s, v_ft = (t1s :-> [])
+	| (AI_SELECT (Some [v_t])) => v_ft = ([v_t; v_t; VALTYPE_I32] :-> [v_t])
+	| (AI_SELECT None) => exists (t t': valtype),
+		v_ft = ([t; t; VALTYPE_I32] :-> [t]) /\
+		t <tv: t' /\
+		((exists nt: numtype, t' = nt) \/ (exists vt: vectype, t' = vt))
+	(*
+	| (AI_BLOCK v_0 v_1)
+	| (AI_LOOP v_0 v_1)
+	| (AI_IFELSE v_0 v_1 v_2)
+	| (AI_BR v_0)
+	| (AI_BR_IF v_0)
+	| (AI_BR_TABLE v_0 v_1)
+	| (AI_CALL v_0)
+	| (AI_CALL_INDIRECT v_0 v_1)
+	| AI_RETURN
+	| (AI_CONST v_0 v_1)
+	| (AI_UNOP v_0 v_1)
+	| (AI_BINOP v_0 v_1)
+	| (AI_TESTOP v_0 v_1)
+	| (AI_RELOP v_0 v_1)
+	| (AI_CVTOP v_0 v_1 v_2)
+	| (AI_EXTEND v_0 v_1)
+	| (AI_VCONST v_0 v_1)
+	| (AI_VVUNOP v_0 v_1)
+	| (AI_VVBINOP v_0 v_1)
+	| (AI_VVTERNOP v_0 v_1)
+	| (AI_VVTESTOP v_0 v_1)
+	| (AI_VUNOP v_0 v_1)
+	| (AI_VBINOP v_0 v_1)
+	| (AI_VTESTOP v_0 v_1)
+	| (AI_VRELOP v_0 v_1)
+	| (AI_VSHIFTOP v_0 v_1)
+	| (AI_VBITMASK v_0)
+	| (AI_VSWIZZLE v_0)
+	| (AI_VSHUFFLE v_0 v_1)
+	| (AI_VSPLAT v_0)
+	| (AI_VEXTRACT_LANE v_0 v_1 v_2)
+	| (AI_VREPLACE_LANE v_0 v_1)
+	| (AI_VEXTUNOP v_0 v_1 v_2)
+	| (AI_VEXTBINOP v_0 v_1 v_2)
+	| (AI_VNARROW v_0 v_1 v_2)
+	| (AI_VCVTOP v_0 v_1 v_2)
+	| (AI_REF_NULL v_0)
+	| (AI_REF_FUNC v_0)
+	| AI_REF_IS_NULL
+	| (AI_LOCAL_GET v_0)
+	| (AI_LOCAL_SET v_0)
+	| (AI_LOCAL_TEE v_0)
+	| (AI_GLOBAL_GET v_0)
+	| (AI_GLOBAL_SET v_0)
+	| (AI_TABLE_GET v_0)
+	| (AI_TABLE_SET v_0)
+	| (AI_TABLE_SIZE v_0)
+	| (AI_TABLE_GROW v_0)
+	| (AI_TABLE_FILL v_0)
+	| (AI_TABLE_COPY v_0 v_1)
+	| (AI_TABLE_INIT v_0 v_1)
+	| (AI_ELEM_DROP v_0)
+	| (AI_LOAD v_0 v_1 v_2)
+	| (AI_STORE v_0 v_1 v_2)
+	| (AI_VLOAD v_0 v_1 v_2)
+	| (AI_VLOAD_LANE v_0 v_1 v_2 v_3)
+	| (AI_VSTORE v_0 v_1)
+	| (AI_VSTORE_LANE v_0 v_1 v_2 v_3)
+	| AI_MEMORY_SIZE
+	| AI_MEMORY_GROW
+	| AI_MEMORY_FILL
+	| AI_MEMORY_COPY
+	| (AI_MEMORY_INIT v_0)
+	| (AI_DATA_DROP v_0)
+	*)
+	| _ => True
 end.
 
 (* v_ft must be the subtype of v_instr's type *)
 Definition instr_principal_typing (v_C : context) v_instr v_ft : Prop :=
 ai_principal_typing default_val v_C (v_instr : admininstr) v_ft.
+
+Lemma instr_typing_inversion: forall (v_C: context) v_instr t1s t2s,
+Instr_ok v_C v_instr (t1s :-> t2s) ->
+instr_principal_typing v_C v_instr (t1s :-> t2s).
+Proof.
+	move=> v_C v_instr t1s t2s HType.
+	inversion HType; subst.
+	all: unfold instr_principal_typing;
+		unfold ai_principal_typing;
+		unfold fun_coec_instr__admininstr.
+	all: do 2 eexists.
+
+	first [
+		(* SELECT *)
+		solve [destruct_disjunctions;
+		repeat eexists; eauto]
+	].
+Qed.
 
 Lemma ai_typing_inversion: forall (v_S: store) (v_C: context) v_ai t1s t2s,
 Admin_instr_ok v_S v_C v_ai (t1s :-> t2s) ->
@@ -75,11 +159,23 @@ Proof.
 	  unfold fun_coec_instr__admininstr.
 	  all: inversion H; subst.
 	  all: do 2 eexists.
-	  all: split; first try exact; simpl; eauto.
-	  all: exists []; do 3 eexists.
-      all: split; [|split; [|split; [|split]]].
-	  all: try apply resulttype_sub_refl.
-	  all: simpl; try exact.
+	  all: split;
+	  [
+		first [
+			solve exact
+		  |
+			solve [simpl; eauto]
+		  |
+			solve [destruct_disjunctions; repeat eexists; eauto]
+		]
+	  |
+		solve [
+			exists []; do 3 eexists;
+			split; [|split; [|split; [|split]]];
+			try apply resulttype_sub_refl;
+			simpl; try exact
+		]
+	  ].
 	}
 	{ (* trap *)
 	  exists t1s, t2s.
@@ -125,9 +221,118 @@ Proof.
 	}
 Qed.
 
+Lemma instrs_single_typing_inversion: forall (v_C: context) v_instr t1s t2s,
+Instrs_ok v_C [v_instr] (t1s :-> t2s) ->
+exists t1s_sup t2s_sub,
+	instr_principal_typing v_C v_instr (t1s_sup :-> t2s_sub) /\
+	(t1s_sup :-> t2s_sub) <ti: (t1s :-> t2s).
+Proof.
+	move=> v_C v_instr t1s t2s HType.
+	dependent induction HType.
+	{ (* seq *)
+	  destruct_list_eq x; subst.
+	  apply instrs_empty_typing in HType.
+	  apply instr_typing_inversion in H.
+	  exists v_t_2, t2s.
+	  split. auto.
+	  unfold instrtype_sub.
+	  exists [], [], t1s, t2s.
+	  split. auto.
+	  split. auto.
+	  split. by apply resulttype_sub_refl.
+	  split. auto.
+	  by apply resulttype_sub_refl.
+	}
+	{ (* sub *)
+	  specialize (IHHType _ _ _ erefl erefl) as [t1s_sup [t2s_sub [Hpt Hsub]]].
+	  exists t1s_sup, t2s_sub.
+	  split. auto.
+	  eapply instrtype_sub_trans.
+	  apply Hsub.
+	  unfold instrtype_sub.
+	  exists [], [], t1s, t2s.
+	  split. auto.
+	  split. auto.
+	  split. by apply resulttype_sub_refl.
+	  split. by apply H.
+	  by apply H0.
+	}
+	{ (* frame *)
+	  specialize (IHHType _ _ _ erefl erefl) as [t1s_sup [t2s_sub [Hpt Hsub]]].
+	  exists t1s_sup, t2s_sub.
+	  split. auto.
+	  eapply instrtype_sub_trans.
+	  apply Hsub.
+	  unfold instrtype_sub.
+	  exists v_t, v_t, v_t_1, v_t_2.
+	  split. auto.
+	  split. auto.
+	  split. by apply resulttype_sub_refl.
+	  split; by apply resulttype_sub_refl.
+	}
+Qed.
+
+Lemma ais_single_typing_inversion: forall (v_S: store) (v_C: context) v_ai t1s t2s,
+Admin_instrs_ok v_S v_C [v_ai] (t1s :-> t2s) ->
+exists t1s_sup t2s_sub,
+	ai_principal_typing v_S v_C v_ai (t1s_sup :-> t2s_sub) /\
+	(t1s_sup :-> t2s_sub) <ti: (t1s :-> t2s).
+Proof.
+	move=> v_S v_C v_ai t1s t2s HType.
+	dependent induction HType.
+	{ (* seq *)
+	  destruct_list_eq x; subst.
+	  apply ai_typing_inversion in H as [t1s_sup [t2s_sub [Hpt Hsub]]].
+	  exists (t1s_sup), (t2s_sub).
+	  split. auto.
+	  eapply instrtype_sub_trans. apply Hsub.
+	  unfold instrtype_sub.
+	  exists [], [], t1s, t2s.
+	  split. auto.
+	  split. auto.
+	  split. by apply resulttype_sub_refl.
+	  split. by eapply ais_empty_typing in HType.
+	  by apply resulttype_sub_refl.
+	}
+	{ (* frame *)
+	  specialize (IHHType _ _ _ erefl erefl) as [t1s_sup [t2s_sub [Hpt Hsub]]].
+	  exists t1s_sup, t2s_sub.
+	  split. auto.
+	  eapply instrtype_sub_trans.
+	  apply Hsub.
+	  unfold instrtype_sub.
+	  exists v_t, v_t, v_t_1, v_t_2.
+	  split. auto.
+	  split. auto.
+	  split. by apply resulttype_sub_refl.
+	  split; by apply resulttype_sub_refl.
+	}
+	{ (* instrs *)
+	  destruct v_instr. discriminate x.
+	  simpl in x.
+	  destruct_list_eq x.
+	  apply map_eq_nil in x_body.
+	  subst.
+	  eapply instrs_single_typing_inversion in H.
+	  auto.
+	}
+Qed.
+
+Lemma Step_pure__unreachable_preserves : forall v_S v_C v_ft,
+	Admin_instrs_ok v_S v_C [(AI_UNREACHABLE )] v_ft ->
+	Step_pure [(AI_UNREACHABLE )] [(AI_TRAP )] ->
+	Admin_instrs_ok v_S v_C [(AI_TRAP )] v_ft.
+Proof.
+	move => v_S v_C v_ft HType HReduce.
+	destruct_functypes.
+	apply (AIs_ok_seq v_S v_C [] (AI_TRAP) v_ft0 v_ft1 v_ft0).
+	- apply admin_weakening_empty_both. apply AIs_ok_empty.
+	- apply AI_ok_trap.
+Qed.
+
 Lemma Nop_typing: forall v_S v_C t1s t2s,
     Admin_instr_ok v_S v_C AI_NOP (t1s :-> t2s) ->
-    (t1s <ts? t2s).
+    (t1s <ts: t2s).
 Proof.
 	move => v_S v_C t1s t2s HType.
 	dependent induction HType.
@@ -143,14 +348,11 @@ Qed.
 
 Lemma Instr_nop_typing: forall v_C t1s t2s,
     Instr_ok v_C instr_NOP (t1s :-> t2s) ->
-    (t1s <ts? t2s).
+    (t1s <ts: t2s).
 Proof.
 	move => v_C t1s t2s HType.
 	dependent induction HType.
 	by apply resulttype_sub_refl.
-	- apply resulttype_sub_app.
-		apply resulttype_sub_refl.
-		by eapply IHHType.
 Qed.
 
 
@@ -202,7 +404,7 @@ Qed.
 
 Lemma Drop_typing: forall v_S v_C t1s t2s,
     Admin_instr_ok v_S v_C AI_NOP (t1s :-> t2s) ->
-    (t1s <ts? t2s).
+    (t1s <ts: t2s).
 
 Lemma Step_pure__drop_preserves : forall v_S v_C (v_val : wasm.val) v_ft,
 	Admin_instrs_ok v_S v_C [(v_val : admininstr); (AI_DROP )] v_ft ->

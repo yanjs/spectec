@@ -6,54 +6,54 @@ From mathcomp Require Import ssreflect ssrfun ssrnat ssrbool seq eqtype.
 Notation "tf1 :-> tf2" :=
 (mk_functype (mk_list _ tf1) (mk_list _ tf2)) (at level 40).
 
-Notation "t1 <t? t2" := (Valtype_sub t1 t2) (at level 30).
+Notation "t1 <tv: t2" := (Valtype_sub t1 t2) (at level 30).
 Definition Resulttype_subtype ts1 ts2 := Resulttype_sub (mk_list _ ts1) (mk_list _ ts2).
-Notation "ts1 <ts? ts2" := (Resulttype_subtype ts1 ts2) (at level 60).
+Notation "ts1 <ts: ts2" := (Resulttype_subtype ts1 ts2) (at level 60).
 
 Definition Ftype_sub tf1 tf2 : Prop :=
   match tf1, tf2 with
   | ts11 :-> ts12,
     ts21 :-> ts22 =>
-        (ts21 <ts? ts11) /\
-        (ts12 <ts? ts22)
+        (ts21 <ts: ts11) /\
+        (ts12 <ts: ts22)
   end.
 
 Definition instrtype_sub tf tf' : Prop :=
   match tf, tf' with
-  | ts1 :-> ts2,
-    ts1' :-> ts2' =>
-        exists ts_sub ts ts1_sub ts2_sup,
-        ts1' = ts_sub ++ ts1 /\
-        ts2' = ts ++ ts2_sup /\
-        (ts_sub <ts? ts) /\
-        (ts1_sub <ts? ts1) /\
-        (ts2 <ts? ts2_sup)
+  | ts11 :-> ts12,
+    ts21 :-> ts22 =>
+        exists ts_sub ts ts11_sub ts12_sup,
+        ts21 = ts_sub ++ ts11_sub /\
+        ts22 = ts ++ ts12_sup /\
+        (ts_sub <ts: ts) /\
+        (ts11_sub <ts: ts11) /\
+        (ts12 <ts: ts12_sup)
   end.
 
-Notation "tf1 <tf? tf2" := (Ftype_sub tf1 tf2) (at level 60).
+Notation "tf1 <tf: tf2" := (Ftype_sub tf1 tf2) (at level 60).
 Notation "tf1 <ti: tf2" := (instrtype_sub tf1 tf2) (at level 60).
 
 Lemma size_length : forall {A : Type} (xs : seq A),
   size xs = length xs.
 Proof. auto. Qed.
 
-Lemma valtype_sub_refl : forall t, t <t? t.
+Lemma valtype_sub_refl : forall t, (t <tv: t).
 Proof.
   move => t.
   apply refl.
 Qed.
 
 Lemma valtype_sub_trans: forall t1 t2 t3,
-    t1 <t? t2 ->
-    t2 <t? t3 ->
-    t1 <t? t3.
+    t1 <tv: t2 ->
+    t2 <tv: t3 ->
+    t1 <tv: t3.
 Proof.
   move => t1 t2 t3 H12 H23.
   destruct t1, t2, t3; eauto; try apply refl; try apply bot;
   try inversion H23; try inversion H12.
 Qed.
 
-Lemma resulttype_sub_refl : forall ts, ts <ts? ts.
+Lemma resulttype_sub_refl : forall ts, ts <ts: ts.
 Proof.
   intros ts.
   constructor; auto.
@@ -63,7 +63,7 @@ Proof.
 Qed.
 
 Lemma resulttype_sub_size_eq: forall ts1 ts2,
-    ts1 <ts? ts2 ->
+    ts1 <ts: ts2 ->
     size ts1 = size ts2.
 Proof.
   move => ts1 ts2 H.
@@ -72,9 +72,9 @@ Proof.
 Qed.
 
 Lemma resulttype_sub_trans: forall ts1 ts2 ts3,
-    ts1 <ts? ts2 ->
-    ts2 <ts? ts3 ->
-    ts1 <ts? ts3.
+    ts1 <ts: ts2 ->
+    ts2 <ts: ts3 ->
+    ts1 <ts: ts3.
 Proof.
   move => ts1 ts2 ts3 H12 H23.
   inversion H12; inversion H23; subst.
@@ -97,9 +97,9 @@ Proof.
 Qed.
 
 Lemma resulttype_sub_app_trans: forall ts_sub ts ts1 ts2,
-    ts_sub <ts? ts ->
-    (ts ++ ts1) <ts? (ts2) ->
-    (ts_sub ++ ts1) <ts? (ts2).
+    ts_sub <ts: ts ->
+    (ts ++ ts1) <ts: (ts2) ->
+    (ts_sub ++ ts1) <ts: (ts2).
 Proof.
   move => ts_sub ts ts1 ts2 H1 H2.
   constructor.
@@ -166,9 +166,9 @@ Proof.
 Qed.
 
 Lemma resulttype_sub_app: forall ts1_sub ts2_sub ts1 ts2,
-  (ts1_sub <ts? ts1) ->
-  (ts2_sub <ts? ts2) ->
-  (ts1_sub ++ ts2_sub) <ts? (ts1 ++ ts2).
+  (ts1_sub <ts: ts1) ->
+  (ts2_sub <ts: ts2) ->
+  (ts1_sub ++ ts2_sub) <ts: (ts1 ++ ts2).
 Proof.
   induction ts1_sub as [| t1_sub ts1_sub IH];
   move=> ts2_sub ts1 ts2 H1 H2.
@@ -218,9 +218,9 @@ Qed.
 
 Lemma resulttype_sub_app': forall ts1_sub ts2_sub ts1 ts2,
   length ts1_sub = length ts1 ->
-  (ts1_sub ++ ts2_sub) <ts? (ts1 ++ ts2) ->
-  (ts1_sub <ts? ts1) /\
-  (ts2_sub <ts? ts2).
+  (ts1_sub ++ ts2_sub) <ts: (ts1 ++ ts2) ->
+  (ts1_sub <ts: ts1) /\
+  (ts2_sub <ts: ts2).
 Proof.
   move => ts1_sub ts2_sub ts1 ts2 Hsize Happ.
   inversion Happ; subst.
@@ -252,9 +252,9 @@ Proof.
 Qed.
 
 Lemma resulttype_sub_split: forall ts1 ts2 n,
-    (ts1 <ts? ts2) ->
-    ((take n ts1) <ts? (take n ts2)) /\
-    ((drop n ts1) <ts? (drop n ts2)).
+    (ts1 <ts: ts2) ->
+    ((take n ts1) <ts: (take n ts2)) /\
+    ((drop n ts1) <ts: (drop n ts2)).
 Proof.
   move => ts1 ts2 n Hsub.
   have Hsize: size ts1 = size ts2 by apply resulttype_sub_size_eq.
@@ -300,9 +300,9 @@ Proof.
 Qed.
 
 Lemma resulttype_sub_split_sup: forall ts ts1 ts2,
-    ts <ts? (ts1 ++ ts2) ->
-    ((take (size ts1) ts) <ts? ts1) /\
-    ((drop (size ts1) ts) <ts? ts2).
+    ts <ts: (ts1 ++ ts2) ->
+    ((take (size ts1) ts) <ts: ts1) /\
+    ((drop (size ts1) ts) <ts: ts2).
 Proof.
   move => ts ts1 ts2 Hsub.
   assert (ts1 = take (size ts1) (ts1 ++ ts2)) as Htake.
@@ -315,7 +315,7 @@ Proof.
   auto.
 Qed.
 
-Lemma ftype_sub_refl : forall tf, tf <tf? tf.
+Lemma ftype_sub_refl : forall tf, tf <tf: tf.
 Proof.
   move => [[ts1] [ts2]].
   unfold Ftype_sub.
@@ -323,9 +323,9 @@ Proof.
 Qed.
 
 Lemma ftype_sub_trans: forall tf1 tf2 tf3,
-    tf1 <tf? tf2 ->
-    tf2 <tf? tf3 ->
-    tf1 <tf? tf3.
+    tf1 <tf: tf2 ->
+    tf2 <tf: tf3 ->
+    tf1 <tf: tf3.
 Proof.
   move => [[ts11] [ts12]] [[ts21] [ts22]] [[ts31] [ts32]] H12 H23.
   unfold Ftype_sub in *; simpl in *.
@@ -355,44 +355,73 @@ Lemma instrtype_sub_trans: forall tf1 tf2 tf3,
 Proof.
   move => [[ts11] [ts12]] [[ts21] [ts22]] [[ts31] [ts32]] H12 H23.
   unfold instrtype_sub in *.
-  destruct H12 as [tsH12_sub [tsH12 [ts11_sub [ts12_sup [
+  destruct H12 as [ts_sub_H12 [ts_H12 [ts11_sub_H12 [ts12_sup_H12 [
     H12_1 [H12_2 [H12_3 [H12_4 H12_5]]]]]]]];
-  destruct H23 as [tsH23_sub [tsH23 [ts21_sub [ts22_sup [
+  destruct H23 as [ts_sub_H23 [ts_H23 [ts11_sub_H23 [ts12_sup_H23 [
     H23_1 [H23_2 [H23_3 [H23_4 H23_5]]]]]]]];
   subst.
 
-  eexists (tsH23_sub ++ tsH12_sub),
-    (tsH23 ++ take (List.length tsH12) ts22_sup), 
-    (ts11_sub), ((drop (List.length tsH12) ts22_sup)).
+  (* Think:
 
-  assert (size tsH12 <= size ts22_sup) as HSize.
-  { apply resulttype_sub_size_eq in H23_5.
-    rewrite <- H23_5.
-    apply size_prefix.
-    apply prefix_prefix.
-  }
-  rewrite <- (cat_take_drop (length tsH12) ts22_sup) in H23_5.
-  assert (size tsH12 = size (take (length tsH12) ts22_sup)).
-  {
-    by apply size_takel in HSize.
-  }
-  apply resulttype_sub_app' in H23_5 as [H23_51 H23_52].
+  [     ts12supH23      ]
+  [tsH12      ts12supH12]
+  [???        ts12      ]
 
+  [tsH12      ts11      ]
+  [tssubH12   ts11subH12]
+  [     ts11subH23      ]
+
+  tsH23
+  tssubH23
+
+  *)
+
+  eexists
+    (ts_sub_H23 ++ take (List.length ts_H12) ts11_sub_H23),
+    (ts_H23  ++ take (List.length ts_H12) ts12_sup_H23),
+    (drop (List.length ts_H12) ts11_sub_H23),
+    (drop (List.length ts_H12) ts12_sup_H23).
   split.
-  { rewrite <- app_assoc.
-    reflexivity. }
+  - rewrite -catA.
+    by rewrite cat_take_drop.
   split.
-  { rewrite <- app_assoc.
-    by erewrite cat_take_drop. }
+  - rewrite -catA.
+    by rewrite cat_take_drop.
   split.
-  { apply resulttype_sub_app; auto.
-    eapply resulttype_sub_trans; eauto.
-  }
-  split; auto.
-  { eapply resulttype_sub_trans; eauto. }
-  auto.
+  - apply resulttype_sub_app. { auto. }
+    {
+      apply (resulttype_sub_trans _ ts_sub_H12).
+      {
+        inversion H12_3; subst.
+        eapply (resulttype_sub_split _ _ (length ts_H12)) in H23_4 as [H23_41 H23_42].
+        rewrite <- H1 in H23_41 at 2.
+        rewrite take_size_cat in H23_41.
+        auto.
+      }
+      {
+        apply (resulttype_sub_trans _ ts_H12). { auto. }
+        eapply (resulttype_sub_split _ _ (length ts_H12)) in H23_5 as [H23_51 H23_52].
+        rewrite take_size_cat in H23_51.
+        auto.
+      }
+    }
+  split.
+  - apply (resulttype_sub_trans _ ts11_sub_H12).
+    {
+      eapply (resulttype_sub_split _ _ (length ts_H12)) in H23_4 as [H23_41 H23_42].
+      inversion H12_3; subst.
+      rewrite <- H1 in H23_42 at 2.
+      rewrite drop_size_cat in H23_42.
+      auto.
+    }
+    { auto. }
+  - apply (resulttype_sub_trans _ ts12_sup_H12). { auto. }
+    {
+      eapply (resulttype_sub_split _ _ (length ts_H12)) in H23_5 as [H23_51 H23_52].
+      rewrite drop_size_cat in H23_52.
+      auto.
+    }
 Qed.
-  
 
 #[global]
 Instance valuetype_sub_preorder: RelationClasses.PreOrder Valtype_sub.
@@ -427,7 +456,7 @@ Proof.
 Qed.
 
 Lemma resulttype_sub_empty : forall ts,
-  (ts <ts? []) ->
+  (ts <ts: []) ->
   (ts = []).
 Proof.
   move => ts H.
@@ -437,7 +466,7 @@ Proof.
 Qed.
 
 Lemma resulttype_empty_sub : forall ts,
-  ([] <ts? ts) ->
+  ([] <ts: ts) ->
   (ts = []).
 Proof.
   move => ts H.
