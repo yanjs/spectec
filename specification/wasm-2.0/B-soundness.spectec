@@ -172,6 +172,13 @@ rule Admin_instrs_ok/seq:
   -- Admin_instrs_ok: S; C |- admininstr_1* : t_1* -> t_2*
   -- Admin_instr_ok: S; C |- admininstr_2 : t_2* -> t_3*
 
+rule Admin_instrs_ok/sub:
+  S; C |- admininstr* : t'_1* -> t'_2*
+  -- Admin_instrs_ok: S; C |- admininstr* : t_1* -> t_2*
+  ----
+  -- Resulttype_sub: |- t'_1* <: t_1*
+  -- Resulttype_sub: |- t_2* <: t'_2*
+
 rule Admin_instrs_ok/frame:
   S; C |- admininstr* : t* t_1* -> t* t_2*
   -- Admin_instrs_ok: S; C |- admininstr* : t_1* -> t_2*
@@ -194,24 +201,27 @@ rule Admin_instr_ok/instr:
 rule Admin_instr_ok/trap:
   S; C |- TRAP : t_1* -> t_2*
 
+rule Admin_instr_ok/ref_extern:
+  S; C |- REF.HOST_ADDR hostaddr : [] -> [EXTERNREF]
+
+rule Admin_instr_ok/ref:
+  S; C |- REF.FUNC_ADDR funcaddr : [] -> [FUNCREF]
+  -- Externaddrs_ok: S |- FUNC funcaddr: FUNC functype
+
 rule Admin_instr_ok/call_addr:
   S; C |- CALL_ADDR funcaddr : t_1* -> t_2*
   -- Externaddrs_ok: S |- FUNC funcaddr: FUNC (t_1* -> t_2*)
 
 rule Admin_instr_ok/label:
   S; C |- LABEL_ n `{instr*} admininstr* : eps -> t_2*
-  -- Instrs_ok: C |- instr*: t_1? -> t_2*
-  -- Admin_instrs_ok: S; $($(C, LABELS (t_1?))) |- admininstr*: eps -> t_2*
-  -- if $(n = $optionSize(t_1?))
+  -- Instrs_ok: C |- instr*: t_1* -> t_2*
+  -- Admin_instrs_ok: S; $($(C, LABELS (t_1*))) |- admininstr*: eps -> t_2*
+  -- if $(n = |t_1*|)
 
 rule Admin_instr_ok/frame:
-  S; C |- FRAME_ n `{F} admininstr* : eps -> t?
-  -- Thread_ok: S; t? |- F; admininstr*: t?
-  -- if $(n = $optionSize(t?))
-
-rule Admin_instr_ok/weakening:
-  S; C |- admininstr : t* t_1* -> t* t_2*
-  -- Admin_instr_ok: S; C |- admininstr : t_1* -> t_2*
+  S; C |- FRAME_ n `{F} admininstr* : eps -> t*
+  -- Thread_ok: S; t* |- F; admininstr*: t*
+  -- if $(n = |t*|)
 
 ;; Configuration validity
 
@@ -223,16 +233,16 @@ rule Frame_ok:
   -- (Val_ok: S |- val : t)*
 
 rule Thread_ok:
-  S; resulttype? |- F; admininstr* : t?
+  S; resulttype? |- F; admininstr* : t*
   -- Frame_ok: S |- F : C
-  -- Admin_instrs_ok: S; $($(C, RETURN resulttype?)) |- admininstr* : eps -> t?
+  -- Admin_instrs_ok: S; $($(C, RETURN resulttype?)) |- admininstr* : eps -> t*
 
 relation Config_ok: |- config : resulttype
 
 rule Config_ok:
-  |- S; F; admininstr* : t?
+  |- S; F; admininstr* : t*
   -- Store_ok: |- S : OK
-  -- Thread_ok: S; eps |- F; admininstr* : t?
+  -- Thread_ok: S; eps |- F; admininstr* : t*
 
 
 

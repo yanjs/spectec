@@ -274,3 +274,20 @@ Ltac destruct_list_eq H :=
   repeat_cat_assoc_left H;
   destruct_list_eq_left H);
   try destruct_empty_list H.
+
+Ltac destruct_functypes :=
+    repeat match goal with
+    | v_ft: functype |- _ =>
+		let v_ft1 := fresh v_ft in
+		let v_ft2 := fresh v_ft in
+        destruct v_ft as [[v_ft1] [v_ft2]]
+    end.
+
+Ltac destruct_disjunctions :=
+	repeat match goal with
+	| H: ?x \/ ?y |- _ =>
+		let H1 := fresh H in
+		let H2 := fresh H in
+		destruct H as [H1 | H2]
+	| _ : _ |- _ => idtac
+	end.
