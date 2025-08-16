@@ -43,11 +43,12 @@ Lemma Step_pure__nop_preserves : forall v_S v_C v_ft,
 Proof.
 	move => v_S v_C v_ft HType _.
 	typing_inversion HType.
+	typing_inversion Hai.
 	unfold_principal_typing Hpt.
-	inversion Hpt; subst.
-	unfold_instrtype_sub Hsub.
-	eapply resulttype_empty_sub in Hsub2.
-	eapply resulttype_sub_empty in Hsub1.
+	inversion Hpt; subst; clear Hpt.
+	unfold_instrtype_sub Hsub;
+	eapply resulttype_empty_sub in Hsub2;
+	eapply resulttype_sub_empty in Hsub1;
 	subst.
 	rewrite !cats0.
 	by apply ais_empty_typing.
@@ -60,9 +61,13 @@ Lemma Step_pure__drop_preserves : forall v_S v_C (v_val : wasm.val) v_ft,
 Proof.
 	move => v_S v_C v_val v_ft HType HReduce.
 	typing_inversion HType.
-	eapply ai_val_principal_typing_inversion in Hpt as [v_t [H1 H2]]; subst.	
-	unfold_principal_typing Hpt0;
-	destruct Hpt0 as [t1s Hteq];
+	typing_inversion H1.
+	typing_inversion Hai; clear Hai.
+	eapply ai_val_principal_typing_inversion in Hpt as [v_t [He1 He2]]; subst.
+	typing_inversion H2.
+	typing_inversion Hai; clear Hai.
+	unfold_principal_typing Hpt;
+	destruct Hpt as [t1s Hteq];
 	inversion Hteq; subst; clear Hteq.
 	apply ais_empty_typing.
 	unfold_instrtype_sub Hsub;
@@ -78,85 +83,84 @@ Proof.
 	[ idtac | by rewrite H6 ]; auto.
 Qed.
 
-Lemma construct_ais_typing_single : forall v_S v_C v_ai ts ts1 ts2 ts1' ts2',
+Lemma construct_ais_typing_single : forall v_S v_C v_ai ts1 ts2 ts1' ts2',
 	Admin_instr_ok v_S v_C v_ai (ts1 :-> ts2) ->
-	((ts ++ ts1) = ts1') ->
-	((ts ++ ts2) = ts2') ->
+	((ts1 :-> ts2) <ti: (ts1' :-> ts2')) ->
 	Admin_instrs_ok v_S v_C [v_ai] (ts1' :-> ts2').
 Proof.
-	move=> v_S v_C v_ai ts ts1 ts2 ts1' ts2' Hai Heq1 Heq2.
-	subst.
-	eapply AIs_ok_frame.
-	eapply (AIs_ok_seq _ _ [] v_ai).
-	- apply ais_empty_typing. by apply resulttype_sub_refl.
-	- auto.
+	move=> v_S v_C v_ai ts1 ts2 ts1' ts2' Hai Hsub.
+	unfold_instrtype_sub Hsub; subst.
+	eapply (AIs_ok_sub _ _); [
+		eapply (AIs_ok_frame) |
+		eapply resulttype_sub_refl |
+		eapply resulttype_sub_app; eauto
+	].
+	eapply (AIs_ok_seq _ _ []).
+	- apply ais_empty_typing. by apply Hsub1.
+	- eauto.
 Qed.
 
-Lemma construct_ais_single_typing_val : forall v_S v_C (v_val: wasm.val) v_t v_ft,
-	ai_principal_typing v_S v_C (v_val: admininstr) v_t ->
-	v_t <ti: v_ft ->
-	Admin_instrs_ok v_S v_C [(v_val: admininstr)] v_ft.
+Definition value_typing v_S v_val ts1 ts2 : Prop :=
+  match v_val with
+  | (VAL_CONST v_nt _) =>
+    ([] :-> [v_nt: valtype]) <ti: (ts1 :-> ts2)
+  | (VAL_VCONST v_vt _) =>
+    ([] :-> [v_vt: valtype]) <ti: (ts1 :-> ts2)
+  | (VAL_REF_NULL v_rt) =>
+    ([] :-> [v_rt: valtype]) <ti: (ts1 :-> ts2)
+  | (VAL_REF_FUNC_ADDR v_funcaddr) =>
+    ([] :-> [VALTYPE_FUNCREF]) <ti: (ts1 :-> ts2) /\
+	exists v_functype, (Externaddrs_ok v_S (EXTADDR_FUNC v_funcaddr) (EXT_FUNC v_functype))
+  | (VAL_REF_HOST_ADDR _) =>
+    ([] :-> [VALTYPE_EXTERNREF]) <ti: (ts1 :-> ts2)
+  end.
+
+Lemma ais_single_value_typing_iff: forall v_S v_C (v_val: wasm.val) ts1 ts2,
+  value_typing v_S v_val ts1 ts2 <->
+  Admin_instrs_ok v_S v_C [v_val: admininstr] (ts1 :-> ts2).
 Proof.
-	move=> v_S v_C v_val v_t v_ft Hpt Hsub.
-	destruct v_val; simpl in *; subst.
-	{
-		unfold_instrtype_sub Hsub; subst.
-		eapply (AIs_ok_instrs _ _ [(instr_CONST _ _)]).
-		eapply (instrs_ok_sub).
-		eapply (instrs_ok_frame).
-		eapply (instrs_ok_seq _ [] _).
-		- eapply (instrs_ok_empty).
-		- eapply (instr_ok_const).
-		- eapply resulttype_sub_app; eauto.
-		- eapply resulttype_sub_app; eauto; apply resulttype_sub_refl.
-	}
-	{
-		unfold_instrtype_sub Hsub; destruct v_vectype; subst.
-		eapply (AIs_ok_instrs _ _ [(instr_VCONST _ _)]).
-		eapply (instrs_ok_sub).
-		eapply (instrs_ok_frame).
-		eapply (instrs_ok_seq _ [] _).
-		- eapply (instrs_ok_empty).
-		- eapply (instr_ok_vconst).
-		- eapply resulttype_sub_app; eauto.
-		- eapply resulttype_sub_app; eauto; apply resulttype_sub_refl.
-	}
-	{
-		unfold_instrtype_sub Hsub; subst.
-		eapply (AIs_ok_instrs _ _ [(instr_REF_NULL _)]).
-		eapply (instrs_ok_sub).
-		eapply (instrs_ok_frame).
-		eapply (instrs_ok_seq _ [] _).
-		- eapply (instrs_ok_empty).
-		- eapply (instr_ok_ref_null).
-		- eapply resulttype_sub_app; eauto.
-		- eapply resulttype_sub_app; eauto; apply resulttype_sub_refl.
-	}
-	{
-		unfold_instrtype_sub Hsub; subst.
-		eapply (AIs_ok_sub _ _ _ _ _ (ts_sub ++ [])).
-		- eapply (AIs_ok_frame).
-		  eapply (AIs_ok_seq _ _ []).
-		  + eapply AIs_ok_empty.
-		  + eapply AI_ok_ref.
-		    
-		- eapply resulttype_sub_app; eauto.
-		- eapply resulttype_sub_app; eauto.
-		  eapply resulttype_sub_refl.
-	}
-	{
-		unfold_instrtype_sub Hsub; subst.
-		eapply (AIs_ok_sub _ _ _ _ _ (ts_sub ++ [])).
-		- eapply (AIs_ok_frame).
-		  eapply (AIs_ok_seq _ _ []).
-		  + eapply AIs_ok_empty.
-		  + eapply AI_ok_ref_extern.
-		- eapply resulttype_sub_app; eauto.
-		- eapply resulttype_sub_app; eauto.
-		  eapply resulttype_sub_refl.
-	}
+  move=> v_S v_C v_val ts1 ts2.
+  split.
+  { move=> H.
+    destruct v_val; unfold value_typing in H;
+	first [
+		unfold_instrtype_sub H |
+		destruct H as [H [v_functype H2]];
+		unfold_instrtype_sub H
+	]; subst.
+	all: apply resulttype_sub_empty in Hsub0; subst.
+	all: eapply AIs_ok_sub; [
+		eapply AIs_ok_frame
+		| eapply resulttype_sub_refl
+		| eapply resulttype_sub_app; eauto
+	].
+	all: eapply (AIs_ok_seq _ _ []); [
+		constructor | try move: H2; try constructor; try eapply AI_ok_ref
+	].
+	all: first [
+	  eapply (AI_ok_instr _ _ (instr_CONST _ _));
+	  eapply instr_ok_const |
+	  eapply (AI_ok_instr _ _ (instr_VCONST _ _));
+	  destruct v_vectype;
+	  eapply instr_ok_vconst |
+	  eapply (AI_ok_instr _ _ (instr_REF_NULL _));
+	  eapply instr_ok_ref_null |
+	  idtac
+	].
+  }
+  {
+	move=> HType.
+	typing_inversion HType.
+	typing_inversion Hai; clear Hai.
+	destruct v_val;
+	unfold value_typing;
+	unfold ai_principal_typing in Hpt;
+	unfold fun_coec_val__admininstr in Hpt.
+	4: destruct Hpt as [v_functype [Hpt H2]]; split.
+	all: inversion Hpt; subst; clear Hpt; auto.
+	exists v_functype; auto.
+  }
 Qed.
-	
 
 Lemma Step_pure__select_true_preserves : forall v_S v_C (v_val_1 : wasm.val) (v_val_2 : wasm.val) (v_c : iN 32) v_t v_ft,
 	Admin_instrs_ok v_S v_C [(v_val_1 : admininstr);(v_val_2 : admininstr);(AI_CONST I32 (v_c));(AI_SELECT v_t)] v_ft ->
@@ -164,15 +168,16 @@ Lemma Step_pure__select_true_preserves : forall v_S v_C (v_val_1 : wasm.val) (v_
 	Admin_instrs_ok v_S v_C [(v_val_1 : admininstr)] v_ft.
 Proof.
 	move => v_S v_C v_val_1 v_val_2 v_c v_t v_ft HType HReduce.
-	typing_inversion HType.
+    typing_inversion HType.
+Admitted.
+(* Too complicated
+	typing_inversion H4.
 	unfold_principal_typing Hpt1;
 	inversion Hpt1; subst; clear Hpt1.
 	eapply ai_val_principal_typing_inversion in Hpt as [v_t_1 [H1 H2]]; 
 	eapply ai_val_principal_typing_inversion in Hpt0 as [v_t_2 [H3 H4]];
 	subst.
 	destruct v_t.
-Admitted.
-(* Too complicated
 	{
 	  destruct l.
 	  {
@@ -198,12 +203,26 @@ Lemma Step_pure__select_false_preserves : forall v_S v_C (v_val_1 : wasm.val) (v
 Proof.
 Admitted.
 
-Lemma Step_pure__if_true_preserves : forall v_S v_C (v_c : iN 32) (v_t : (option valtype)) (v_instr_1 : (list instr)) (v_instr_2 : (list instr)) v_func_type,
-	Admin_instrs_ok v_S v_C [(AI_CONST I32 v_c);(AI_IFELSE v_t v_instr_1 v_instr_2)] v_func_type ->
-	Step_pure [(AI_CONST I32 v_c);(AI_IFELSE v_t v_instr_1 v_instr_2)] [(AI_BLOCK v_t v_instr_1)] ->
-	Admin_instrs_ok v_S v_C [(AI_BLOCK v_t v_instr_1)] v_func_type.
+Lemma Step_pure__if_true_preserves : forall v_S v_C (v_c : iN 32) (v_bt: blocktype) (v_instrs_1 : (list instr)) (v_instrs_2 : (list instr)) v_ft,
+	Admin_instrs_ok v_S v_C [(AI_CONST I32 v_c);(AI_IFELSE v_bt v_instrs_1 v_instrs_2)] v_ft ->
+	Step_pure [(AI_CONST I32 v_c);(AI_IFELSE v_bt v_instrs_1 v_instrs_2)] [(AI_BLOCK v_bt v_instrs_1)] ->
+	Admin_instrs_ok v_S v_C [(AI_BLOCK v_bt v_instrs_1)] v_ft.
 Proof.
-	move => v_S v_C v_c v_t v_instr_1 v_instr_2 v_func_type HType HReduce.
+	move => v_S v_C v_c v_bt v_instrs_1 v_instrs_2 v_ft HType HReduce.
+	typing_inversion HType.
+	eapply construct_ais_typing_single.
+	eapply (AI_ok_instr _ _ (instr_BLOCK _ _)).
+	constructor.
+	destruct v_bt.
+	- eapply block_ok_valtype.
+	
+	unfold_principal_typing Hpt.
+	unfold_principal_typing Hpt0.
+	destruct Hpt0 as [t1 [t2 [He [Hbok [Ht1 Ht2]]]]].
+    inversion Hpt; inversion He; clear Hpt; clear He; subst.
+
+
+
 Admitted.
 
 Lemma Step_pure__if_false_preserves : forall v_S v_C (v_c : iN 32) (v_t : (option valtype)) (v_instr_1 : (list instr)) (v_instr_2 : (list instr)) v_func_type,
