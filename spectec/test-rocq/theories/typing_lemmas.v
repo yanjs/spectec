@@ -449,8 +449,12 @@ match v_ai with
 		v_ft = ([t; t; VALTYPE_I32] :-> [t]) /\
 		t <tv: t' /\
 		((exists nt: numtype, t' = nt) \/ (exists vt: vectype, t' = vt))
-	(*| (AI_BLOCK v_0 v_1)
-	| (AI_LOOP v_0 v_1)*)
+	| (AI_BLOCK v_bt v_instr) =>
+	    exists t t',
+	    v_ft = (t :-> t') /\
+		(Blocktype_ok v_C v_bt (t :-> t')) /\
+		(Instrs_ok (prepend_label v_C t') v_instr (t :-> t'))
+	(*| (AI_LOOP v_0 v_1)*)
 	| (AI_IFELSE v_bt v_instrs1 v_instrs2) => exists (t t': seq valtype),
 	  	v_ft = ((t ++ [VALTYPE_I32]) :-> t') /\
 		(Blocktype_ok v_C v_bt (t :-> t')) /\
@@ -462,10 +466,10 @@ match v_ai with
 	    ((fun_proj_uN_0 32 v_l) < (List.length (C_LABELS v_C))) /\
 		((fun_proj_list_0 valtype (lookup_total (C_LABELS v_C) (fun_proj_uN_0 32 v_l))) = v_t)
 	| (AI_BR_IF v_l) =>
-	  exists t v_t,
+	  exists t,
 	    v_ft = ((t ++ [VALTYPE_I32]) :-> t) /\
 	    ((fun_proj_uN_0 32 v_l) < (List.length (C_LABELS v_C))) /\
-		((fun_proj_list_0 valtype (lookup_total (C_LABELS v_C) (fun_proj_uN_0 32 v_l))) = v_t)
+		((fun_proj_list_0 valtype (lookup_total (C_LABELS v_C) (fun_proj_uN_0 32 v_l))) = t)
 	| (AI_BR_TABLE v_l v_l') =>
       exists t t' v_t,
 	    v_ft = ((t ++ v_t ++ [VALTYPE_I32]) :-> t') /\
@@ -845,7 +849,9 @@ Qed.
 Ltac do_instr_typing_inversion H :=
   lazymatch type of H with
   | Instr_ok _ ?v_instr _ =>
-    eapply instr_typing_inversion in H as Hpt
+    let Hpt := fresh "Hpt" in
+    eapply instr_typing_inversion in H as Hpt;
+	clear H
   | _ => idtac
 end.
 
@@ -856,7 +862,7 @@ Ltac do_instrs_typing_inversion H :=
   | Instrs_ok _ [?v_instr] ( ?t1s :-> ?t2s ) =>
     let t1s_sup := fresh t1s "_sup" in
 	let t2s_sub := fresh t2s "_sub" in
-	let Hpt := fresh "Hpt" in
+	let Hinstr := fresh "Hinstr" in
 	let Hsub := fresh "Hsub" in
     eapply instrs_single_typing_inversion in H
 	  as [t1s_sup [t2s_sub [Hinstr Hsub]]]
@@ -883,7 +889,9 @@ Ltac do_instrs_typing_inversion H :=
 Ltac do_ai_typing_inversion H :=
   lazymatch type of H with
   | Admin_instr_ok _ _ _ _ =>
-    eapply ai_typing_inversion in H as Hpt
+    let Hpt := fresh "Hpt" in
+    eapply ai_typing_inversion in H as Hpt;
+	clear H
   | _ => idtac
   end.
 
@@ -894,7 +902,7 @@ Ltac do_ais_typing_inversion H :=
   | Admin_instrs_ok _ _ [?v_ai] ( ?t1s :-> ?t2s ) =>
     let t1s_sup := fresh t1s "_sup" in
 	let t2s_sub := fresh t2s "_sub" in
-	let Hpt := fresh "Hpt" in
+	let Hai := fresh "Hai" in
 	let Hsub := fresh "Hsub" in
     eapply ais_single_typing_inversion in H
 	  as [t1s_sup [t2s_sub [Hai Hsub]]]

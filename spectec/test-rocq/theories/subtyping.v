@@ -474,3 +474,86 @@ Proof.
   simpl in H2.
   by eapply length_zero_iff_nil.
 Qed.
+
+Lemma instrtype_sub_compose : forall ts1 ts2 ts3 txs tys tzs,
+  ((ts1 :-> ts2) <ti: (txs :-> tys)) ->
+  ((ts2 :-> ts3) <ti: (tys :-> tzs)) ->
+  ((ts1 :-> ts3) <ti: (txs :-> tzs)).
+Proof.
+  move=> ts1 ts2 ts3 txs tys tzs H1 H2.
+  unfold instrtype_sub in *.
+  destruct H1 as [tp1' [tp1 [ts1' [ts2'' [H1e1 [H1e2 [H1s1 [H1s2 H1s3]]]]]]]].
+  destruct H2 as [tp2' [tp2 [ts2' [ts3'' [H2e1 [H2e2 [H2s1 [H2s2 H2s3]]]]]]]].
+  subst.
+  eapply (resulttype_sub_app _ _ _ _ H1s1) in H1s3.
+  eapply (resulttype_sub_app _ _ _ _ H2s1) in H2s2.
+  rewrite H2e1 in H1s3.
+  eapply (resulttype_sub_trans _ _ _ H1s3) in H2s2.
+  inversion H2s2.
+  rewrite -!size_length in H1.
+  rewrite !size_cat in H1.
+  apply Nat.add_cancel_r in H1.
+  eapply (resulttype_sub_app' _ _ _ _ H1) in H2s2 as [H3 H4].
+  subst.
+
+  exists tp1', tp2, ts1', ts3''.
+  auto.
+Qed.
+
+Lemma instrtype_sub_compose1 : forall ts1 ts2 ts3 ts4 txs tys tzs,
+  ((ts1 :-> ts2) <ti: (txs :-> tys)) ->
+  (((ts3 ++ ts2) :-> ts4) <ti: (tys :-> tzs)) ->
+  (((ts3 ++ ts1) :-> ts4) <ti: (txs :-> tzs)).
+Proof.
+  move=> ts1 ts2 ts3 ts4 txs tys tzs H1 H2.
+  unfold instrtype_sub in H1, H2.
+  destruct H1 as [tp1' [tp1 [ts1' [ts2'' [H1e1 [H1e2 [H1s1 [H1s2 H1s3]]]]]]]].
+  destruct H2 as [tp2' [tp2 [ts3'ts2' [ts4'' [H2e1 [H2e2 [H2s1 [H2s2 H2s3]]]]]]]].
+
+  subst.
+  eapply (resulttype_sub_app _ _ _ _ H1s1) in H1s3.
+  eapply (resulttype_sub_app _ _ _ _ H2s1) in H2s2.
+  rewrite H2e1 in H1s3.
+  eapply (resulttype_sub_trans _ _ _ H1s3) in H2s2.
+  rewrite catA in H2s2.
+  inversion H2s2; subst.
+  rewrite -!size_length in H1.
+  rewrite size_cat in H1.
+  rewrite size_cat in H1.
+  apply Nat.add_cancel_r in H1.
+  eapply (resulttype_sub_app' _ _ _ _ H1) in H2s2 as [H3 _].
+
+  unfold instrtype_sub.
+  eexists (take (size tp2) tp1'), tp2, (drop (size tp2') tp1' ++ ts1'), ts4''.
+  assert (size tp2 = size tp2'). { by inversion H2s1. }
+
+  split.
+  {
+    rewrite catA.
+    rewrite H.
+    rewrite cat_take_drop.
+    auto.
+  }
+  split.
+  {
+    auto.
+  }
+  rewrite -(cat_take_drop (size tp2) tp1') in H3.
+  eapply (resulttype_sub_app') in H3 as [H4 H5].
+  2: {
+  rewrite -!size_length.
+  apply size_takel.
+  rewrite H1.
+  apply size_subseq.
+  apply prefix_subseq.
+  }
+  split. auto.
+  split.
+  {
+    eapply resulttype_sub_app.
+    rewrite -H.
+    auto.
+    auto.
+  }
+  auto.
+Qed.

@@ -62,10 +62,10 @@ Proof.
 	move => v_S v_C v_val v_ft HType HReduce.
 	typing_inversion HType.
 	typing_inversion H1.
-	typing_inversion Hai; clear Hai.
+	typing_inversion Hai.
 	eapply ai_val_principal_typing_inversion in Hpt as [v_t [He1 He2]]; subst.
 	typing_inversion H2.
-	typing_inversion Hai; clear Hai.
+	typing_inversion Hai.
 	unfold_principal_typing Hpt;
 	destruct Hpt as [t1s Hteq];
 	inversion Hteq; subst; clear Hteq.
@@ -110,7 +110,7 @@ Definition value_typing v_S v_val ts1 ts2 : Prop :=
     ([] :-> [v_rt: valtype]) <ti: (ts1 :-> ts2)
   | (VAL_REF_FUNC_ADDR v_funcaddr) =>
     ([] :-> [VALTYPE_FUNCREF]) <ti: (ts1 :-> ts2) /\
-	exists v_functype, (Externaddrs_ok v_S (EXTADDR_FUNC v_funcaddr) (EXT_FUNC v_functype))
+	exists v_ft, (Externaddrs_ok v_S (EXTADDR_FUNC v_funcaddr) (EXT_FUNC v_ft))
   | (VAL_REF_HOST_ADDR _) =>
     ([] :-> [VALTYPE_EXTERNREF]) <ti: (ts1 :-> ts2)
   end.
@@ -125,7 +125,7 @@ Proof.
     destruct v_val; unfold value_typing in H;
 	first [
 		unfold_instrtype_sub H |
-		destruct H as [H [v_functype H2]];
+		destruct H as [H [v_ft H2]];
 		unfold_instrtype_sub H
 	]; subst.
 	all: apply resulttype_sub_empty in Hsub0; subst.
@@ -151,14 +151,14 @@ Proof.
   {
 	move=> HType.
 	typing_inversion HType.
-	typing_inversion Hai; clear Hai.
+	typing_inversion Hai.
 	destruct v_val;
 	unfold value_typing;
 	unfold ai_principal_typing in Hpt;
 	unfold fun_coec_val__admininstr in Hpt.
-	4: destruct Hpt as [v_functype [Hpt H2]]; split.
+	4: destruct Hpt as [v_ft [Hpt H2]]; split.
 	all: inversion Hpt; subst; clear Hpt; auto.
-	exists v_functype; auto.
+	exists v_ft; auto.
   }
 Qed.
 
@@ -210,51 +210,85 @@ Lemma Step_pure__if_true_preserves : forall v_S v_C (v_c : iN 32) (v_bt: blockty
 Proof.
 	move => v_S v_C v_c v_bt v_instrs_1 v_instrs_2 v_ft HType HReduce.
 	typing_inversion HType.
+	typing_inversion H1;
+	typing_inversion Hai;
+	unfold_principal_typing Hpt;
+	inversion Hpt; subst; clear Hpt.
+	typing_inversion H2;
+	typing_inversion Hai;
+	unfold_principal_typing Hpt;
+	destruct Hpt as [t [t' [He [H2 [H3 H4]]]]].
+	inversion He; subst; clear He.
 	eapply construct_ais_typing_single.
-	eapply (AI_ok_instr _ _ (instr_BLOCK _ _)).
-	constructor.
-	destruct v_bt.
-	- eapply block_ok_valtype.
-	
+	{
+	  eapply (AI_ok_instr _ _ (instr_BLOCK _ _)).
+	  constructor.
+	  apply H2.
+	  apply H3.
+	}
+	rewrite -(cats0 t).
+	eapply instrtype_sub_compose1.
+	eapply Hsub.
+	eapply Hsub0.
+Qed.
+
+Lemma Step_pure__if_false_preserves : forall v_S v_C (v_c : iN 32) (v_bt: blocktype) (v_instrs_1 : (list instr)) (v_instrs_2 : (list instr)) v_ft,
+	Admin_instrs_ok v_S v_C [(AI_CONST I32 v_c);(AI_IFELSE v_bt v_instrs_1 v_instrs_2)] v_ft ->
+	Step_pure [(AI_CONST I32 v_c);(AI_IFELSE v_bt v_instrs_1 v_instrs_2)] [(AI_BLOCK v_bt v_instrs_2)] ->
+	Admin_instrs_ok v_S v_C [(AI_BLOCK v_bt v_instrs_2)] v_ft.
+Proof.
+	move => v_S v_C v_c v_t v_instr_1 v_instr_2 v_ft HType HReduce.
+	typing_inversion HType.
+	typing_inversion H1;
+	typing_inversion Hai;
+	unfold_principal_typing Hpt;
+	inversion Hpt; subst; clear Hpt.
+	typing_inversion H2;
+	typing_inversion Hai;
+	unfold_principal_typing Hpt;
+	destruct Hpt as [t [t' [He [H2 [H3 H4]]]]].
+	inversion He; subst; clear He.
+	eapply construct_ais_typing_single.
+	{
+	  eapply (AI_ok_instr _ _ (instr_BLOCK _ _)).
+	  constructor.
+	  apply H2.
+	  apply H4.
+	}
+	rewrite -(cats0 t).
+	eapply instrtype_sub_compose1.
+	eapply Hsub.
+	eapply Hsub0.
+Qed.
+
+Lemma Step_pure__label_vals_preserves : forall v_S v_C (v_n : n) (v_instrs : (list instr)) (v_val : (list wasm.val)) v_ft,
+	Admin_instrs_ok v_S v_C [(AI_LABEL_ v_n v_instrs (map fun_coec_val__admininstr v_val))] v_ft ->
+	Step_pure [(AI_LABEL_ v_n v_instrs (map fun_coec_val__admininstr v_val))] (map fun_coec_val__admininstr v_val) ->
+	Admin_instrs_ok v_S v_C (map fun_coec_val__admininstr v_val) v_ft.
+Proof.
+	move => v_S v_C v_n v_instrs v_val v_ft HType HReduce.
+	typing_inversion HType.
+	typing_inversion Hai.
 	unfold_principal_typing Hpt.
-	unfold_principal_typing Hpt0.
-	destruct Hpt0 as [t1 [t2 [He [Hbok [Ht1 Ht2]]]]].
-    inversion Hpt; inversion He; clear Hpt; clear He; subst.
-
-
-
 Admitted.
 
-Lemma Step_pure__if_false_preserves : forall v_S v_C (v_c : iN 32) (v_t : (option valtype)) (v_instr_1 : (list instr)) (v_instr_2 : (list instr)) v_func_type,
-	Admin_instrs_ok v_S v_C [(AI_CONST I32 v_c);(AI_IFELSE v_t v_instr_1 v_instr_2)] v_func_type ->
-	Step_pure [(AI_CONST I32 v_c);(AI_IFELSE v_t v_instr_1 v_instr_2)] [(AI_BLOCK v_t v_instr_2)] ->
-	Admin_instrs_ok v_S v_C [(AI_BLOCK v_t v_instr_2)] v_func_type.
+Lemma Step_pure__br_zero_preserves : forall v_S v_C (v_n : n) (v_instr' : (list instr)) (v_val' : (list wasm.val)) (v_val : (list wasm.val)) (v_instr : (list instr)) v_ft,
+	Admin_instrs_ok v_S v_C [(AI_LABEL_ v_n v_instr' (@app _ (map fun_coec_val__admininstr v_val') (@app _ (map fun_coec_val__admininstr v_val) (@app _ [AI_BR 0] (map fun_coec_instr__admininstr v_instr)))))] v_ft ->
+	Admin_instrs_ok v_S v_C (@app _ (map fun_coec_val__admininstr v_val) (map fun_coec_instr__admininstr v_instr')) v_ft.
 Proof.
-	move => v_S v_C v_c v_t v_instr_1 v_instr_2 v_func_type HType HReduce.
-Admitted.
-
-Lemma Step_pure__label_vals_preserves : forall v_S v_C (v_n : n) (v_instr : (list instr)) (v_val : (list val)) v_func_type,
-	Admin_instrs_ok v_S v_C [(AI_LABEL_ v_n v_instr (map fun_coec_val__admininstr v_val))] v_func_type ->
-	Step_pure [(AI_LABEL_ v_n v_instr (map fun_coec_val__admininstr v_val))] (map fun_coec_val__admininstr v_val) ->
-	Admin_instrs_ok v_S v_C (map fun_coec_val__admininstr v_val) v_func_type.
-Proof.
-	move => v_S v_C v_n v_instr v_val v_func_type HType HReduce.
-Admitted.
-
-Lemma Step_pure__br_zero_preserves : forall v_S v_C (v_n : n) (v_instr' : (list instr)) (v_val' : (list val)) (v_val : (list val)) (v_instr : (list instr)) v_func_type,
-	Admin_instrs_ok v_S v_C [(AI_LABEL_ v_n v_instr' (@app _ (map fun_coec_val__admininstr v_val') (@app _ (map fun_coec_val__admininstr v_val) (@app _ [AI_BR 0] (map fun_coec_instr__admininstr v_instr)))))] v_func_type ->
-	Admin_instrs_ok v_S v_C (@app _ (map fun_coec_val__admininstr v_val) (map fun_coec_instr__admininstr v_instr')) v_func_type.
-Proof.
-	move => v_S v_C v_instr' v_val' v_val v_instr v_func_type HType.
+	move => v_S v_C v_n v_instr' v_val' v_val v_instr v_ft HType.
+	typing_inversion HType.
+	typing_inversion Hai.
+	unfold_principal_typing Hpt.
 Admitted.
 
 
-Lemma Step_pure__br_succ_preserves : forall v_S v_C (v_n : n) (v_instr' : (list instr)) (v_val : (list val)) (v_l : labelidx) (v_instr : (list instr)) v_func_type,
-	Admin_instrs_ok v_S v_C [(AI_LABEL_ v_n v_instr' (@app _ (map fun_coec_val__admininstr v_val) (@app _ [AI_BR (v_l + 1)] (map fun_coec_instr__admininstr v_instr))))] v_func_type ->
+Lemma Step_pure__br_succ_preserves : forall v_S v_C (v_n : n) (v_instr' : (list instr)) (v_val : (list wasm.val)) (v_l : labelidx) (v_instr : (list instr)) v_ft,
+	Admin_instrs_ok v_S v_C [(AI_LABEL_ v_n v_instr' (@app _ (map fun_coec_val__admininstr v_val) (@app _ [AI_BR (v_l + 1)] (map fun_coec_instr__admininstr v_instr))))] v_ft ->
 	Step_pure [(AI_LABEL_ v_n v_instr' (@app _ (map fun_coec_val__admininstr v_val) (@app _ [AI_BR (v_l + 1)] (map fun_coec_instr__admininstr v_instr))))] (@app _ (map fun_coec_val__admininstr v_val) [(AI_BR v_l)]) ->
-	Admin_instrs_ok v_S v_C (@app _ (map fun_coec_val__admininstr v_val) [(AI_BR v_l)]) v_func_type.
+	Admin_instrs_ok v_S v_C (@app _ (map fun_coec_val__admininstr v_val) [(AI_BR v_l)]) v_ft.
 Proof.
-	move => v_S v_C v_n v_instr' v_val v_l v_instr v_func_type HType HReduce.
+	move => v_S v_C v_n v_instr' v_val v_l v_instr v_ft HType HReduce.
 Admitted.
 
 Lemma Step_pure__preserves__br_if_true : 
@@ -267,177 +301,169 @@ Proof.
   move => l c ft C s Hadmin Hstep Hval.
 Admitted.
 
-(* TODO: Example of migrating proofs using auto-translated statements (SSReflect) *)
-Lemma cat_app : 
-  forall {A : Type} (s1 s2 : seq A),
-  app s1 s2 = cat s1 s2.
-Proof. by []. Qed.
-
-Lemma cat_inv : 
-  forall {A : Type} (s1 : seq A) (s2 : seq A) (x1 : A) (x2 : A),
-	s1 ++ [:: x1] = s2 ++ [::x2] ->
-	s1 = s2 /\ x1 = x2.
-Proof. by apply: app_inj_tail. Qed.
-
-Lemma Admin_instrs_ok_admin_instr_ok : forall s C e ts1 ts2,
-  Admin_instrs_ok s C [:: e] (mk_functype ts1 ts2) ->
-  exists ts ts1' ts2', 
-    ts1 = ts ++ ts1' /\
-    ts2 = ts ++ ts2' /\
-    Admin_instr_ok s C e (mk_functype ts1' ts2').
-Proof.
-  move=> s C e ts1 ts2 Hadmin.
-  rewrite -[[:: _]]cat0s -cat_app in Hadmin.
-  move/admin_composition_typing_single: Hadmin => [ts [ts1' [ts2' [ts3 [Hts1 [Hts2 [Hempty Hadmin]]]]]]].
-  exists ts, ts1', ts2'; do ? split.
-  - by rewrite -cat_app.
-  - by rewrite -cat_app.
-  - move/admin_empty_same_type: Hempty => Hts3. 
-    by rewrite -{}Hts3 in Hadmin.
-Qed.
-
-Lemma Step_pure__br_if_true_preserves : forall v_S v_C (v_c : iN 32) (v_l : labelidx) v_func_type,
-	Admin_instrs_ok v_S v_C [(AI_CONST I32 v_c);(AI_BR_IF v_l)] v_func_type ->
+Lemma Step_pure__br_if_true_preserves : forall v_S v_C (v_c : iN 32) (v_l : labelidx) v_ft,
+	Admin_instrs_ok v_S v_C [(AI_CONST I32 v_c);(AI_BR_IF v_l)] v_ft ->
 	Step_pure [(AI_CONST I32 v_c);(AI_BR_IF v_l)] [(AI_BR v_l)] ->
-	Admin_instrs_ok v_S v_C [(AI_BR v_l)] v_func_type.
+	Admin_instrs_ok v_S v_C [(AI_BR v_l)] v_ft.
 Proof.
-	move => v_S v_C v_c v_l v_func_type HType HReduce.
-	destruct v_func_type as [ts1 ts2].
-	apply_composition_typing_and_single HType.
-	apply_composition_typing_single H4_comp.
-	destruct v_l.
-	apply Br_if_typing in H4_comp1; destruct H4_comp1 as [ts [ts' [H1 [H2 [H3 H4]]]]].
-	apply AI_const_typing in H4_comp0.
-	subst.
-	repeat rewrite -> app_assoc in H1_comp1; apply split_append_last in H1_comp1; destruct H1_comp1.
-	rewrite H.
-	repeat rewrite -> app_assoc.
-	apply AIs_ok_frame.
-	remember (lookup_total (C_LABELS v_C) v_i) as ts'.
-	apply (AIs_ok_seq v_S v_C [] (AI_BR v_i) ts' ts' ts').
-	apply admin_weakening_empty_both. apply AIs_ok_empty.
-	apply (AI_ok_instr _ _ (BR v_i) (mk_functype ts' ts')).
-	apply (br v_C v_i [] ts' ts').
-	move: H3 => /leP Hbool. auto.
-	subst. reflexivity.
+	move => v_S v_C v_c v_l v_ft HType HReduce.
+	typing_inversion HType.
+	typing_inversion H1.
+	typing_inversion Hai.
+	typing_inversion H2.
+	typing_inversion Hai.
+	unfold_principal_typing Hpt.
+	inversion Hpt; subst; clear Hpt.
+	unfold_principal_typing Hpt0.
+	destruct Hpt0 as [t [He1 [H1 H2]]].
+	inversion He1; subst; clear He1.
+
+	eapply construct_ais_typing_single.
+	eapply (AI_ok_instr _ _ (instr_BR _)).
+	eapply (instr_ok_br _ _ []).
+	auto.
+	auto.
+	eapply (instrtype_sub_compose1 _ _ _ _ _ _ _ Hsub) in Hsub0.
+	rewrite cats0 in Hsub0.
+	eapply Hsub0.
 Qed.
 
-Lemma Step_pure__br_if_false_preserves : forall v_S v_C (v_c : iN 32) (v_l : labelidx) v_func_type,
-	Admin_instrs_ok v_S v_C [(AI_CONST I32 v_c);(AI_BR_IF v_l)] v_func_type ->
+Lemma Step_pure__br_if_false_preserves : forall v_S v_C (v_c : iN 32) (v_l : labelidx) v_ft,
+	Admin_instrs_ok v_S v_C [(AI_CONST I32 v_c);(AI_BR_IF v_l)] v_ft ->
 	Step_pure [(AI_CONST I32 v_c);(AI_BR_IF v_l)] [] ->
-	Admin_instrs_ok v_S v_C [] v_func_type.
+	Admin_instrs_ok v_S v_C [] v_ft.
 Proof.
-	move => v_S v_C v_c v_l v_func_type HType HReduce.
-	destruct v_func_type as [ts1 ts2].
-	apply_composition_typing_and_single HType.
-	apply_composition_typing_single H4_comp.
-	destruct v_l.
-	apply Br_if_typing in H4_comp1; destruct H4_comp1 as [ts [ts' [H1 [H2 [H3 H4]]]]].
-	apply AI_const_typing in H4_comp0.
-	subst.
-	repeat rewrite -> app_assoc in H1_comp1; apply split_append_last in H1_comp1; destruct H1_comp1.
-	rewrite H.
-	repeat rewrite -> app_assoc.
-	apply admin_weakening_empty_both. apply AIs_ok_empty.
+	move => v_S v_C v_c v_l v_ft HType HReduce.
+	typing_inversion HType.
+	typing_inversion H1.
+	typing_inversion Hai.
+	typing_inversion H2.
+	typing_inversion Hai.
+	unfold_principal_typing Hpt.
+	inversion Hpt; subst; clear Hpt.
+	unfold_principal_typing Hpt0.
+	destruct Hpt0 as [t [He1 [H1 H2]]].
+	inversion He1; subst; clear He1.
+
+	eapply (instrtype_sub_compose1 _ _ _ _ _ _ _ Hsub) in Hsub0.
+	rewrite cats0 in Hsub0.
+	eapply ais_empty_typing.
+	unfold_instrtype_sub Hsub0; subst.
+	apply resulttype_sub_app.
+	auto.
+	eapply resulttype_sub_trans; eauto.
 Qed.
 
-Lemma Step_pure__br_table_lt_preserves : forall v_S v_C (v_i : uN 32) (v_l : (list labelidx)) (v_l' : labelidx) v_func_type,
-	Admin_instrs_ok v_S v_C [(AI_CONST I32 v_i);(AI_BR_TABLE v_l v_l')] v_func_type ->
+Lemma proj_identity : forall A a, mk_list A (fun_proj_list_0 A a) = a.
+Proof.
+	destruct a.
+	auto.
+Qed.
+
+Lemma Step_pure__br_table_lt_preserves : forall v_S v_C (v_i : uN 32) (v_l : (list labelidx)) (v_l' : labelidx) v_ft,
+	Admin_instrs_ok v_S v_C [(AI_CONST I32 v_i);(AI_BR_TABLE v_l v_l')] v_ft ->
 	Step_pure [(AI_CONST I32 (v_i : u32));(AI_BR_TABLE v_l v_l')] [(AI_BR (lookup_total v_l (fun_u32__nat v_i)))] ->
 	(fun_u32__nat v_i < Datatypes.length v_l) -> 
-	Admin_instrs_ok v_S v_C [(AI_BR (lookup_total v_l (fun_u32__nat v_i)))] v_func_type.
+	Admin_instrs_ok v_S v_C [(AI_BR (lookup_total v_l (fun_u32__nat v_i)))] v_ft.
 Proof.
-	move => v_S v_C v_i v_l v_l' v_func_type HType HReduce H.
-	destruct v_func_type as [ts1 ts2].
-	apply_composition_typing_and_single HType.
-	apply_composition_typing_single H4_comp.
-	apply Br_table_typing in H4_comp1.
-	destruct H4_comp1 as [ts1' [ts [H1 [H2 [H3 [H4 H5]]]]]].
-	apply AI_const_typing in H4_comp0.
-	subst.
-	repeat rewrite -> app_assoc in H1_comp1.
-	apply split_append_last in H1_comp1; destruct H1_comp1.
-	rewrite H0.
-	repeat rewrite <- app_assoc.
-	apply AIs_ok_frame.
-	apply AIs_ok_frame.
-	remember (ts1' ++ lookup_total (C_LABELS v_C) v_l')%list as ts. (* Just for convencience *)
-	apply (AIs_ok_seq v_S v_C [] (AI_BR (lookup_total v_l (fun_u32__nat v_i))) ts ts3_comp1 ts).
-	+ (* Empty *) apply admin_weakening_empty_both. apply AIs_ok_empty.
-	+ (* BR *) apply (AI_ok_instr _ _ (BR (lookup_total v_l (fun_u32__nat v_i))) (mk_functype ts ts3_comp1)).
-		subst. apply (br v_C (lookup_total v_l (fun_u32__nat v_i)) ts1' (lookup_total (C_LABELS v_C) v_l') ts3_comp1).
-		rewrite Forall_nth in H5.
-		rewrite Forall_nth in H2.
-	  	move: H => /leP H.
-		apply (H5 _ default_val) in H as H6.
-		apply (H2 _ default_val) in H as H7.
+	move => v_S v_C v_i v_l v_l' v_ft HType HReduce H.
+	typing_inversion HType.
+	typing_inversion H1.
+	typing_inversion Hai.
+	unfold_principal_typing Hpt.
+	inversion Hpt; subst; clear Hpt.
+	typing_inversion H2.
+	typing_inversion Hai.
+	unfold_principal_typing Hpt.
+	destruct Hpt as [t [t' [v_t [H1 [H2 [H3 [H4 H5]]]]]]].
+	inversion H1; subst; clear H1.
+	rewrite catA in Hsub0.
+	eapply (instrtype_sub_compose1 _ _ _ _ _ _ _ Hsub) in Hsub0.
+	rewrite cats0 in Hsub0.
 
-	  	move: H7 => /leP Hbool. auto.
-		rewrite -> Forall_forall in H5.
-		assert (In (lookup_total v_l (fun_u32__nat v_i)) v_l) as H4.
-		{ induction v_l as [| a l].
-		  - inversion H; subst.
-		  - move: H => /leP H.
-		    eapply nth_In in H.
-			unfold lookup_total.
-			apply H.
-		}
-		eapply H5 in H4. auto.
+	eapply construct_ais_typing_single.
+	eapply (AI_ok_instr _ _ (instr_BR _)).
+	eapply (instr_ok_br _ _ t _ t').
+	{
+	  eapply Forall_nth in H2.
+	  apply H2.
+	  by apply/ltP.
+	}
+    {
+		reflexivity.		
+	}
+	eapply (instrtype_sub_trans _ ((t ++ v_t) :-> t')).
+	{
+	  exists [], [], (t ++ v_t), t'.
+	  do 4 split; auto. 2: eapply resulttype_sub_refl.
+	  eapply resulttype_sub_app. eapply resulttype_sub_refl.
+	  eapply (Forall_nth) in H3.
+	  unfold Resulttype_subtype.
+	  rewrite proj_identity.
+	  eapply H3.
+	  by apply/ltP.
+	}
+	auto.
 Qed.
 
-Lemma Step_pure__br_table_ge_preserves : forall v_S v_C (v_i : uN 32) (v_l : (list labelidx)) (v_l' : labelidx) v_func_type,
-	Admin_instrs_ok v_S v_C [(AI_CONST I32 v_i);(AI_BR_TABLE v_l v_l')] v_func_type ->
+Lemma Step_pure__br_table_ge_preserves : forall v_S v_C (v_i : uN 32) (v_l : (list labelidx)) (v_l' : labelidx) v_ft,
+	Admin_instrs_ok v_S v_C [(AI_CONST I32 v_i);(AI_BR_TABLE v_l v_l')] v_ft ->
 	Step_pure [(AI_CONST I32 v_i);(AI_BR_TABLE v_l v_l')] [(AI_BR v_l')] ->
 	(List.length v_l <= fun_u32__nat v_i) ->
-	Admin_instrs_ok v_S v_C [(AI_BR v_l')] v_func_type.
+	Admin_instrs_ok v_S v_C [(AI_BR v_l')] v_ft.
 Proof.
-	move => v_S v_C v_i v_l v_l' v_func_type HType HReduce H.
-	destruct v_func_type as [ts1 ts2].
-	apply_composition_typing_and_single HType.
-	apply_composition_typing_single H4_comp.
-	apply Br_table_typing in H4_comp1; destruct H4_comp1 as [ts1' [ts [H1 [H2 [H3 [H4 H5]]]]]].
-	apply AI_const_typing in H4_comp0.
-	subst.
-	repeat rewrite -> app_assoc in H1_comp1.
-	apply split_append_last in H1_comp1; destruct H1_comp1.
-	rewrite H0.
-	repeat rewrite <- app_assoc.
-	apply AIs_ok_frame.
-	apply AIs_ok_frame.
-	remember (ts1' ++ lookup_total (C_LABELS v_C) v_l')%list as ts. (* Just for convencience *)
-	apply (AIs_ok_seq v_S v_C [] (AI_BR v_l') ts ts3_comp1 ts).
-	+ (* Empty *) apply admin_weakening_empty_both. apply AIs_ok_empty.
-	+ (* BR *) apply (AI_ok_instr _ _ (BR v_l') (mk_functype ts ts3_comp1)).
-		subst. apply (br v_C v_l' ts1' (lookup_total (C_LABELS v_C) v_l') ts3_comp1).
+	move => v_S v_C v_i v_l v_l' v_ft HType HReduce H.
+	typing_inversion HType.
+	typing_inversion H1.
+	typing_inversion Hai.
+	unfold_principal_typing Hpt.
+	inversion Hpt; subst; clear Hpt.
+	typing_inversion H2.
+	typing_inversion Hai.
+	unfold_principal_typing Hpt.
+	destruct Hpt as [t [t' [v_t [H1 [H2 [H3 [H4 H5]]]]]]].
+	inversion H1; subst; clear H1.
+	rewrite catA in Hsub0.
+	eapply (instrtype_sub_compose1 _ _ _ _ _ _ _ Hsub) in Hsub0.
+	rewrite cats0 in Hsub0.
 
-	  	move: H3 => /leP Hbool. auto.
-		split => //.
+	eapply (construct_ais_typing_single).
+	eapply (AI_ok_instr _ _ (instr_BR _)).
+	eapply (instr_ok_br _ _ t _ t').
+	{
+	  apply H4.
+	}
+    {
+		reflexivity.		
+	}
+	eapply (instrtype_sub_trans _ ((t ++ v_t) :-> t')).
+	{
+	  exists [], [], (t ++ v_t), t'.
+	  do 4 split; auto. 2: eapply resulttype_sub_refl.
+	  eapply resulttype_sub_app. eapply resulttype_sub_refl.
+	  unfold Resulttype_subtype.
+	  rewrite proj_identity.
+	  eapply H5.
+	}
+	auto.
 Qed.
 
-Lemma Step_pure__frame_vals_preserves : forall v_S v_C (v_n : n) (v_f : frame) (v_val : (list val)) v_func_type,
-	Admin_instrs_ok v_S v_C [(AI_FRAME_ v_n v_f (map fun_coec_val__admininstr v_val))] v_func_type ->
+Lemma Step_pure__frame_vals_preserves : forall v_S v_C (v_n : n) (v_f : frame) (v_val : (list wasm.val)) v_ft,
+	Admin_instrs_ok v_S v_C [(AI_FRAME_ v_n v_f (map fun_coec_val__admininstr v_val))] v_ft ->
 	Step_pure [(AI_FRAME_ v_n v_f (map fun_coec_val__admininstr v_val))] (map fun_coec_val__admininstr v_val) ->
-	Admin_instrs_ok v_S v_C (map fun_coec_val__admininstr v_val) v_func_type.
+	Admin_instrs_ok v_S v_C (map fun_coec_val__admininstr v_val) v_ft.
 Proof.
-	move => v_S v_C v_n v_f v_val v_func_type HType HReduce.
-	destruct v_func_type as [ts1 ts2].
-	rewrite <- admin_instrs_ok_eq in HType.
-	apply Frame_typing in HType; destruct HType as [ts [? [? ?]]].
-	inversion H0. destruct H2.
-	apply Val_Const_list_typing in H3; simpl in *; subst.
-	apply admin_instrs_weakening_empty_1.
-	rewrite H3.
-	apply Const_list_typing_empty.
-Qed.
+	move => v_S v_C v_n v_f v_val v_ft HType HReduce.
+Admitted.
 
-Lemma Step_pure__return_frame_preserves : forall v_S v_C (v_n : n) (v_f : frame) (v_val' : (list val)) (v_val : (list val)) (v_instr : (list instr)) v_func_type,
-	Admin_instrs_ok v_S v_C [(AI_FRAME_ v_n v_f (@app _ (map fun_coec_val__admininstr v_val') (@app _ (map fun_coec_val__admininstr v_val) (@app _ [(AI_RETURN )] (map fun_coec_instr__admininstr v_instr)))))] v_func_type ->
+Lemma Step_pure__return_frame_preserves : forall v_S v_C (v_n : n) (v_f : frame) (v_val' : (list wasm.val)) (v_val : (list wasm.val)) (v_instr : (list instr)) v_ft,
+	Admin_instrs_ok v_S v_C [(AI_FRAME_ v_n v_f (@app _ (map fun_coec_val__admininstr v_val') (@app _ (map fun_coec_val__admininstr v_val) (@app _ [(AI_RETURN )] (map fun_coec_instr__admininstr v_instr)))))] v_ft ->
 	Step_pure [(AI_FRAME_ v_n v_f (@app _ (map fun_coec_val__admininstr v_val') (@app _ (map fun_coec_val__admininstr v_val) (@app _ [(AI_RETURN )] (map fun_coec_instr__admininstr v_instr)))))] (map fun_coec_val__admininstr v_val) ->
-	Admin_instrs_ok v_S v_C (map fun_coec_val__admininstr v_val) v_func_type.
+	Admin_instrs_ok v_S v_C (map fun_coec_val__admininstr v_val) v_ft.
 Proof.
 Admitted. (*
-	move => v_S v_C v_n v_f v_val' v_val v_instr v_func_type HType HReduce.
-	destruct v_func_type as [ts1 ts2].
+	move => v_S v_C v_n v_f v_val' v_val v_instr v_ft HType HReduce.
+	destruct v_ft as [ts1 ts2].
 	rewrite <- admin_instrs_ok_eq in HType.
 	apply Frame_typing in HType; destruct HType as [ts [? [? ?]]].
 	inversion H1; destruct H3.
@@ -470,233 +496,208 @@ Admitted. (*
 	by destruct ts0.
 Qed. *)
 
-Lemma Step_pure__return_label_preserves : forall v_S v_C (v_n : n) (v_instr' : (list instr)) (v_val : (list val)) (v_instr : (list instr)) v_func_type,
-	Admin_instrs_ok v_S v_C [(AI_LABEL_ v_n v_instr' (@app _ (map fun_coec_val__admininstr v_val) (@app _ [(AI_RETURN )] (map fun_coec_instr__admininstr v_instr))))] v_func_type ->
+Lemma Step_pure__return_label_preserves : forall v_S v_C (v_n : n) (v_instr' : (list instr)) (v_val : (list wasm.val)) (v_instr : (list instr)) v_ft,
+	Admin_instrs_ok v_S v_C [(AI_LABEL_ v_n v_instr' (@app _ (map fun_coec_val__admininstr v_val) (@app _ [(AI_RETURN )] (map fun_coec_instr__admininstr v_instr))))] v_ft ->
 	Step_pure [(AI_LABEL_ v_n v_instr' (@app _ (map fun_coec_val__admininstr v_val) (@app _ [(AI_RETURN )] (map fun_coec_instr__admininstr v_instr))))] (@app _ (map fun_coec_val__admininstr v_val) [(AI_RETURN )]) ->
-	Admin_instrs_ok v_S v_C (@app _ (map fun_coec_val__admininstr v_val) [(AI_RETURN )]) v_func_type.
+	Admin_instrs_ok v_S v_C (@app _ (map fun_coec_val__admininstr v_val) [(AI_RETURN )]) v_ft.
 Proof.
-	move => v_S v_C v_n v_instr' v_val v_instr v_func_type HType HReduce.
-	destruct v_func_type as [ts1 ts2].
-	rewrite <- admin_instrs_ok_eq in HType.
-	apply Label_typing in HType; destruct HType as [ts [ts2' [? [? [? ?]]]]].
-	apply_composition_typing H2.
-	apply_composition_typing H4_comp.
-	repeat rewrite <- app_right_nil in *.
-	rewrite <- admin_instrs_ok_eq in H3_comp0.
-	apply Return_typing in H3_comp0; destruct H3_comp0 as [ts0 [ts' [? ?]]].
-	unfold upd_label, set in H1. simpl in H1.
-	apply Val_Const_list_typing in H3_comp.
-	apply empty_append in H1_comp; destruct H1_comp.
-	subst. simpl in *.
-	apply admin_instrs_weakening_empty_1.
-	eapply admin_composition'.
-	apply Const_list_typing_empty.
-	rewrite H1_comp0.
-	rewrite H2_comp.
-	apply AIs_ok_frame.
-	rewrite <- admin_instrs_ok_eq.
-	apply AI_ok_instr with (v_instr := RETURN).
-	by apply res_return.
+	move => v_S v_C v_n v_instr' v_val v_instr v_ft HType HReduce.
+Admitted.
+
+Lemma construct_ais_trap : forall v_S v_C v_ft,
+Admin_instrs_ok v_S v_C [(AI_TRAP )] v_ft.
+Proof.
+	move=> v_S v_C v_ft.
+	destruct_functypes.
+	eapply (AIs_ok_seq _ _ [] AI_TRAP).
+	eapply ais_empty_typing.
+	eapply resulttype_sub_refl.
+	eapply AI_ok_trap.
 Qed.
 
-Lemma Step_pure__trap_vals_preserves : forall v_S v_C (v_val : (list val)) (v_instr : (list instr)) v_func_type,
-	Admin_instrs_ok v_S v_C (@app _ (map fun_coec_val__admininstr v_val) (@app _ [(AI_TRAP )] (map fun_coec_instr__admininstr v_instr))) v_func_type ->
+Lemma Step_pure__trap_vals_preserves : forall v_S v_C (v_val : (list wasm.val)) (v_instr : (list instr)) v_ft,
+	Admin_instrs_ok v_S v_C (@app _ (map fun_coec_val__admininstr v_val) (@app _ [(AI_TRAP )] (map fun_coec_instr__admininstr v_instr))) v_ft ->
 	((v_val <> []) \/ (v_instr <> [])) ->
-	Admin_instrs_ok v_S v_C [(AI_TRAP )] v_func_type.
-Proof.
-	move => v_S v_C v_val v_instr v_func_type HType H.
-	destruct v_func_type as [ts1 ts2].
-	rewrite <- admin_instrs_ok_eq.
-	apply AI_ok_trap.
-Qed.
-
-Lemma Step_pure__trap_label_preserves : forall v_S v_C (v_n : n) (v_instr' : (list instr)) v_func_type,
-	Admin_instrs_ok v_S v_C [(AI_LABEL_ v_n v_instr' [(AI_TRAP )])] v_func_type ->
-	Admin_instrs_ok v_S v_C [(AI_TRAP )] v_func_type.
-Proof.
-	move => v_S v_C n v_instr' v_func_type HType.
-	destruct v_func_type as [ts1 ts2].
-	rewrite <- admin_instrs_ok_eq.
-	apply AI_ok_trap.
-Qed.
-
-Lemma Step_pure__trap_frame_preserves : forall v_S v_C (v_n : n) (v_f : frame) v_func_type,
-	Admin_instrs_ok v_S v_C [(AI_FRAME_ v_n v_f [(AI_TRAP )])] v_func_type ->
-	Admin_instrs_ok v_S v_C [(AI_TRAP )] v_func_type.
+	Admin_instrs_ok v_S v_C [(AI_TRAP )] v_ft.
 Proof.
 	intros.
-	destruct v_func_type as [ts1 ts2].
-	rewrite <- admin_instrs_ok_eq.
-	apply AI_ok_trap.
+	apply construct_ais_trap.
 Qed.
 
-Lemma Step_pure__unop_val_preserves : forall v_S v_C (v_t : valtype) (v_c_1 : val_ v_t) (v_unop : unop_ v_t) v_c v_func_type,
-	Admin_instrs_ok v_S v_C [(AI_CONST v_t v_c_1);(AI_UNOP v_t v_unop)] v_func_type ->
+Lemma Step_pure__trap_label_preserves : forall v_S v_C (v_n : n) (v_instr' : (list instr)) v_ft,
+	Admin_instrs_ok v_S v_C [(AI_LABEL_ v_n v_instr' [(AI_TRAP )])] v_ft ->
+	Admin_instrs_ok v_S v_C [(AI_TRAP )] v_ft.
+Proof.
+	intros.
+	apply construct_ais_trap.
+Qed.
+
+Lemma Step_pure__trap_frame_preserves : forall v_S v_C (v_n : n) (v_f : frame) v_ft,
+	Admin_instrs_ok v_S v_C [(AI_FRAME_ v_n v_f [(AI_TRAP )])] v_ft ->
+	Admin_instrs_ok v_S v_C [(AI_TRAP )] v_ft.
+Proof.
+	intros.
+	apply construct_ais_trap.
+Qed.
+
+Lemma Step_pure__unop_val_preserves : forall v_S v_C v_t v_c_1 v_unop v_c v_ft,
+	Admin_instrs_ok v_S v_C [(AI_CONST v_t v_c_1);(AI_UNOP v_t v_unop)] v_ft ->
 	Step_pure [(AI_CONST v_t v_c_1);(AI_UNOP v_t v_unop)] [(AI_CONST v_t v_c)] ->
-	Admin_instrs_ok v_S v_C [(AI_CONST v_t v_c)] v_func_type.
+	Admin_instrs_ok v_S v_C [(AI_CONST v_t v_c)] v_ft.
 Proof.
 	move => v_S v_C t v unop_op v_c tf HType HReduce.
-	destruct tf as [tf1 tf2].
-	rewrite -cat1s in HType; subst.
-	apply admin_composition_typing_single in HType; destruct HType as [ts1 [ts2 [ts3 [ts4 [H1 [H3 [H4 H5]]]]]]].
-	rewrite -> app_left_single_nil in H4; subst.
-	apply admin_composition_typing_single in H4; destruct H4 as [ts5 [ts6 [ts7 [ts8 [H6 [H7 [H8 H9]]]]]]].
-	apply AI_const_typing in H9.
-	apply Unop_typing in H5; destruct H5 as [H10 [ts H11]]. 
-	apply admin_empty_same_type in H8; subst.
-	repeat rewrite app_assoc.
-	apply admin_instrs_weakening_empty_1.
-	apply (AIs_ok_seq v_S v_C [] (AI_CONST t v_c) [] [t] []).
-	apply AIs_ok_empty.
-	apply (AI_ok_instr v_S v_C (CONST t v_c) (mk_functype [] [t])).
-	by apply const.
+	typing_inversion HType.
+	typing_inversion H1.
+	typing_inversion Hai.
+	unfold_principal_typing Hpt.
+	inversion Hpt; subst; clear Hpt.
+	typing_inversion H2.
+	typing_inversion Hai.
+	unfold_principal_typing Hpt.
+	inversion Hpt; subst; clear Hpt.
+
+	eapply construct_ais_typing_single.
+	eapply (AI_ok_instr _ _ (instr_CONST _ _)).
+	constructor.
+	eapply instrtype_sub_compose; eauto.
 Qed.
 
-Lemma Step_pure__unop_trap_preserves : forall v_S v_C (v_t : valtype) (v_c_1 : val_ v_t) (v_unop : unop_ v_t) v_func_type,
-	Admin_instrs_ok v_S v_C [(AI_CONST v_t v_c_1);(AI_UNOP v_t v_unop)] v_func_type ->
+Lemma Step_pure__unop_trap_preserves : forall v_S v_C v_t v_c_1 v_unop v_ft,
+	Admin_instrs_ok v_S v_C [(AI_CONST v_t v_c_1);(AI_UNOP v_t v_unop)] v_ft ->
 	Step_pure [(AI_CONST v_t v_c_1);(AI_UNOP v_t v_unop)] [(AI_TRAP )] ->
-	Admin_instrs_ok v_S v_C [(AI_TRAP )] v_func_type.
+	Admin_instrs_ok v_S v_C [(AI_TRAP )] v_ft.
 Proof.
-	move => v_S v_C v_t v_c_1 v_unop v_func_type HType HReduce.
-	destruct v_func_type as [tf1 tf2].
-	apply (AIs_ok_seq v_S v_C [] (AI_TRAP) tf1 tf2 tf1).
-	- (* Empty *) apply admin_weakening_empty_both. apply AIs_ok_empty.
-	- (* TRAP *) apply AI_ok_trap.
+	intros.
+	apply construct_ais_trap.
 Qed.
 
 
-Lemma Step_pure__binop_val_preserves : forall v_S v_C (v_t : valtype) (v_c_1 : val_ v_t) (v_c_2 : val_ v_t) (v_binop : binop_ v_t) v_c v_func_type,
-	Admin_instrs_ok v_S v_C [(AI_CONST v_t v_c_1);(AI_CONST v_t v_c_2);(AI_BINOP v_t v_binop)] v_func_type ->
+Lemma Step_pure__binop_val_preserves : forall v_S v_C v_t v_c_1 v_c_2 v_binop v_c v_ft,
+	Admin_instrs_ok v_S v_C [(AI_CONST v_t v_c_1);(AI_CONST v_t v_c_2);(AI_BINOP v_t v_binop)] v_ft ->
 	Step_pure [(AI_CONST v_t v_c_1);(AI_CONST v_t v_c_2);(AI_BINOP v_t v_binop)] [(AI_CONST v_t v_c)] ->
-	Admin_instrs_ok v_S v_C [(AI_CONST v_t v_c)] v_func_type.
+	Admin_instrs_ok v_S v_C [(AI_CONST v_t v_c)] v_ft.
 Proof.
-	move => v_S v_C v_t v_c_1 v_c_2 v_binop v_c v_func_type HType HReduce.
-	destruct v_func_type as [tf1 tf2].
-	apply_composition_typing_and_single HType.
-	apply_composition_typing_and_single H4_comp.
-	apply_composition_typing_single H4_comp1.
-	apply AI_const_typing in H4_comp0.
-	apply AI_const_typing in H4_comp.
-	apply Binop_typing in H4_comp2; destruct H4_comp2 as [H [ts H0]].
-	subst.
-	repeat rewrite -> app_assoc in H1_comp0.
-	apply split_append_last in H1_comp0; destruct H1_comp0.
-	rewrite H in H1_comp1.
-	repeat rewrite -> app_assoc in H1_comp1.
-	apply split_append_last in H1_comp1; destruct H1_comp1.
-	rewrite H1.
-	repeat rewrite -> app_assoc.
-	apply admin_instrs_weakening_empty_1.
-	apply (AIs_ok_seq v_S v_C [] (AI_CONST v_t v_c) [] [v_t] []).
-	apply AIs_ok_empty.
-	apply (AI_ok_instr v_S v_C (CONST v_t v_c) (mk_functype [] [v_t])).
-	by apply const.
+	move => v_S v_C v_t v_c_1 v_c_2 v_binop v_c v_ft HType HReduce.
+	typing_inversion HType.
+	typing_inversion H2.
+	typing_inversion Hai.
+	unfold_principal_typing Hpt.
+	inversion Hpt; subst; clear Hpt.
+	typing_inversion H3.
+	typing_inversion Hai.
+	unfold_principal_typing Hpt.
+	inversion Hpt; subst; clear Hpt.
+	typing_inversion Hai0.
+	unfold_principal_typing Hpt.
+	inversion Hpt; subst; clear Hpt.
+	eapply (instrtype_sub_compose1 _ _ [v_t: valtype] _ _ _ _ Hsub1) in Hsub0.
+	rewrite cats0 in Hsub0.
+
+	eapply construct_ais_typing_single.
+	eapply (AI_ok_instr _ _ (instr_CONST _ _)).
+	constructor.
+	eapply instrtype_sub_compose; eauto.
 Qed.
 
-Lemma Step_pure__binop_trap_preserves : forall v_S v_C (v_t : valtype) v_c_1 v_c_2 v_binop v_func_type,
-	Admin_instrs_ok v_S v_C [(AI_CONST v_t v_c_1);(AI_CONST v_t v_c_2);(AI_BINOP v_t v_binop)] v_func_type ->
+Lemma Step_pure__binop_trap_preserves : forall v_S v_C v_t v_c_1 v_c_2 v_binop v_ft,
+	Admin_instrs_ok v_S v_C [(AI_CONST v_t v_c_1);(AI_CONST v_t v_c_2);(AI_BINOP v_t v_binop)] v_ft ->
 	Step_pure [(AI_CONST v_t v_c_1);(AI_CONST v_t v_c_2);(AI_BINOP v_t v_binop)] [(AI_TRAP )] ->
-	Admin_instrs_ok v_S v_C [(AI_TRAP )] v_func_type.
+	Admin_instrs_ok v_S v_C [(AI_TRAP )] v_ft.
 Proof.
-	move => v_S v_C v_t v_c_1 v_c_2 v_binop v_func_type HType HReduce.
-	destruct v_func_type as [tf1 tf2].
-	apply (AIs_ok_seq v_S v_C [] (AI_TRAP) tf1 tf2 tf1).
-	- (* Empty *) apply admin_weakening_empty_both. apply AIs_ok_empty.
-	- (* TRAP *) apply AI_ok_trap.
+	intros.
+	apply construct_ais_trap.
 Qed.
 
 
 
-Lemma Step_pure__testop_preserves : forall v_S v_C (v_t : valtype) v_c_1 (v_testop : testop_ v_t) (v_c : iN 32) v_func_type,
-	Admin_instrs_ok v_S v_C [(AI_CONST v_t v_c_1);(AI_TESTOP v_t v_testop)] v_func_type ->
+Lemma Step_pure__testop_preserves : forall v_S v_C v_t v_c_1 v_testop (v_c : iN 32) v_ft,
+	Admin_instrs_ok v_S v_C [(AI_CONST v_t v_c_1);(AI_TESTOP v_t v_testop)] v_ft ->
 	Step_pure [(AI_CONST v_t v_c_1);(AI_TESTOP v_t v_testop)] [(AI_CONST I32 v_c)] ->
-	Admin_instrs_ok v_S v_C [(AI_CONST I32 v_c)] v_func_type.
+	Admin_instrs_ok v_S v_C [(AI_CONST I32 v_c)] v_ft.
 Proof.
-	move => v_S v_C v_t v_c_1 v_testop v_c v_func_type HType HReduce.
-	destruct v_func_type as [tf1 tf2].
-	apply_composition_typing_and_single HType.
-	apply_composition_typing_single H4_comp.
-	apply AI_const_typing in H4_comp0.
-	apply Testop_typing in H4_comp1; destruct H4_comp1 as [ts [H1 H2]]; subst.
-	repeat rewrite -> app_assoc in H1_comp1. apply split_append_last in H1_comp1; destruct H1_comp1; subst.
-	rewrite H.
-	repeat rewrite -> app_assoc.
-	apply admin_instrs_weakening_empty_1.
-	apply (AIs_ok_seq v_S v_C [] (AI_CONST (I32) v_c) [] [I32] []). 
-	- (* Empty *) apply AIs_ok_empty.
-	- (* Const *) apply (AI_ok_instr v_S v_C (CONST (I32) v_c) (mk_functype [] [I32])).
-		by apply const.
+	move => v_S v_C t v unop_op v_c tf HType HReduce.
+	typing_inversion HType.
+	typing_inversion H1.
+	typing_inversion Hai.
+	unfold_principal_typing Hpt.
+	inversion Hpt; subst; clear Hpt.
+	typing_inversion H2.
+	typing_inversion Hai.
+	unfold_principal_typing Hpt.
+	inversion Hpt; subst; clear Hpt.
+
+	eapply construct_ais_typing_single.
+	eapply (AI_ok_instr _ _ (instr_CONST _ _)).
+	constructor.
+	eapply instrtype_sub_compose; eauto.
 Qed.
 
-Lemma Step_pure__relop_preserves : forall v_S v_C (v_t : valtype) v_c_1 v_c_2 (v_relop : relop_ v_t) (v_c : iN 32) v_func_type,
-	Admin_instrs_ok v_S v_C [(AI_CONST v_t v_c_1);(AI_CONST v_t v_c_2);(AI_RELOP v_t v_relop)] v_func_type ->
+Lemma Step_pure__relop_preserves : forall v_S v_C v_t v_c_1 v_c_2 v_relop (v_c : iN 32) v_ft,
+	Admin_instrs_ok v_S v_C [(AI_CONST v_t v_c_1);(AI_CONST v_t v_c_2);(AI_RELOP v_t v_relop)] v_ft ->
 	Step_pure [(AI_CONST v_t v_c_1);(AI_CONST v_t v_c_2);(AI_RELOP v_t v_relop)] [(AI_CONST I32 v_c)] ->
-	Admin_instrs_ok v_S v_C [(AI_CONST I32 v_c)] v_func_type.
+	Admin_instrs_ok v_S v_C [(AI_CONST I32 v_c)] v_ft.
 Proof.
-	move => v_S v_C v_t v_c_1 v_c_2 v_relop v_c v_func_type HType HReduce.
-	destruct v_func_type as [tf1 tf2].
-	apply_composition_typing_and_single HType.
-	apply_composition_typing_and_single H4_comp.
-	apply_composition_typing_single H4_comp1.
-	apply AI_const_typing in H4_comp0.
-	apply AI_const_typing in H4_comp.
-	apply Relop_typing in H4_comp2; destruct H4_comp2 as [ts [H1 H2]].
-	subst.
-	rewrite split_cons in H1_comp0.
-	repeat rewrite -> app_assoc in H1_comp0; apply split_append_last in H1_comp0; destruct H1_comp0.
-	rewrite H in H1_comp1.
-	repeat rewrite -> app_assoc in H1_comp1; apply split_append_last in H1_comp1; destruct H1_comp1.
-	rewrite H1.
-	repeat rewrite -> app_assoc.
-	apply admin_instrs_weakening_empty_1.
-	apply (AIs_ok_seq v_S v_C [] (AI_CONST (I32) v_c) [] [I32] []).
-	- (* Empty *) apply AIs_ok_empty.
-	- (* Const *) apply (AI_ok_instr v_S v_C (CONST (I32) v_c) (mk_functype [] [I32])).
-	by apply const.
+	move => v_S v_C v_t v_c_1 v_c_2 v_relop v_c v_ft HType HReduce.
+	typing_inversion HType.
+	typing_inversion H2.
+	typing_inversion Hai.
+	unfold_principal_typing Hpt.
+	inversion Hpt; subst; clear Hpt.
+	typing_inversion H3.
+	typing_inversion Hai.
+	unfold_principal_typing Hpt.
+	inversion Hpt; subst; clear Hpt.
+	typing_inversion Hai0.
+	unfold_principal_typing Hpt.
+	inversion Hpt; subst; clear Hpt.
+	eapply (instrtype_sub_compose1 _ _ [v_t: valtype] _ _ _ _ Hsub1) in Hsub0.
+	rewrite cats0 in Hsub0.
+
+	eapply construct_ais_typing_single.
+	eapply (AI_ok_instr _ _ (instr_CONST _ _)).
+	constructor.
+	eapply instrtype_sub_compose; eauto.
 Qed.
 
-Lemma Step_pure__cvtop_val_preserves : forall v_S v_C (v_t_1 : valtype) v_c_1 (v_t_2 : valtype) (v_cvtop : cvtop) v_c v_func_type,
-	Admin_instrs_ok v_S v_C [(AI_CONST v_t_1 v_c_1);(AI_CVTOP v_t_2 v_t_1 v_cvtop)] v_func_type ->
+Lemma Step_pure__cvtop_val_preserves : forall v_S v_C v_t_1 v_c_1 v_t_2 v_cvtop v_c v_ft,
+	Admin_instrs_ok v_S v_C [(AI_CONST v_t_1 v_c_1);(AI_CVTOP v_t_2 v_t_1 v_cvtop)] v_ft ->
 	Step_pure [(AI_CONST v_t_1 v_c_1);(AI_CVTOP v_t_2 v_t_1 v_cvtop)] [(AI_CONST v_t_2 v_c)] ->
-	Admin_instrs_ok v_S v_C [(AI_CONST v_t_2 v_c)] v_func_type.
+	Admin_instrs_ok v_S v_C [(AI_CONST v_t_2 v_c)] v_ft.
 Proof.
-	move => v_S v_C v_t_1 v_c_1 v_t_2 v_cvtop v_c v_func_type HType HReduce.
-	destruct v_func_type as [tf1 tf2].
-	apply_composition_typing_and_single HType.
-	apply_composition_typing_single H4_comp.
-	apply AI_const_typing in H4_comp0.
-	apply Cvtop_typing in H4_comp1; destruct H4_comp1 as [ts [H1 H2]].
-	subst.
-	repeat rewrite -> app_assoc in H1_comp1; apply split_append_last in H1_comp1; destruct H1_comp1.
-	rewrite H.
-	repeat rewrite -> app_assoc.
-	apply admin_instrs_weakening_empty_1.
-	apply (AIs_ok_seq v_S v_C [] (AI_CONST v_t_2 v_c) [] [v_t_2] []).
-	- (* Empty *) apply AIs_ok_empty.
-	- (* Const *) apply (AI_ok_instr v_S v_C (CONST v_t_2 v_c) (mk_functype [] [v_t_2])).
-	by apply const.
+	move => v_S v_C v_t_1 v_c_1 v_t_2 v_cvtop v_c v_ft HType HReduce.
+	typing_inversion HType.
+	typing_inversion H1.
+	typing_inversion Hai.
+	unfold_principal_typing Hpt.
+	inversion Hpt; subst; clear Hpt.
+	typing_inversion H2.
+	typing_inversion Hai.
+	unfold_principal_typing Hpt.
+	inversion Hpt; subst; clear Hpt.
+
+	eapply construct_ais_typing_single.
+	eapply (AI_ok_instr _ _ (instr_CONST _ _)).
+	constructor.
+	eapply instrtype_sub_compose; eauto.
 Qed.
 
-Lemma Step_pure__cvtop_trap_preserves : forall v_S v_C (v_t_1 : valtype) v_c_1 (v_t_2 : valtype) (v_cvtop : cvtop) v_func_type,
-	Admin_instrs_ok v_S v_C [(AI_CONST v_t_1 v_c_1);(AI_CVTOP v_t_2 v_t_1 v_cvtop)] v_func_type ->
+Lemma Step_pure__cvtop_trap_preserves : forall v_S v_C v_t_1 v_c_1 v_t_2 v_cvtop v_ft,
+	Admin_instrs_ok v_S v_C [(AI_CONST v_t_1 v_c_1);(AI_CVTOP v_t_2 v_t_1 v_cvtop)] v_ft ->
 	Step_pure [(AI_CONST v_t_1 v_c_1);(AI_CVTOP v_t_2 v_t_1 v_cvtop)] [(AI_TRAP )] ->
-	Admin_instrs_ok v_S v_C [(AI_TRAP )] v_func_type.
+	Admin_instrs_ok v_S v_C [(AI_TRAP )] v_ft.
 Proof.
-	move => v_S v_C v_t_1 v_c_1 v_t_2 v_cvtop v_func_type HType HReduce.
-	destruct v_func_type as [tf1 tf2].
-	apply (AIs_ok_seq v_S v_C [] (AI_TRAP) tf1 tf2 tf1).
-	- (* Empty *) apply admin_weakening_empty_both. apply AIs_ok_empty.
-	- (* TRAP *) apply AI_ok_trap.
+	intros.
+	apply construct_ais_trap.
 Qed.
 
 (*
-Lemma Step_pure__local_tee_preserves : forall v_S v_C (v_val : val) (v_x : idx) v_func_type,
-	Admin_instrs_ok v_S v_C [(v_val : admininstr);(AI_LOCAL_TEE v_x)] v_func_type ->
+Lemma Step_pure__local_tee_preserves : forall v_S v_C (v_val : val) (v_x : idx) v_ft,
+	Admin_instrs_ok v_S v_C [(v_val : admininstr);(AI_LOCAL_TEE v_x)] v_ft ->
 	Step_pure [(v_val : admininstr);(AI_LOCAL_TEE v_x)] [(v_val : admininstr);(v_val : admininstr);(AI_LOCAL_SET v_x)] ->
-	Admin_instrs_ok v_S v_C [(v_val : admininstr);(v_val : admininstr);(AI_LOCAL_SET v_x)] v_func_type.
+	Admin_instrs_ok v_S v_C [(v_val : admininstr);(v_val : admininstr);(AI_LOCAL_SET v_x)] v_ft.
 Proof.
-	move => v_S v_C v_val v_x v_func_type HType HReduce.
-	destruct v_func_type as [tf1 tf2].
+	move => v_S v_C v_val v_x v_ft HType HReduce.
+	destruct v_ft as [tf1 tf2].
 	apply_composition_typing_and_single HType.
 	apply_composition_typing_single H4_comp.
 	induction v_val.
@@ -727,16 +728,16 @@ Proof.
 		move : H3 => /leP Hbool. auto. auto.
 Qed.
 
-Lemma Step_read__block_preserves : forall v_S (r_v_f : frame) v_C (v_z : state) (v_t : (option valtype)) (v_instr : (list instr)) (v_n : n) v_func_type v_t1 lab ret ,
-	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab)[(AI_BLOCK v_t v_instr)] v_func_type ->
+Lemma Step_read__block_preserves : forall v_S (r_v_f : frame) v_C (v_z : state) (v_t : (option valtype)) (v_instr : (list instr)) (v_n : n) v_ft v_t1 lab ret ,
+	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab)[(AI_BLOCK v_t v_instr)] v_ft ->
 	Module_instance_ok v_S (F_MODULE r_v_f) v_C  ->
 	v_z = mk_state v_S r_v_f ->
 	(((v_t = None) /\ (v_n = 0)) \/ ((v_t <> None) /\ (v_n = 1))) ->
 	Forall2 (fun v_t v_val => Val_ok v_val v_t) v_t1 (LOCALS r_v_f) ->
-	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab) [(AI_LABEL_ v_n [] (map fun_coec_instr__admininstr v_instr))] v_func_type.
+	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab) [(AI_LABEL_ v_n [] (map fun_coec_instr__admininstr v_instr))] v_ft.
 Proof.
-	move => v_S r_v_f v_C v_z v_t v_instr v_n v_func_type v_t1 lab ret HType HMinst HState H1 HValOK.
-	destruct v_func_type as [ts1 ts2].
+	move => v_S r_v_f v_C v_z v_t v_instr v_n v_ft v_t1 lab ret HType HMinst HState H1 HValOK.
+	destruct v_ft as [ts1 ts2].
 	rewrite <- admin_instrs_ok_eq in HType.
 	apply Block_typing in HType; destruct HType as [ts [? [? ?]]]; subst. simpl in H2.
 	rewrite <- admin_instrs_ok_eq.
@@ -751,15 +752,15 @@ Proof.
 	destruct v_t => //=.
 Qed.
 
-Lemma Step_read__loop_preserves : forall v_S (r_v_f : frame) v_C (v_z : state) (v_t : (option valtype)) (v_instr : (list instr)) v_func_type v_t1 lab ret ,
-	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab)[(AI_LOOP v_t v_instr)] v_func_type ->
+Lemma Step_read__loop_preserves : forall v_S (r_v_f : frame) v_C (v_z : state) (v_t : (option valtype)) (v_instr : (list instr)) v_ft v_t1 lab ret ,
+	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab)[(AI_LOOP v_t v_instr)] v_ft ->
 	Module_instance_ok v_S (F_MODULE r_v_f) v_C  ->
 	v_z = mk_state v_S r_v_f ->
 	Forall2 (fun v_t v_val => Val_ok v_val v_t) v_t1 (LOCALS r_v_f) ->
-	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab) [(AI_LABEL_ 0 [(LOOP v_t v_instr)] (map fun_coec_instr__admininstr v_instr))] v_func_type.
+	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab) [(AI_LABEL_ 0 [(LOOP v_t v_instr)] (map fun_coec_instr__admininstr v_instr))] v_ft.
 Proof.
-	move => v_S r_v_f v_C v_z v_t v_instr v_func_type v_t1 lab ret HType HMinst H HValOK.
-	destruct v_func_type as [ts1 ts2].
+	move => v_S r_v_f v_C v_z v_t v_instr v_ft v_t1 lab ret HType HMinst H HValOK.
+	destruct v_ft as [ts1 ts2].
 	rewrite <- admin_instrs_ok_eq in HType.
 	apply Loop_typing in HType; destruct HType as [ts [? [? ?]]]; subst.
 	simpl in H2.
@@ -780,16 +781,16 @@ Admitted.
 		apply H2. auto.
 Qed. *)
 
-Lemma Step_read__call_preserves : forall v_S (r_v_f : frame) v_C (v_z : state) (v_x : idx) v_func_type v_t1 lab ret ,
-	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab)[(AI_CALL v_x)] v_func_type ->
+Lemma Step_read__call_preserves : forall v_S (r_v_f : frame) v_C (v_z : state) (v_x : idx) v_ft v_t1 lab ret ,
+	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab)[(AI_CALL v_x)] v_ft ->
 	Module_instance_ok v_S (F_MODULE r_v_f) v_C  ->
 	v_z = mk_state v_S r_v_f ->
 	(v_x < (List.length (fun_funcaddr v_z))) ->
 	Forall2 (fun v_t v_val => Val_ok v_val v_t) v_t1 (LOCALS r_v_f) ->
-	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab) [(AI_CALL_ADDR (lookup_total (fun_funcaddr v_z) v_x))] v_func_type.
+	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab) [(AI_CALL_ADDR (lookup_total (fun_funcaddr v_z) v_x))] v_ft.
 Proof.
-	move => v_S r_v_f v_C v_z v_x v_func_type v_t1 lab ret HType HMinst H H1 HValOK.
-	destruct v_func_type as [ts1 ts2].
+	move => v_S r_v_f v_C v_z v_x v_ft v_t1 lab ret HType HMinst H H1 HValOK.
+	destruct v_ft as [ts1 ts2].
 	rewrite <- admin_instrs_ok_eq in HType.
 	apply Call_typing in HType; destruct HType as [ts [t1s' [t2s' [? [? [? ?]]]]]]; subst.
 	simpl in *.
@@ -834,8 +835,8 @@ Proof.
 	- simpl in *. auto.
 Qed.
 
-Lemma Step_read__call_indirect_call_preserves : forall v_S (r_v_f : frame) v_C (v_z : state) (v_i : uN 32) (v_x : idx) (v_a : addr) v_func_type v_t1 lab ret ,
-	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab)[(AI_CONST I32 v_i);(AI_CALL_INDIRECT v_x)] v_func_type ->
+Lemma Step_read__call_indirect_call_preserves : forall v_S (r_v_f : frame) v_C (v_z : state) (v_i : uN 32) (v_x : idx) (v_a : addr) v_ft v_t1 lab ret ,
+	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab)[(AI_CONST I32 v_i);(AI_CALL_INDIRECT v_x)] v_ft ->
 	Module_instance_ok v_S (F_MODULE r_v_f) v_C  ->
 	Store_ok v_S ->
 	v_z = mk_state v_S r_v_f ->
@@ -844,10 +845,10 @@ Lemma Step_read__call_indirect_call_preserves : forall v_S (r_v_f : frame) v_C (
 	((lookup_total (REFS (fun_table v_z 0)) (fun_u32__nat v_i)) = (Some v_a)) ->
 	((fun_type v_z v_x) = (FUNC_TYPE (lookup_total (fun_funcinst v_z) v_a))) ->
 	Forall2 (fun v_t v_val => Val_ok v_val v_t) v_t1 (LOCALS r_v_f) ->
-	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab) [(AI_CALL_ADDR v_a)] v_func_type.
+	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab) [(AI_CALL_ADDR v_a)] v_ft.
 Proof.
-	move => v_S r_v_f v_C v_z v_i v_x v_a v_func_type v_t1 lab ret HType HMinst HST H1 H2 H3 H4 H5 HValOK.
-	destruct v_func_type as [ts1 ts2].
+	move => v_S r_v_f v_C v_z v_i v_x v_a v_ft v_t1 lab ret HType HMinst HST H1 H2 H3 H4 H5 HValOK.
+	destruct v_ft as [ts1 ts2].
 	apply_composition_typing_and_single HType.
 	apply AI_const_typing in H4_comp0.
 	rewrite <- admin_instrs_ok_eq in H4_comp.
@@ -868,22 +869,22 @@ Proof.
 	eapply store_typed_exterval_types; eauto.
 Qed.
 
-Lemma Step_read__call_indirect_trap_preserves : forall v_S (r_v_f : frame) v_C (v_z : state) (v_i : val_ I32) (v_x : idx) v_func_type v_t1 lab ret ,
-	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab)[(AI_CONST I32 v_i);(AI_CALL_INDIRECT v_x)] v_func_type ->
+Lemma Step_read__call_indirect_trap_preserves : forall v_S (r_v_f : frame) v_C (v_z : state) (v_i : val_ I32) (v_x : idx) v_ft v_t1 lab ret ,
+	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab)[(AI_CONST I32 v_i);(AI_CALL_INDIRECT v_x)] v_ft ->
 	Module_instance_ok v_S (F_MODULE r_v_f) v_C  ->
 	v_z = mk_state v_S r_v_f ->
 	(~(Step_read_before_call_indirect_trap (mk_config v_z [(AI_CONST I32 v_i);(AI_CALL_INDIRECT v_x)]))) ->
 	Forall2 (fun v_t v_val => Val_ok v_val v_t) v_t1 (LOCALS r_v_f) ->
-	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab) [(AI_TRAP )] v_func_type.
+	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab) [(AI_TRAP )] v_ft.
 Proof.
 	intros.
-	destruct v_func_type.
+	destruct v_ft.
 	rewrite <- admin_instrs_ok_eq.
 	apply AI_ok_trap.
 Qed.
 
-Lemma Step_read__call_addr_preserves : forall v_S (r_v_f : frame) v_C (v_z : state) (v_val : (list val)) (v_k : nat) (v_a : addr) (v_n : n) (v_f : frame) (v_instr : (list instr)) (v_t_1 v_t_2 : (list valtype)) (v_mm : moduleinst) (v_func : func) (v_x : idx) (v_t : (list valtype)) v_func_type v_t1 lab ret ,
-	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab)(@app _ (map fun_coec_val__admininstr v_val) [(AI_CALL_ADDR v_a)]) v_func_type ->
+Lemma Step_read__call_addr_preserves : forall v_S (r_v_f : frame) v_C (v_z : state) (v_val : (list wasm.val)) (v_k : nat) (v_a : addr) (v_n : n) (v_f : frame) (v_instr : (list instr)) (v_t_1 v_t_2 : (list wasm.valtype)) (v_mm : moduleinst) (v_func : func) (v_x : idx) (v_t : (list wasm.valtype)) v_ft v_t1 lab ret ,
+	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab)(@app _ (map fun_coec_val__admininstr v_val) [(AI_CALL_ADDR v_a)]) v_ft ->
 	Module_instance_ok v_S (F_MODULE r_v_f) v_C  ->
 	Store_ok v_S -> 
 	v_z = mk_state v_S r_v_f ->
@@ -892,11 +893,11 @@ Lemma Step_read__call_addr_preserves : forall v_S (r_v_f : frame) v_C (v_z : sta
 	(v_func = (FUNC v_x (List.map (fun v_t => (LOCAL v_t)) (v_t)) v_instr)) ->
 	(v_f = {| LOCALS := (@app _ v_val (List.map (fun v_t => (fun_default_ v_t)) (v_t))); F_MODULE := v_mm |}) ->
 	Forall2 (fun v_t v_val => Val_ok v_val v_t) v_t1 (LOCALS r_v_f) ->
-	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab) [(AI_FRAME_ v_n v_f [(AI_LABEL_ v_n [] (map fun_coec_instr__admininstr v_instr))])] v_func_type.
+	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab) [(AI_FRAME_ v_n v_f [(AI_LABEL_ v_n [] (map fun_coec_instr__admininstr v_instr))])] v_ft.
 Admitted.
 (* Proof.
-	move => v_S r_v_f v_C v_z v_val v_k v_a v_n v_f v_instr v_t_1 v_t_2 v_mm v_func v_x v_t v_func_type v_t1 lab ret HType HMinst H1 H2 H3 H4 H5 H6 H7 H8 H9.
-	destruct v_func_type as [ts1 ts2].
+	move => v_S r_v_f v_C v_z v_val v_k v_a v_n v_f v_instr v_t_1 v_t_2 v_mm v_func v_x v_t v_ft v_t1 lab ret HType HMinst H1 H2 H3 H4 H5 H6 H7 H8 H9.
+	destruct v_ft as [ts1 ts2].
 	apply_composition_typing_single HType.
 	apply Val_Const_list_typing in H3_comp.
 	rewrite -> H3 in H4. simpl in H4.
@@ -929,15 +930,15 @@ Admitted.
 		apply H11. 
 Qed. *)
 
-Lemma Step_read__local_get_preserves : forall v_S (r_v_f : frame) v_C (v_z : state) (v_x : idx) v_func_type v_t1 lab ret ,
-	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab)[(AI_LOCAL_GET v_x)] v_func_type ->
+Lemma Step_read__local_get_preserves : forall v_S (r_v_f : frame) v_C (v_z : state) (v_x : idx) v_ft v_t1 lab ret ,
+	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab)[(AI_LOCAL_GET v_x)] v_ft ->
 	Module_instance_ok v_S (F_MODULE r_v_f) v_C  ->
 	v_z = mk_state v_S r_v_f ->
 	Forall2 (fun v_t v_val => Val_ok v_val v_t) v_t1 (LOCALS r_v_f) ->
-	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab) [((fun_local v_z v_x) : admininstr)] v_func_type.
+	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab) [((fun_local v_z v_x) : admininstr)] v_ft.
 Proof.
-	move => v_S r_v_f v_C v_z v_x v_func_type v_t1 lab ret HType HMinst H1 HValOK.
-	destruct v_func_type as [ts1 ts2].
+	move => v_S r_v_f v_C v_z v_x v_ft v_t1 lab ret HType HMinst H1 HValOK.
+	destruct v_ft as [ts1 ts2].
 	rewrite <- admin_instrs_ok_eq.
 	rewrite <- admin_instrs_ok_eq in HType.
 	apply Get_local_typing in HType; destruct HType as [t [? [? ?]]]. 
@@ -985,15 +986,15 @@ Admitted.
 	f_equal => //=.
 Qed. *)
 
-Lemma Step_read__global_get_preserves : forall v_S (r_v_f : frame) v_C (v_z : state) (v_x : idx) v_func_type v_t1 lab ret ,
-	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab)[(AI_GLOBAL_GET v_x)] v_func_type ->
+Lemma Step_read__global_get_preserves : forall v_S (r_v_f : frame) v_C (v_z : state) (v_x : idx) v_ft v_t1 lab ret ,
+	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab)[(AI_GLOBAL_GET v_x)] v_ft ->
 	Module_instance_ok v_S (F_MODULE r_v_f) v_C  ->
 	v_z = mk_state v_S r_v_f ->
 	Forall2 (fun v_t v_val => Val_ok v_val v_t) v_t1 (LOCALS r_v_f) ->
-	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab) [((VALUE (fun_global v_z v_x)) : admininstr)] v_func_type.
+	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab) [((VALUE (fun_global v_z v_x)) : admininstr)] v_ft.
 Proof.
-	move => v_S r_v_f v_C v_z v_x v_func_type v_t1 lab ret HType HMinst H HValOK.
-	destruct v_func_type as [ts1 ts2].
+	move => v_S r_v_f v_C v_z v_x v_ft v_t1 lab ret HType HMinst H HValOK.
+	destruct v_ft as [ts1 ts2].
 	rewrite <- admin_instrs_ok_eq in HType.
 	rewrite <- admin_instrs_ok_eq.
 	apply Get_global_typing in HType.
@@ -1013,30 +1014,30 @@ Proof.
 	apply const.
 Qed.
 
-Lemma Step_read__load_num_trap_preserves : forall v_S (r_v_f : frame) v_C (v_z : state) (v_i : uN 32) (v_t : valtype) (v_mo : memarg) v_func_type v_t1 lab ret ,
-	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab)[(AI_CONST I32 v_i);(AI_LOAD v_t None v_mo)] v_func_type ->
+Lemma Step_read__load_num_trap_preserves : forall v_S (r_v_f : frame) v_C (v_z : state) (v_i : uN 32) (v_t : valtype) (v_mo : memarg) v_ft v_t1 lab ret ,
+	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab)[(AI_CONST I32 v_i);(AI_LOAD v_t None v_mo)] v_ft ->
 	Module_instance_ok v_S (F_MODULE r_v_f) v_C  ->
 	v_z = mk_state v_S r_v_f ->
 	((List.length (BYTES (fun_mem v_z 0))) < ((v_i + (OFFSET v_mo)) + ((fun_size v_t) / 8))) ->
 	Forall2 (fun v_t v_val => Val_ok v_val v_t) v_t1 (LOCALS r_v_f) ->
-	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab) [(AI_TRAP )] v_func_type.
+	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab) [(AI_TRAP )] v_ft.
 Proof.
 	intros.
-	destruct v_func_type.
+	destruct v_ft.
 	rewrite <- admin_instrs_ok_eq.
 	apply AI_ok_trap.
 Qed.
 
-Lemma Step_read__load_num_val_preserves : forall v_S (r_v_f : frame) v_C (v_z : state) (v_i : uN 32) (v_t : valtype) (v_mo : memarg) v_c v_func_type v_t1 lab ret ,
-	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab)[(AI_CONST I32 v_i);(AI_LOAD v_t None v_mo)] v_func_type ->
+Lemma Step_read__load_num_val_preserves : forall v_S (r_v_f : frame) v_C (v_z : state) (v_i : uN 32) (v_t : valtype) (v_mo : memarg) v_c v_ft v_t1 lab ret ,
+	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab)[(AI_CONST I32 v_i);(AI_LOAD v_t None v_mo)] v_ft ->
 	Module_instance_ok v_S (F_MODULE r_v_f) v_C  ->
 	v_z = mk_state v_S r_v_f ->
 	((fun_bytes_ v_t v_c) = (list_slice (BYTES (fun_mem v_z 0)) (fun_u32__nat v_i + (OFFSET v_mo)) ((fun_size v_t) / 8))) ->
 	Forall2 (fun v_t v_val => Val_ok v_val v_t) v_t1 (LOCALS r_v_f) ->
-	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab) [(AI_CONST v_t v_c)] v_func_type.
+	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab) [(AI_CONST v_t v_c)] v_ft.
 Proof.
-	move => v_S r_v_f v_C v_z v_i v_t v_mo v_c v_func_type v_t1 lab ret HType HMinst HState H HValOK.
-	destruct v_func_type as [ts1 ts2].
+	move => v_S r_v_f v_C v_z v_i v_t v_mo v_c v_ft v_t1 lab ret HType HMinst HState H HValOK.
+	destruct v_ft as [ts1 ts2].
 	apply_composition_typing_and_single HType.
 	apply AI_const_typing in H4_comp0.
 	rewrite <- admin_instrs_ok_eq.
@@ -1052,53 +1053,53 @@ Admitted. (*
 	apply const.
 Qed. *)
 
-Lemma Step_read__load_pack_trap_I32_preserves : forall v_S (r_v_f : frame) v_C (v_z : state) (v_i : uN 32) (v_n : n) (v_sx : sx) (v_mo : memarg) v_func_type v_t1 lab ret ,
-	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab)[(AI_CONST I32 v_i);(AI_LOAD INN_I32 (Some (op__ INN_I32 (mk_sz v_n) v_sx)) v_mo)] v_func_type ->
+Lemma Step_read__load_pack_trap_I32_preserves : forall v_S (r_v_f : frame) v_C (v_z : state) (v_i : uN 32) (v_n : n) (v_sx : sx) (v_mo : memarg) v_ft v_t1 lab ret ,
+	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab)[(AI_CONST I32 v_i);(AI_LOAD INN_I32 (Some (op__ INN_I32 (mk_sz v_n) v_sx)) v_mo)] v_ft ->
 	Module_instance_ok v_S (F_MODULE r_v_f) v_C  ->
 	v_z = mk_state v_S r_v_f ->
 	((List.length (BYTES (fun_mem v_z 0))) < ((fun_u32__nat v_i + (OFFSET v_mo)) + (v_n / 8))) ->
 	Forall2 (fun v_t v_val => Val_ok v_val v_t) v_t1 (LOCALS r_v_f) ->
-	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab) [(AI_TRAP )] v_func_type.
+	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab) [(AI_TRAP )] v_ft.
 Admitted.
 
-Lemma Step_read__load_pack_trap_I64_preserves : forall v_S (r_v_f : frame) v_C (v_z : state) (v_i : uN 32) (v_n : n) (v_sx : sx) (v_mo : memarg) v_func_type v_t1 lab ret ,
-	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab)[(AI_CONST I32 v_i);(AI_LOAD INN_I64 (Some (op__ INN_I64 (mk_sz v_n) v_sx)) v_mo)] v_func_type ->
+Lemma Step_read__load_pack_trap_I64_preserves : forall v_S (r_v_f : frame) v_C (v_z : state) (v_i : uN 32) (v_n : n) (v_sx : sx) (v_mo : memarg) v_ft v_t1 lab ret ,
+	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab)[(AI_CONST I32 v_i);(AI_LOAD INN_I64 (Some (op__ INN_I64 (mk_sz v_n) v_sx)) v_mo)] v_ft ->
 	Module_instance_ok v_S (F_MODULE r_v_f) v_C  ->
 	v_z = mk_state v_S r_v_f ->
 	((List.length (BYTES (fun_mem v_z 0))) < ((fun_u32__nat v_i + (OFFSET v_mo)) + (v_n / 8))) ->
 	Forall2 (fun v_t v_val => Val_ok v_val v_t) v_t1 (LOCALS r_v_f) ->
-	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab) [(AI_TRAP )] v_func_type.
+	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab) [(AI_TRAP )] v_ft.
 Admitted.
 
 (*
 Proof.
 	intros.
-	destruct v_func_type.
+	destruct v_ft.
 	rewrite <- admin_instrs_ok_eq.
 	apply AI_ok_trap.
 Qed. *)
 
-Lemma Step_read__load_pack_val_I32_preserves : forall v_S (r_v_f : frame) v_C (v_z : state) (v_i : uN 32) (v_n : n) (v_sx : sx) (v_mo : memarg) (v_c : iN v_n) v_func_type v_t1 lab ret ,
-	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab)[(AI_CONST INN_I32 v_i);(AI_LOAD INN_I32 (Some (op__ INN_I32 (mk_sz v_n) v_sx)) v_mo)] v_func_type ->
+Lemma Step_read__load_pack_val_I32_preserves : forall v_S (r_v_f : frame) v_C (v_z : state) (v_i : uN 32) (v_n : n) (v_sx : sx) (v_mo : memarg) (v_c : iN v_n) v_ft v_t1 lab ret ,
+	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab)[(AI_CONST INN_I32 v_i);(AI_LOAD INN_I32 (Some (op__ INN_I32 (mk_sz v_n) v_sx)) v_mo)] v_ft ->
 	Module_instance_ok v_S (F_MODULE r_v_f) v_C  ->
 	v_z = mk_state v_S r_v_f ->
 	((fun_ibytes_ v_n v_c) = (list_slice (BYTES (fun_mem v_z 0)) (fun_u32__nat v_i + (OFFSET v_mo)) (v_n / 8))) ->
 	Forall2 (fun v_t v_val => Val_ok v_val v_t) v_t1 (LOCALS r_v_f) ->
-	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab) [(AI_CONST INN_I32 (fun_extend__ v_n (fun_size INN_I32) v_sx v_c))] v_func_type.
+	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab) [(AI_CONST INN_I32 (fun_extend__ v_n (fun_size INN_I32) v_sx v_c))] v_ft.
 Admitted.
 
-Lemma Step_read__load_pack_val_I64_preserves : forall v_S (r_v_f : frame) v_C (v_z : state) (v_i : uN 32) (v_n : n) (v_sx : sx) (v_mo : memarg) (v_c : iN v_n) v_func_type v_t1 lab ret ,
-	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab)[(AI_CONST INN_I32 v_i);(AI_LOAD INN_I64 (Some (op__ INN_I64 (mk_sz v_n) v_sx)) v_mo)] v_func_type ->
+Lemma Step_read__load_pack_val_I64_preserves : forall v_S (r_v_f : frame) v_C (v_z : state) (v_i : uN 32) (v_n : n) (v_sx : sx) (v_mo : memarg) (v_c : iN v_n) v_ft v_t1 lab ret ,
+	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab)[(AI_CONST INN_I32 v_i);(AI_LOAD INN_I64 (Some (op__ INN_I64 (mk_sz v_n) v_sx)) v_mo)] v_ft ->
 	Module_instance_ok v_S (F_MODULE r_v_f) v_C  ->
 	v_z = mk_state v_S r_v_f ->
 	((fun_ibytes_ v_n v_c) = (list_slice (BYTES (fun_mem v_z 0)) (fun_u32__nat v_i + (OFFSET v_mo)) (v_n / 8))) ->
 	Forall2 (fun v_t v_val => Val_ok v_val v_t) v_t1 (LOCALS r_v_f) ->
-	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab) [(AI_CONST INN_I64 (fun_extend__ v_n (fun_size INN_I64) v_sx v_c))] v_func_type.
+	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab) [(AI_CONST INN_I64 (fun_extend__ v_n (fun_size INN_I64) v_sx v_c))] v_ft.
 Admitted.
 (*
 Proof.
-	move => v_S r_v_f v_C v_z v_i v_inn v_n v_sx v_mo v_c v_func_type v_t1 lab ret HType HMinst HState H HValOK.
-	destruct v_func_type as [ts1 ts2].
+	move => v_S r_v_f v_C v_z v_i v_inn v_n v_sx v_mo v_c v_ft v_t1 lab ret HType HMinst HState H HValOK.
+	destruct v_ft as [ts1 ts2].
 	apply_composition_typing_and_single HType.
 	apply AI_const_typing in H4_comp0.
 	rewrite <- admin_instrs_ok_eq.
@@ -1113,16 +1114,16 @@ Proof.
 	apply const.
 Qed. *)
 
-Lemma Step_read__memory_size_preserves : forall v_S (r_v_f : frame) v_C (v_z : state) (v_n : n) v_func_type v_t1 lab ret ,
-	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab)[(AI_MEMORY_SIZE )] v_func_type ->
+Lemma Step_read__memory_size_preserves : forall v_S (r_v_f : frame) v_C (v_z : state) (v_n : n) v_ft v_t1 lab ret ,
+	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab)[(AI_MEMORY_SIZE )] v_ft ->
 	Module_instance_ok v_S (F_MODULE r_v_f) v_C  ->
 	v_z = mk_state v_S r_v_f ->
 	(((v_n * 64) * (fun_Ki )) = (List.length (BYTES (fun_mem v_z 0)))) ->
 	Forall2 (fun v_t v_val => Val_ok v_val v_t) v_t1 (LOCALS r_v_f) ->
-	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab) [(AI_CONST I32 (fun_nat__u32 v_n : val_ I32))] v_func_type.
+	Admin_instrs_ok v_S (upd_label (upd_local_return v_C (v_t1 ++ C_LOCALS v_C) ret) lab) [(AI_CONST I32 (fun_nat__u32 v_n : val_ I32))] v_ft.
 Proof.
-	move => v_S r_v_f v_C v_z v_n v_func_type v_t1 lab ret HType HMinst HState HLength HValOK.
-	destruct v_func_type as [ts1 ts2].
+	move => v_S r_v_f v_C v_z v_n v_ft v_t1 lab ret HType HMinst HState HLength HValOK.
+	destruct v_ft as [ts1 ts2].
 	rewrite <- admin_instrs_ok_eq.
 	rewrite <- admin_instrs_ok_eq in HType.
 	apply Memory_size_typing in HType; destruct HType as [v_mt [? [? ?]]].
@@ -1305,15 +1306,15 @@ Proof.
 	by erewrite <- list_update_length.
 Qed.
 
-Lemma func_agree_extension: forall v_S v_S' v_funcaddr v_funcinst_1' v_funcinst_2 v_functype,
-	Externaddrs_ok v_S (EXTVAL_FUNC v_funcaddr) (EXT_FUNC v_functype) ->
+Lemma func_agree_extension: forall v_S v_S' v_funcaddr v_funcinst_1' v_funcinst_2 v_ft,
+	Externaddrs_ok v_S (EXTVAL_FUNC v_funcaddr) (EXT_FUNC v_ft) ->
 	length (FUNCS v_S) = length v_funcinst_1' ->
 	FUNCS v_S' = (v_funcinst_1' ++ v_funcinst_2)%list -> 
     Forall2 (fun v s => Func_extension v s) (FUNCS v_S) v_funcinst_1' ->
-    Externaddrs_ok v_S' (EXTVAL_FUNC v_funcaddr) (EXT_FUNC v_functype).
+    Externaddrs_ok v_S' (EXTVAL_FUNC v_funcaddr) (EXT_FUNC v_ft).
 Admitted.
 (* Proof.
-	move => v_S v_S' v_funcaddr v_funcinst_1' v_funcinst_2 v_functype HOk HLength HApp Hext.
+	move => v_S v_S' v_funcaddr v_funcinst_1' v_funcinst_2 v_ft HOk HLength HApp Hext.
 	inversion HOk; destruct H2; subst.
 	apply Forall2_nth in Hext; destruct Hext.
 	apply (H0 _ default_val default_val) in H2 as H2'.
@@ -1616,7 +1617,7 @@ Admitted.
 	removeinst2 H19.
 	removeinst2 H21. subst.
 	simpl in *.
-	eapply Store_ok__OK with (v_funcinst := v_funcinst) (v_functype := v_functype)
+	eapply Store_ok__OK with (v_funcinst := v_funcinst) (v_ft := v_ft)
 		(v_tableinst := v_tableinst) (v_tabletype := v_tabletype)
 		(v_meminst := v_meminst) (v_memtype := v_memtype)
 		(v_globalinst := globals2) (v_globaltype := v_globaltype); subst; repeat split => //=.
@@ -1704,7 +1705,7 @@ Admitted.
 		apply Set_local_typing in H4_comp1; destruct H4_comp1 as [t [HLookup [H0' H1']]].
 		subst.
 		repeat rewrite -> app_assoc in H1_comp1; apply split_append_last in H1_comp1; destruct H1_comp1.
-		replace (C_LOCALS C) with ([::]: list valtype) in *; last by symmetry; eapply inst_t_context_local_empty; eauto.
+		replace (C_LOCALS C) with ([::]: list wasm.valtype) in *; last by symmetry; eapply inst_t_context_local_empty; eauto.
 		rewrite -> cats0 in *.
 		simpl in H1'; simpl in H0. rewrite -> List.map_length in H1'. 
 		apply list_update_map with (f := typeof) (val := (VAL_CONST v_valtype v_val_)) in H1' as HUpdate.
@@ -2134,9 +2135,11 @@ Proof.
 	- eapply Step_pure__relop_preserves; eauto.
 	- eapply Step_pure__cvtop_val_preserves; eauto.
 	- eapply Step_pure__cvtop_trap_preserves; eauto.
+(*
 	- eapply Step_pure__local_tee_preserves; eauto.
 	- eapply Step_pure__ref_is_null_true_preserves; auto.
 	- eapply Step_pure__ref_is_null_false_preserves; auto.
+	*)
 Admitted.
 
 Lemma t_read_preservation: forall v_s v_f v_ais v_ais' v_C v_t1 t1s t2s lab ret,
