@@ -445,10 +445,7 @@ match v_ai with
 		v_ft = ([t; t; VALTYPE_I32] :-> [t]) /\
 		t <tv: t' /\
 		((exists nt: numtype, t' = nt) \/ (exists vt: vectype, t' = vt))
-	| (AI_SELECT _) => exists (t t': valtype),
-		v_ft = ([t; t; VALTYPE_I32] :-> [t]) /\
-		t <tv: t' /\
-		((exists nt: numtype, t' = nt) \/ (exists vt: vectype, t' = vt))
+	| (AI_SELECT _) => False
 	| (AI_BLOCK v_bt v_instr) =>
 	    exists t t',
 	    v_ft = (t :-> t') /\
@@ -730,6 +727,40 @@ Proof.
 	  split; by apply resulttype_sub_refl.
 	}
 Qed.
+
+Lemma ais_single_typing_inversion' : forall (v_S: store) (v_C: context) v_ai t1s t2s,
+	Admin_instrs_ok v_S v_C [v_ai] (t1s :-> t2s) ->
+	Admin_instr_ok v_S v_C v_ai (t1s :-> t2s).
+Proof.
+	move=> v_S v_C v_ai t1s t2s HType.
+	dependent induction HType.
+	- destruct_list_eq x; subst.
+	  eapply ais_empty_typing in HType.
+	  eapply (AI_ok_weakening _ _ _ [] _ []).
+	  eapply H.
+	  eapply resulttype_sub_refl.
+	  eapply HType.
+	  eapply resulttype_sub_refl.
+	- eapply (AI_ok_weakening _ _ _ [] _ []); eauto.
+	  eapply resulttype_sub_refl.
+	- eapply (AI_ok_weakening _ _ _ v_t _ v_t); eauto;
+	  eapply resulttype_sub_refl.
+	- destruct v_instr. discriminate.
+	  simpl in x.
+	  destruct_list_eq x; subst.
+	  destruct v_instr. 2: discriminate.
+	  eapply instrs_single_typing_inversion in H
+	    as [t1s_sup [t2s_sub [Hi Hsub]]].
+	  unfold instrtype_sub in Hsub.
+	  destruct Hsub as [ts_sub [ts [ts1 [ts2 [
+		H1 [H2 [H3 [H4 H5]]]
+	  ]]]]]; subst.
+	  eapply (AI_ok_weakening _ _ _ ); eauto.
+	  eapply AI_ok_instr.
+	  eapply Hi.
+Qed.
+
+
 
 Lemma ais_single_typing_inversion: forall (v_S: store) (v_C: context) v_ai t1s t2s,
 Admin_instrs_ok v_S v_C [v_ai] (t1s :-> t2s) ->

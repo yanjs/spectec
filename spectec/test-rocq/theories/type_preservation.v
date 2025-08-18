@@ -248,7 +248,6 @@ Proof.
 	eapply value_principal_typing_iff_ai in Hai.
 	eapply ais_single_value_typing_iff in H4.
 	typing_inversion H3.
-	typing_inversion Hai0.
 	typing_inversion H2.
 	unfold_principal_typing Hai0.
 	inversion Hai0; subst; clear Hai0.
@@ -265,17 +264,12 @@ Proof.
 	{ (* Some *)
 	  destruct l.
 	  { (* Some [] *)
-		inversion Hai1; subst.
-		rewrite H in H0.
-		apply injective_fun_coec_instr__admininstr in H0.
-		subst.
-		inversion H3.
+	    inversion Hai1.
 	  }
 	  destruct l.
 	  { (* Some [_] *)
-		typing_inversion Hai0.
-		unfold_principal_typing Hpt.
-		inversion Hpt; subst; clear Hpt.
+		unfold_principal_typing Hai1.
+		inversion Hai1; subst; clear Hai1.
 		eapply (instrtype_sub_compose1 _ _ [v; v] _ _ _ _ Hsub0) in Hsub1.
 		rewrite cats0 in Hsub1.
 
@@ -320,17 +314,12 @@ Proof.
 		all: unfold value_typing, value_typing_data; auto.
 	  }
 	  { (* Some (_ :: _ :: _)*)
-		inversion Hai0; subst.
-		rewrite H in H0.
-		apply injective_fun_coec_instr__admininstr in H0.
-		subst.
-		inversion H3.
+		inversion Hai1.
 	  }
 	}
 	(* None *)
-	typing_inversion Hai0.
-	unfold_principal_typing Hpt.
-	destruct Hpt as [t [t' [He [Hvsub0 Hvtype]]]]; subst.
+	unfold_principal_typing Hai1.
+	destruct Hai1 as [t [t' [He [Hvsub0 Hvtype]]]]; subst.
 	inversion He; subst; clear He.
 	eapply (instrtype_sub_compose1 _ _ [t; t] _ _ _ _ Hsub0) in Hsub1.
 	rewrite cats0 in Hsub1.
@@ -386,7 +375,6 @@ Proof.
 	auto.
 Qed.
 
-(* Exact the same proof. I don't find a way to simplify this *)
 Lemma Step_pure__select_false_preserves : forall v_S v_C (v_val_1 : wasm.val) (v_val_2 : wasm.val) (v_c : iN 32) v_t v_ft,
 	Admin_instrs_ok v_S v_C [(v_val_1 : admininstr);(v_val_2 : admininstr);(AI_CONST I32 (v_c));(AI_SELECT v_t)] v_ft ->
 	Step_pure [(v_val_1 : admininstr);(v_val_2 : admininstr);(AI_CONST I32 (v_c));(AI_SELECT v_t)] [(v_val_2 : admininstr)] ->
@@ -397,33 +385,38 @@ Proof.
 	auto.
 Qed.
 
+Lemma Step_pure__if_preserves_helper : forall v_S v_C (v_c : iN 32) (v_bt: blocktype) (v_instrs_1 : (list instr)) (v_instrs_2 : (list instr)) v_ft,
+	Admin_instrs_ok v_S v_C [(AI_CONST I32 v_c);(AI_IFELSE v_bt v_instrs_1 v_instrs_2)] v_ft ->
+	(Admin_instrs_ok v_S v_C [(AI_BLOCK v_bt v_instrs_1)] v_ft /\
+	Admin_instrs_ok v_S v_C [(AI_BLOCK v_bt v_instrs_2)] v_ft).
+Proof.
+	move => v_S v_C v_c v_bt v_instrs_1 v_instrs_2 v_ft HType.
+	typing_inversion HType.
+	typing_inversion H1.
+	typing_inversion H2.
+	unfold_principal_typing Hai.
+	inversion Hai; subst; clear Hai.
+	unfold_principal_typing Hai0.
+	destruct Hai0 as [t [t' [He [H2 [H3 H4]]]]].
+	inversion He; subst; clear He.
+	
+	eapply instrtype_sub_compose1 in Hsub0.
+	2: apply Hsub.
+	rewrite cats0 in Hsub0.
+	split;
+	eapply construct_ais_typing_single; [| eauto| |eauto].
+	all: eapply (AI_ok_instr _ _ (instr_BLOCK _ _));
+	constructor; eauto.
+Qed.
+
 Lemma Step_pure__if_true_preserves : forall v_S v_C (v_c : iN 32) (v_bt: blocktype) (v_instrs_1 : (list instr)) (v_instrs_2 : (list instr)) v_ft,
 	Admin_instrs_ok v_S v_C [(AI_CONST I32 v_c);(AI_IFELSE v_bt v_instrs_1 v_instrs_2)] v_ft ->
 	Step_pure [(AI_CONST I32 v_c);(AI_IFELSE v_bt v_instrs_1 v_instrs_2)] [(AI_BLOCK v_bt v_instrs_1)] ->
 	Admin_instrs_ok v_S v_C [(AI_BLOCK v_bt v_instrs_1)] v_ft.
 Proof.
 	move => v_S v_C v_c v_bt v_instrs_1 v_instrs_2 v_ft HType HReduce.
-	typing_inversion HType.
-	typing_inversion H1;
-	typing_inversion Hai;
-	unfold_principal_typing Hpt;
-	inversion Hpt; subst; clear Hpt.
-	typing_inversion H2;
-	typing_inversion Hai;
-	unfold_principal_typing Hpt;
-	destruct Hpt as [t [t' [He [H2 [H3 H4]]]]].
-	inversion He; subst; clear He.
-	eapply construct_ais_typing_single.
-	{
-	  eapply (AI_ok_instr _ _ (instr_BLOCK _ _)).
-	  constructor.
-	  apply H2.
-	  apply H3.
-	}
-	rewrite -(cats0 t).
-	eapply instrtype_sub_compose1.
-	eapply Hsub.
-	eapply Hsub0.
+	eapply (Step_pure__if_preserves_helper) in HType.
+	by destruct HType.
 Qed.
 
 Lemma Step_pure__if_false_preserves : forall v_S v_C (v_c : iN 32) (v_bt: blocktype) (v_instrs_1 : (list instr)) (v_instrs_2 : (list instr)) v_ft,
@@ -431,30 +424,12 @@ Lemma Step_pure__if_false_preserves : forall v_S v_C (v_c : iN 32) (v_bt: blockt
 	Step_pure [(AI_CONST I32 v_c);(AI_IFELSE v_bt v_instrs_1 v_instrs_2)] [(AI_BLOCK v_bt v_instrs_2)] ->
 	Admin_instrs_ok v_S v_C [(AI_BLOCK v_bt v_instrs_2)] v_ft.
 Proof.
-	move => v_S v_C v_c v_t v_instr_1 v_instr_2 v_ft HType HReduce.
-	typing_inversion HType.
-	typing_inversion H1;
-	typing_inversion Hai;
-	unfold_principal_typing Hpt;
-	inversion Hpt; subst; clear Hpt.
-	typing_inversion H2;
-	typing_inversion Hai;
-	unfold_principal_typing Hpt;
-	destruct Hpt as [t [t' [He [H2 [H3 H4]]]]].
-	inversion He; subst; clear He.
-	eapply construct_ais_typing_single.
-	{
-	  eapply (AI_ok_instr _ _ (instr_BLOCK _ _)).
-	  constructor.
-	  apply H2.
-	  apply H4.
-	}
-	rewrite -(cats0 t).
-	eapply instrtype_sub_compose1.
-	eapply Hsub.
-	eapply Hsub0.
+	move => v_S v_C v_c v_bt v_instrs_1 v_instrs_2 v_ft HType HReduce.
+	eapply (Step_pure__if_preserves_helper) in HType.
+	by destruct HType.
 Qed.
 
+(*
 Lemma construct_ai_from_ais_val_single : forall v_S v_C (v_val: wasm.val) t1s t2s t1s' t2s',
 	Admin_instrs_ok v_S v_C [v_val: admininstr] (t1s :-> t2s) ->
 	((t1s' :-> t2s') <ti: (t1s :-> t2s)) ->
@@ -483,38 +458,28 @@ Lemma construct_ais_seq : forall v_S v_C v_ais v_ai t1s t2s t3s,
 Proof.
 	move => v_S v_C v_ais v_ai t1s t2s t3s H1 H2.
 
-	move: v_ai t1s t2s t3s H1 H2.
-
-	induction v_ais using last_ind.
+	dependent induction H2.
 	{
-	  move=> v_ai t1s t2s t3s H1 H2.
-	  typing_inversion H1.
-	  typing_inversion H2.
-	  unfold_instrtype_sub Hsub.
-	  subst.
-	  simpl.
-	  eapply AIs_ok_sub.
-	  eapply AIs_ok_frame.
-	  eapply (AIs_ok_seq _ _ []).
-	  eapply ais_empty_typing.
-	  eapply resulttype_sub_refl.
-	  eapply Hai.
-	  eapply resulttype_sub_trans.
-	  eapply H1.
-	  eapply resulttype_sub_app.
-	  eapply Hsub0.
-	  eapply Hsub1.
-	  eapply resulttype_sub_app.
-	  eapply resulttype_sub_refl.
-	  eapply Hsub2.
+		destruct_list_eq x; subst.
+		eapply AIs_ok_seq.
+		eapply H1.
+		eapply ais_empty_typing in H2.
+		eapply (AI_ok_weakening _ _ _ [] _ []).
+		eapply H.
+		eapply resulttype_sub_refl.
+		eapply H2.
+		eapply resulttype_sub_refl.
 	}
-	move=> v_ai t1s t2s t3s H1 H2.
-	rewrite -cats1 in H1.
-	typing_inversion H1.
-	typing_inversion H3.
-	apply (IHv_ais _ _ _ _ H0) in H3.
-	typing_inversion H1.
-	unfold_instrtype_sub Hsub; subst.
+	{
+		eapply (AIs_ok_seq _ _ _ _ _ _ v_t_1).
+		eapply (AIs_ok_sub).
+		eapply H1.
+		eapply resulttype_sub_refl.
+		eapply H.
+		typing_inversion H2.
+		eapply (AI_ok_weakening _ _ _ [] _ []).
+	}
+*)
 
 Lemma construct_ais_vals : forall v_S v_C v_C' (v_vals: seq wasm.val) v_ft,
 	Admin_instrs_ok v_S v_C (map fun_coec_val__admininstr v_vals) v_ft ->
@@ -540,27 +505,44 @@ Proof.
 	  rewrite -cats1.
 	  typing_inversion HType.
 	  typing_inversion H2.
-	  destruct x.
-	  {
-		assert (Admin_instr_ok v_S v_C')
-		typing_inversion Hai.
-		unfold_principal_typing Hpt.
-	  }
-	  unfold_instrtype_sub Hsub; subst.
-	  eapply AIs_ok_sub.
-	  - eapply AIs_ok_seq.
-	    eapply IHv_vals.
-	    eapply H1.
-	  typing_inversion H2.
-	  destruct x; typing_inversion Hai.
-	  {
-		unfold_principal_typing Hpt.
-		inversion Hpt; subst; clear Hpt.
-		eapply (AI_ok_instr _ _ (instr_CONST _ _)).
-		eapply instr_ok_const.
-	  }
+	  destruct x;
+	  unfold_principal_typing Hai.
+	  4: destruct Hai as [v_ft [Hai Heok]].
+	  all: 
+		inversion Hai; subst; clear Hai;
+		eapply AIs_ok_seq;
+		[
+			eapply IHv_vals;
+			eauto
+			|
+		].
+		all: unfold instrtype_sub in Hsub;
+		destruct Hsub as [ts_sub [ts [ts11_sub [ts12_sup [
+			H0 [H2 [H3 [H4 H5]]]
+		]]]]]; subst;
+		eapply resulttype_sub_empty in H4; subst.
+		all: eapply (AI_ok_weakening _ _ _ );
+		[
+			idtac |
+			eapply H3 |
+			eapply resulttype_sub_refl |
+			eapply H5
+		].
+		all:
+		first [
+			eapply (AI_ok_instr _ _ (instr_CONST _ _));
+			eapply (instr_ok_const) |
+			eapply (AI_ok_instr _ _ (instr_VCONST _ _));
+			destruct v_vectype;
+			eapply (instr_ok_vconst) |
+			eapply (AI_ok_instr _ _ (instr_REF_NULL _));
+			eapply (instr_ok_ref_null) | 
+			eapply (AI_ok_ref) ; eauto |
+			eapply (AI_ok_ref_extern) |
+			idtac
+		].
 	}
-
+Qed.
 
 Lemma Step_pure__label_vals_preserves : forall v_S v_C (v_n : n) (v_instrs : (list instr)) (v_val : (list wasm.val)) v_ft,
 	Admin_instrs_ok v_S v_C [(AI_LABEL_ v_n v_instrs (map fun_coec_val__admininstr v_val))] v_ft ->
@@ -569,14 +551,19 @@ Lemma Step_pure__label_vals_preserves : forall v_S v_C (v_n : n) (v_instrs : (li
 Proof.
 	move => v_S v_C v_n v_instrs v_val v_ft HType HReduce.
 	typing_inversion HType.
-	typing_inversion Hai.
-	unfold ai_principal_typing in Hpt.
-	destruct Hpt as [t [t' [He [Hitype [Hatype Hlen]]]]].
+	unfold ai_principal_typing in Hai.
+	destruct Hai as [t [t' [He [Hitype [Hatype Hlen]]]]].
 	inversion He; subst; clear He.
-	typing_inversion Hatype.
-	unfold_principal_typing Hpt.
-	destruct Hpt
-Admitted.
+	
+	unfold_instrtype_sub Hsub; subst.
+	eapply resulttype_sub_empty in Hsub1; subst.
+	eapply (AIs_ok_sub _ _ _ _ _ (ts_sub ++ []) (ts_sub ++ t')).
+	eapply (AIs_ok_frame).
+	eapply (construct_ais_vals); eauto.
+	rewrite !cats0;	eauto.
+	eapply resulttype_sub_app; eauto.
+	eapply resulttype_sub_refl.
+Qed.
 
 Lemma Step_pure__br_zero_preserves : forall v_S v_C (v_n : n) (v_instr' : (list instr)) (v_val' : (list wasm.val)) (v_val : (list wasm.val)) (v_instr : (list instr)) v_ft,
 	Admin_instrs_ok v_S v_C [(AI_LABEL_ v_n v_instr' (@app _ (map fun_coec_val__admininstr v_val') (@app _ (map fun_coec_val__admininstr v_val) (@app _ [AI_BR 0] (map fun_coec_instr__admininstr v_instr)))))] v_ft ->
