@@ -449,37 +449,39 @@ Proof.
 	- eapply (AI_ok_instr _ _ (instr_REF_NULL _)).
 	  eapply instr_ok_ref_null.
 	all: econstructor. eauto.
-Qed.
+Qed. *)
 
-Lemma construct_ais_seq : forall v_S v_C v_ais v_ai t1s t2s t3s,
-	Admin_instrs_ok v_S v_C v_ais (t1s :-> t2s) ->
-	Admin_instrs_ok v_S v_C [v_ai] (t2s :-> t3s) ->
-	Admin_instrs_ok v_S v_C (v_ais ++ [v_ai]) (t1s :-> t3s).
+Lemma construct_ais_compose : forall v_S v_C v_ais1 v_ais2 t1s t2s t3s,
+	Admin_instrs_ok v_S v_C v_ais1 (t1s :-> t2s) ->
+	Admin_instrs_ok v_S v_C v_ais2 (t2s :-> t3s) ->
+	Admin_instrs_ok v_S v_C (v_ais1 ++ v_ais2) (t1s :-> t3s).
 Proof.
-	move => v_S v_C v_ais v_ai t1s t2s t3s H1 H2.
-
-	dependent induction H2.
+	move => v_S v_C v_ais1 v_ais2 t1s t2s t3s H1 H2.
+	move: v_ais1 t1s t2s t3s H1 H2.
+	induction v_ais2 using last_ind.
 	{
-		destruct_list_eq x; subst.
-		eapply AIs_ok_seq.
+		move=> v_ais1 t1s t2s t3s H1 H2.
+		rewrite cats0.
+		eapply AIs_ok_sub.
 		eapply H1.
+		eapply resulttype_sub_refl.
 		eapply ais_empty_typing in H2.
-		eapply (AI_ok_weakening _ _ _ [] _ []).
-		eapply H.
-		eapply resulttype_sub_refl.
 		eapply H2.
-		eapply resulttype_sub_refl.
 	}
 	{
-		eapply (AIs_ok_seq _ _ _ _ _ _ v_t_1).
-		eapply (AIs_ok_sub).
-		eapply H1.
-		eapply resulttype_sub_refl.
-		eapply H.
+		move=> v_ais1 t1s t2s t3s H1 H2.
+		rewrite -cats1.
+		rewrite catA.
+		rewrite -cats1 in H2.
 		typing_inversion H2.
-		eapply (AI_ok_weakening _ _ _ [] _ []).
+
+		eapply AIs_ok_seq.
+		eapply IHv_ais2.
+		eapply H1.
+		eapply H0.
+		by eapply ais_single_typing_inversion'.
 	}
-*)
+Qed.
 
 Lemma construct_ais_vals : forall v_S v_C v_C' (v_vals: seq wasm.val) v_ft,
 	Admin_instrs_ok v_S v_C (map fun_coec_val__admininstr v_vals) v_ft ->
@@ -565,14 +567,39 @@ Proof.
 	eapply resulttype_sub_refl.
 Qed.
 
+Lemma lookup_label_0: forall v_C t,
+lookup_total (C_LABELS (prepend_label v_C t)) 0 = t.
+Proof.
+	move=> v_C t.
+	unfold lookup_total.
+	unfold C_LABELS, prepend_label, _append, Append_context, _append_context.
+	unfold _append, Append_List_.
+	unfold C_LABELS.
+	rewrite app_cat.
+	rewrite cat1s.
+	unfold ListDef.nth.
+	eauto.
+Qed.
+
 Lemma Step_pure__br_zero_preserves : forall v_S v_C (v_n : n) (v_instr' : (list instr)) (v_val' : (list wasm.val)) (v_val : (list wasm.val)) (v_instr : (list instr)) v_ft,
 	Admin_instrs_ok v_S v_C [(AI_LABEL_ v_n v_instr' (@app _ (map fun_coec_val__admininstr v_val') (@app _ (map fun_coec_val__admininstr v_val) (@app _ [AI_BR 0] (map fun_coec_instr__admininstr v_instr)))))] v_ft ->
 	Admin_instrs_ok v_S v_C (@app _ (map fun_coec_val__admininstr v_val) (map fun_coec_instr__admininstr v_instr')) v_ft.
 Proof.
 	move => v_S v_C v_n v_instr' v_val' v_val v_instr v_ft HType.
 	typing_inversion HType.
+	unfold ai_principal_typing in Hai.
+	destruct Hai as [t [t' [Heq [Hi [Hai Hlen]]]]].
+	inversion Heq; subst; clear Heq.
 	typing_inversion Hai.
-	unfold_principal_typing Hpt.
+	typing_inversion H2.
+	typing_inversion H3.
+	typing_inversion H2.
+	unfold_principal_typing Hai.
+	destruct Hai as [t1 [t2 [v_t [H5 [H6 H7]]]]].
+	inversion H5; subst; clear H5.
+	rewrite lookup_label_0 in Hsub0.
+	unfold fun_proj_list_0, fun_list__res_list in Hsub0.
+
 Admitted.
 
 
@@ -602,13 +629,11 @@ Proof.
 	move => v_S v_C v_c v_l v_ft HType HReduce.
 	typing_inversion HType.
 	typing_inversion H1.
-	typing_inversion Hai.
 	typing_inversion H2.
-	typing_inversion Hai.
-	unfold_principal_typing Hpt.
-	inversion Hpt; subst; clear Hpt.
-	unfold_principal_typing Hpt0.
-	destruct Hpt0 as [t [He1 [H1 H2]]].
+	unfold_principal_typing Hai.
+	inversion Hai; subst; clear Hai.
+	unfold_principal_typing Hai0.
+	destruct Hai0 as [t [He1 [H1 H2]]].
 	inversion He1; subst; clear He1.
 
 	eapply construct_ais_typing_single.
@@ -629,13 +654,11 @@ Proof.
 	move => v_S v_C v_c v_l v_ft HType HReduce.
 	typing_inversion HType.
 	typing_inversion H1.
-	typing_inversion Hai.
 	typing_inversion H2.
-	typing_inversion Hai.
-	unfold_principal_typing Hpt.
-	inversion Hpt; subst; clear Hpt.
-	unfold_principal_typing Hpt0.
-	destruct Hpt0 as [t [He1 [H1 H2]]].
+	unfold_principal_typing Hai.
+	inversion Hai; subst; clear Hai.
+	unfold_principal_typing Hai0.
+	destruct Hai0 as [t [He1 [H1 H2]]].
 	inversion He1; subst; clear He1.
 
 	eapply (instrtype_sub_compose1 _ _ _ _ _ _ _ Hsub) in Hsub0.
@@ -661,14 +684,13 @@ Lemma Step_pure__br_table_lt_preserves : forall v_S v_C (v_i : uN 32) (v_l : (li
 Proof.
 	move => v_S v_C v_i v_l v_l' v_ft HType HReduce H.
 	typing_inversion HType.
+
 	typing_inversion H1.
-	typing_inversion Hai.
-	unfold_principal_typing Hpt.
-	inversion Hpt; subst; clear Hpt.
+	unfold_principal_typing Hai.
+	inversion Hai; subst; clear Hai.
 	typing_inversion H2.
-	typing_inversion Hai.
-	unfold_principal_typing Hpt.
-	destruct Hpt as [t [t' [v_t [H1 [H2 [H3 [H4 H5]]]]]]].
+	unfold_principal_typing Hai.
+	destruct Hai as [t [t' [v_t [H1 [H2 [H3 [H4 H5]]]]]]].
 	inversion H1; subst; clear H1.
 	rewrite catA in Hsub0.
 	eapply (instrtype_sub_compose1 _ _ _ _ _ _ _ Hsub) in Hsub0.
@@ -707,14 +729,13 @@ Lemma Step_pure__br_table_ge_preserves : forall v_S v_C (v_i : uN 32) (v_l : (li
 Proof.
 	move => v_S v_C v_i v_l v_l' v_ft HType HReduce H.
 	typing_inversion HType.
+
 	typing_inversion H1.
-	typing_inversion Hai.
-	unfold_principal_typing Hpt.
-	inversion Hpt; subst; clear Hpt.
+	unfold_principal_typing Hai.
+	inversion Hai; subst; clear Hai.
 	typing_inversion H2.
-	typing_inversion Hai.
-	unfold_principal_typing Hpt.
-	destruct Hpt as [t [t' [v_t [H1 [H2 [H3 [H4 H5]]]]]]].
+	unfold_principal_typing Hai.
+	destruct Hai as [t [t' [v_t [H1 [H2 [H3 [H4 H5]]]]]]].
 	inversion H1; subst; clear H1.
 	rewrite catA in Hsub0.
 	eapply (instrtype_sub_compose1 _ _ _ _ _ _ _ Hsub) in Hsub0.
@@ -841,13 +862,11 @@ Proof.
 	move => v_S v_C t v unop_op v_c tf HType HReduce.
 	typing_inversion HType.
 	typing_inversion H1.
-	typing_inversion Hai.
-	unfold_principal_typing Hpt.
-	inversion Hpt; subst; clear Hpt.
+	unfold_principal_typing Hai.
+	inversion Hai; subst; clear Hai.
 	typing_inversion H2.
-	typing_inversion Hai.
-	unfold_principal_typing Hpt.
-	inversion Hpt; subst; clear Hpt.
+	unfold_principal_typing Hai.
+	inversion Hai; subst; clear Hai.
 
 	eapply construct_ais_typing_single.
 	eapply (AI_ok_instr _ _ (instr_CONST _ _)).
@@ -873,16 +892,13 @@ Proof.
 	move => v_S v_C v_t v_c_1 v_c_2 v_binop v_c v_ft HType HReduce.
 	typing_inversion HType.
 	typing_inversion H2.
-	typing_inversion Hai.
-	unfold_principal_typing Hpt.
-	inversion Hpt; subst; clear Hpt.
+	unfold_principal_typing Hai.
+	inversion Hai; subst; clear Hai.
 	typing_inversion H3.
-	typing_inversion Hai.
-	unfold_principal_typing Hpt.
-	inversion Hpt; subst; clear Hpt.
-	typing_inversion Hai0.
-	unfold_principal_typing Hpt.
-	inversion Hpt; subst; clear Hpt.
+	unfold_principal_typing Hai.
+	inversion Hai; subst; clear Hai.
+	unfold_principal_typing Hai0.
+	inversion Hai0; subst; clear Hai0.
 	eapply (instrtype_sub_compose1 _ _ [v_t: valtype] _ _ _ _ Hsub1) in Hsub0.
 	rewrite cats0 in Hsub0.
 
@@ -911,13 +927,11 @@ Proof.
 	move => v_S v_C t v unop_op v_c tf HType HReduce.
 	typing_inversion HType.
 	typing_inversion H1.
-	typing_inversion Hai.
-	unfold_principal_typing Hpt.
-	inversion Hpt; subst; clear Hpt.
+	unfold_principal_typing Hai.
+	inversion Hai; subst; clear Hai.
 	typing_inversion H2.
-	typing_inversion Hai.
-	unfold_principal_typing Hpt.
-	inversion Hpt; subst; clear Hpt.
+	unfold_principal_typing Hai.
+	inversion Hai; subst; clear Hai.
 
 	eapply construct_ais_typing_single.
 	eapply (AI_ok_instr _ _ (instr_CONST _ _)).
@@ -933,16 +947,13 @@ Proof.
 	move => v_S v_C v_t v_c_1 v_c_2 v_relop v_c v_ft HType HReduce.
 	typing_inversion HType.
 	typing_inversion H2.
-	typing_inversion Hai.
-	unfold_principal_typing Hpt.
-	inversion Hpt; subst; clear Hpt.
+	unfold_principal_typing Hai.
+	inversion Hai; subst; clear Hai.
 	typing_inversion H3.
-	typing_inversion Hai.
-	unfold_principal_typing Hpt.
-	inversion Hpt; subst; clear Hpt.
-	typing_inversion Hai0.
-	unfold_principal_typing Hpt.
-	inversion Hpt; subst; clear Hpt.
+	unfold_principal_typing Hai.
+	inversion Hai; subst; clear Hai.
+	unfold_principal_typing Hai0.
+	inversion Hai0; subst; clear Hai0.
 	eapply (instrtype_sub_compose1 _ _ [v_t: valtype] _ _ _ _ Hsub1) in Hsub0.
 	rewrite cats0 in Hsub0.
 
@@ -960,13 +971,11 @@ Proof.
 	move => v_S v_C v_t_1 v_c_1 v_t_2 v_cvtop v_c v_ft HType HReduce.
 	typing_inversion HType.
 	typing_inversion H1.
-	typing_inversion Hai.
-	unfold_principal_typing Hpt.
-	inversion Hpt; subst; clear Hpt.
+	unfold_principal_typing Hai.
+	inversion Hai; subst; clear Hai.
 	typing_inversion H2.
-	typing_inversion Hai.
-	unfold_principal_typing Hpt.
-	inversion Hpt; subst; clear Hpt.
+	unfold_principal_typing Hai.
+	inversion Hai; subst; clear Hai.
 
 	eapply construct_ais_typing_single.
 	eapply (AI_ok_instr _ _ (instr_CONST _ _)).

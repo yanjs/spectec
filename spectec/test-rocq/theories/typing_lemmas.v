@@ -906,6 +906,37 @@ Proof.
 	}
 Qed.
 
+Lemma ais_composition_typing: forall (v_S: store) (v_C: context) v_ais1 v_ais2 t1s t2s,
+Admin_instrs_ok v_S v_C (v_ais1 ++ v_ais2) (t1s :-> t2s) ->
+exists t3s, Admin_instrs_ok v_S v_C v_ais1 (t1s :-> t3s) /\
+	Admin_instrs_ok v_S v_C v_ais2 (t3s :-> t2s).
+Proof.
+	move=> v_S v_C v_ais1 v_ais2 t1s t2s HType.
+	move: v_ais1 t1s t2s HType.
+	induction v_ais2 using last_ind.
+	{
+		move=> v_ais1 t1s t2s HType.
+		exists t2s.
+		split.
+		rewrite cats0 in HType. auto.
+		eapply ais_empty_typing.
+		eapply resulttype_sub_refl.
+	}
+	{
+		move=> v_ais1 t1s t2s HType.
+		rewrite -cats1 in HType.
+		rewrite catA in HType.
+		eapply ais_seq_typing_inversion in HType as [t3s [H1 H2]].
+		eapply IHv_ais2 in H1 as [t3s' [H3 H4]].
+		exists t3s'.
+		split. auto.
+		rewrite -cats1.
+		eapply AIs_ok_seq. eauto.
+		eapply ais_single_typing_inversion'.
+		eauto.
+	}
+Qed.
+
 Ltac do_instr_typing_inversion H :=
   lazymatch type of H with
   | Instr_ok _ ?v_instr _ =>
@@ -985,11 +1016,17 @@ Ltac do_ais_typing_inversion H :=
     repeat rewrite -(cat1s _ (_ :: _)) in H;
 	repeat rewrite !catA in H;
 	do_ais_typing_inversion H
+  | Admin_instrs_ok _ _ (_ ++ _) _ =>
+    let t3s := fresh "t3s" in
+	let H1 := fresh "H1" in
+	let H2 := fresh "H2" in
+	eapply ais_composition_typing in H as [t3s [H1 H2]]
   | _ => idtac
   end.
 
 Ltac typing_inversion H :=
   destruct_functypes;
+  try rewrite !app_cat in H;
   lazymatch type of H with
   | Admin_instrs_ok _ _ _ _ =>
     do_ais_typing_inversion H
