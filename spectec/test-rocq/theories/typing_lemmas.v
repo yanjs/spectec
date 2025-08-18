@@ -595,65 +595,90 @@ Qed.
 
 Lemma ai_typing_inversion: forall (v_S: store) (v_C: context) v_ai t1s t2s,
 	Admin_instr_ok v_S v_C v_ai (t1s :-> t2s) ->
-	ai_principal_typing v_S v_C v_ai (t1s :-> t2s).
+	exists t1s' t2s',
+	ai_principal_typing v_S v_C v_ai (t1s' :-> t2s') /\
+	((t1s' :-> t2s') <ti: (t1s :-> t2s)).
 Proof.
-	move => v_S v_C v_ai t1s t2s HType.
+	move => v_S v_C v_ai t1s t2s.
+	move => HType.
 	dependent induction HType.
 	{ (* instr *)
-	  destruct v_instr.
-	  all: unfold ai_principal_typing;
-	  unfold fun_coec_instr__admininstr.
-	  all: inversion H; subst.
-	  all:
-		first [
-			solve exact
-		  |
-			solve [simpl; eauto]
-		  |
-			solve [destruct_disjunctions; repeat eexists; eauto]
-		].
+		destruct v_instr.
+		all: unfold ai_principal_typing;
+		unfold fun_coec_instr__admininstr.
+		all: inversion H; subst.
+		all: do 2 eexists.
+		all: split;
+		[
+			first [
+				solve exact
+			|
+				solve [simpl; eauto]
+			|
+				solve [destruct_disjunctions; repeat eexists; eauto]
+			]
+		|
+			solve [
+				exists []; do 3 eexists;
+				split; [|split; [|split; [|split]]];
+				try apply resulttype_sub_refl;
+				simpl; try exact
+			]
+	  	].
 	}
 	{ (* trap *)
-	  by unfold ai_principal_typing.
+	  exists t1s, t2s.
+	  split.
+	  - unfold ai_principal_typing; exact.
+	  - apply instrtype_sub_refl.
 	}
 	{ (* ref_extern *)
-	  by unfold ai_principal_typing. 
+	  exists [], [VALTYPE_EXTERNREF].
+	  split.
+	  - unfold ai_principal_typing; auto.
+	  - apply instrtype_sub_refl. 
 	}
 	{ (* ref *)
-	  unfold ai_principal_typing.
-	  do 2 eexists; eauto.
+	  exists [], [VALTYPE_FUNCREF].
+	  split.
+	  - unfold ai_principal_typing;
+	    do 2 eexists; eauto.
+	  - apply instrtype_sub_refl.
 	}
 	{ (* call_addr *) (* TODO *)
-	  by unfold ai_principal_typing.
+	  eexists _, _.
+	  split.
+	  - unfold ai_principal_typing; exact.
+	  - apply instrtype_sub_refl.
 	}
 	{ (* label *) (* TODO *)
-	  unfold ai_principal_typing.
-	  repeat eexists; auto.
+	  eexists _, _.
+	  split.
+	  - unfold ai_principal_typing; repeat eexists; eauto.
+	  - apply instrtype_sub_refl.
 	}
 	{ (* frame *) (* TODO *)
-	  unfold ai_principal_typing.
-	  eexists.
-	  split; [|split]; eauto.
+	  eexists _, _.
+	  split.
+	  - unfold ai_principal_typing.
+		eexists.
+		split; [|split]; eauto.
+	  - apply instrtype_sub_refl.
 	}
-	(*
 	{ (* weakening *)
-	  specialize (IHHType _ _ erefl) as [t1s_sup [t2s_sub [Hpt His]]].
-	  exists t1s_sup, t2s_sub.
-	  split. exact.
-	  unfold instrtype_sub.
-	  unfold instrtype_sub in His.
-	  destruct His
-	    as [ts_sub [ts [ts1_sub [ts2_sup [H1 [H2 [H3 [H4 H5]]]]]]]].
-	  exists (v_t ++ ts_sub).
-	  exists (v_t ++ ts).
-	  exists (ts1_sub).
-	  exists (ts2_sup).
-	  subst.
-	  all: split; [|split; [|split; [|split]]]; auto;
-	  try by rewrite catA.
-	  apply resulttype_sub_app; auto.
-	  by apply resulttype_sub_refl.
-	} *)
+		specialize (IHHType _ _ erefl) as [t1' [t2' [Hpt His]]].
+		exists t1', t2'.
+		split. exact.
+		eapply instrtype_sub_trans.
+		eapply His.
+		unfold instrtype_sub.
+		eexists
+		(v_t'),
+		(v_t),
+		(v_t'_1),
+		(v_t'_2).
+		split; [|split; [|split; [|split]]]; auto.
+	}
 Qed.
 
 Lemma instrs_single_typing_inversion: forall (v_C: context) v_instr t1s t2s,
@@ -709,7 +734,7 @@ Qed.
 Lemma ais_single_typing_inversion: forall (v_S: store) (v_C: context) v_ai t1s t2s,
 Admin_instrs_ok v_S v_C [v_ai] (t1s :-> t2s) ->
 exists t1s_sup t2s_sub,
-	Admin_instr_ok v_S v_C v_ai (t1s_sup :-> t2s_sub) /\
+	ai_principal_typing v_S v_C v_ai (t1s_sup :-> t2s_sub) /\
 	(t1s_sup :-> t2s_sub) <ti: (t1s :-> t2s).
 Proof.
 	move=> v_S v_C v_ai t1s t2s HType.
@@ -717,8 +742,10 @@ Proof.
 	{ (* seq *)
 	  destruct_list_eq x; subst.
 	  apply ais_empty_typing in HType.
-	  exists (v_t_2), (t2s).
+	  eapply ai_typing_inversion in H as [t1s' [t2s' [Hpt Hsub]]].
+	  exists (t1s'), (t2s').
 	  split. auto.
+	  eapply instrtype_sub_trans. eapply Hsub.
 	  unfold instrtype_sub.
 	  exists [], [], t1s, t2s.
 	  split. auto.
@@ -761,11 +788,13 @@ Proof.
 	  subst.
 
 	  eapply instrs_single_typing_inversion in H
-	    as [t1s_sup [t2s_sub [Hpt H1]]].
+	    as [t1s_sup [t2s_sub [Hi H1]]].
+	  eapply instr_typing_inversion in Hi.
+	  unfold instr_principal_typing in Hi.
 	  exists t1s_sup, t2s_sub.
-	  split.
-	  - by eapply AI_ok_instr.
-	  - auto.
+	  split. 2: auto.
+	  destruct i;
+	  auto.
 	}
 Qed.
 
@@ -890,8 +919,10 @@ Ltac do_ai_typing_inversion H :=
   lazymatch type of H with
   | Admin_instr_ok _ _ _ _ =>
     let Hpt := fresh "Hpt" in
-    eapply ai_typing_inversion in H as Hpt;
-	clear H
+	let t1s' := fresh "t1s'" in
+	let t2s' := fresh "t2s'" in
+	let Hsub := fresh "Hsub" in
+    eapply ai_typing_inversion in H as [t1s' [t2s' [Hpt Hsub]]]
   | _ => idtac
   end.
 
@@ -961,6 +992,8 @@ Proof.
 Qed.
 
 Ltac unfold_principal_typing H :=
+  unfold instr_principal_typing in H;
+  unfold fun_coec_instr__admininstr in H;
   unfold ai_principal_typing in H;
   unfold fun_coec_val__admininstr in H.
 
@@ -981,6 +1014,13 @@ Ltac unfold_instrtype_sub H :=
 	  H1 [H2 [Hsub1 [Hsub2 Hsub3]]]
 	]]]]]
   end.
+
+Lemma injective_fun_coec_instr__admininstr : injective fun_coec_instr__admininstr.
+Proof.
+	unfold injective.
+	move=> x1 x2 H.
+	destruct x1; destruct x2; try discriminate; inversion H; auto.
+Qed.
 
 (*
 Ltac apply_instrs_composition_typing_single H := 

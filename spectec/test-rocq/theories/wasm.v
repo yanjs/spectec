@@ -6448,7 +6448,7 @@ Inductive Store_ok: store -> Prop :=
 		List.Forall (fun (v_datainst : datainst) => (Data_instance_ok v_S v_datainst)) (v_datainst) ->
 		Store_ok v_S.
 
-(* Inductive Relations Definition at: ../specification/wasm-2.0/B-soundness.spectec:228.1-228.44 *)
+(* Inductive Relations Definition at: ../specification/wasm-2.0/B-soundness.spectec:236.1-236.44 *)
 Inductive Frame_ok: store -> frame -> context -> Prop :=
 	| mk_Frame_ok : forall (v_S : store) (v_val : (list val)) (v_moduleinst : moduleinst) (v_C : context) (v_t : (list valtype)), 
 		(Module_instance_ok v_S v_moduleinst v_C) ->
@@ -6479,6 +6479,12 @@ Inductive Admin_instr_ok: store -> context -> admininstr -> functype -> Prop :=
 		(Thread_ok v_S (Some (mk_list _ v_t)) v_F v_admininstr (mk_list _ v_t)) ->
 		(v_n = (List.length v_t)) ->
 		Admin_instr_ok v_S v_C (AI_FRAME_ v_n v_F v_admininstr) (mk_functype (mk_list _ []) (mk_list _ v_t))
+	| AI_ok_weakening : forall (v_S : store) (v_C : context) (v_admininstr : admininstr) (v_t' : (list valtype)) (v_t'_1 : (list valtype)) (v_t : (list valtype)) (v_t'_2 : (list valtype)) (v_t_1 : (list valtype)) (v_t_2 : (list valtype)), 
+		(Admin_instr_ok v_S v_C v_admininstr (mk_functype (mk_list _ v_t_1) (mk_list _ v_t_2))) ->
+		(Resulttype_sub (mk_list _ v_t') (mk_list _ v_t)) ->
+		(Resulttype_sub (mk_list _ v_t'_1) (mk_list _ v_t_1)) ->
+		(Resulttype_sub (mk_list _ v_t_2) (mk_list _ v_t'_2)) ->
+		Admin_instr_ok v_S v_C v_admininstr (mk_functype (mk_list _ (v_t' ++ v_t'_1)) (mk_list _ (v_t ++ v_t'_2)))
 
 with
 
@@ -6517,36 +6523,36 @@ Definition fun_optionSize (var_0 : (option valtype)) : nat :=
 		| None => 0
 	end.
 
-(* Inductive Relations Definition at: ../specification/wasm-2.0/B-soundness.spectec:240.1-240.43 *)
+(* Inductive Relations Definition at: ../specification/wasm-2.0/B-soundness.spectec:248.1-248.43 *)
 Inductive Config_ok: config -> resulttype -> Prop :=
 	| mk_Config_ok : forall (v_S : store) (v_F : frame) (v_admininstr : (list admininstr)) (v_t : (list valtype)), 
 		(Store_ok v_S) ->
 		(Thread_ok v_S None v_F v_admininstr (mk_list _ v_t)) ->
 		Config_ok (mk_config (mk_state v_S v_F) v_admininstr) (mk_list _ v_t).
 
-(* Inductive Relations Definition at: ../specification/wasm-2.0/B-soundness.spectec:251.1-251.48 *)
+(* Inductive Relations Definition at: ../specification/wasm-2.0/B-soundness.spectec:259.1-259.48 *)
 Inductive Func_extension: funcinst -> funcinst -> Prop :=
 	| mk_Func_extension : forall (v_funcinst : funcinst), Func_extension v_funcinst v_funcinst.
 
-(* Inductive Relations Definition at: ../specification/wasm-2.0/B-soundness.spectec:252.1-252.51 *)
+(* Inductive Relations Definition at: ../specification/wasm-2.0/B-soundness.spectec:260.1-260.51 *)
 Inductive Table_extension: tableinst -> tableinst -> Prop :=
 	| mk_Table_extension : forall (v_n1 : u32) (v_m : m) (v_rt : reftype) (v_ref_1 : (list ref)) (v_n2 : u32) (v_ref_2 : (list ref)), 
 		((fun_proj_uN_0 32 v_n1) <= (fun_proj_uN_0 32 v_n2)) ->
 		Table_extension {| TAB_TYPE := (mk_tabletype (mk_limits v_n1 (mk_uN _ v_m)) v_rt); TAB_REFS := v_ref_1 |} {| TAB_TYPE := (mk_tabletype (mk_limits v_n2 (mk_uN _ v_m)) v_rt); TAB_REFS := v_ref_2 |}.
 
-(* Inductive Relations Definition at: ../specification/wasm-2.0/B-soundness.spectec:253.1-253.45 *)
+(* Inductive Relations Definition at: ../specification/wasm-2.0/B-soundness.spectec:261.1-261.45 *)
 Inductive Mem_extension: meminst -> meminst -> Prop :=
 	| mk_Mem_extension : forall (v_n1 : u32) (v_m : m) (v_b_1 : (list byte)) (v_n2 : u32) (v_b_2 : (list byte)), 
 		((fun_proj_uN_0 32 v_n1) <= (fun_proj_uN_0 32 v_n2)) ->
 		Mem_extension {| MEM_TYPE := (PAGE (mk_limits v_n1 (mk_uN _ v_m))); MEM_BYTES := v_b_1 |} {| MEM_TYPE := (PAGE (mk_limits v_n2 (mk_uN _ v_m))); MEM_BYTES := v_b_2 |}.
 
-(* Inductive Relations Definition at: ../specification/wasm-2.0/B-soundness.spectec:254.1-254.54 *)
+(* Inductive Relations Definition at: ../specification/wasm-2.0/B-soundness.spectec:262.1-262.54 *)
 Inductive Global_extension: globalinst -> globalinst -> Prop :=
 	| mk_Global_extension : forall (v_mut : mut) (v_t : valtype) (v_val_1 : val) (v_val_2 : val), 
 		((v_mut = (Some MUT)) \/ (v_val_1 = v_val_2)) ->
 		Global_extension {| GLOB_TYPE := (mk_globaltype v_mut v_t); GLOB_VALUE := v_val_1 |} {| GLOB_TYPE := (mk_globaltype v_mut v_t); GLOB_VALUE := v_val_2 |}.
 
-(* Inductive Relations Definition at: ../specification/wasm-2.0/B-soundness.spectec:255.1-255.43 *)
+(* Inductive Relations Definition at: ../specification/wasm-2.0/B-soundness.spectec:263.1-263.43 *)
 Inductive Store_extension: store -> store -> Prop :=
 	| mk_Store_extension : forall (v_store_1 : store) (v_store_2 : store) (v_funcinst_1 : (list funcinst)) (v_tableinst_1 : (list tableinst)) (v_meminst_1 : (list meminst)) (v_globalinst_1 : (list globalinst)) (v_funcinst_1' : (list funcinst)) (v_funcinst_2 : (list funcinst)) (v_tableinst_1' : (list tableinst)) (v_tableinst_2 : (list tableinst)) (v_meminst_1' : (list meminst)) (v_meminst_2 : (list meminst)) (v_globalinst_1' : (list globalinst)) (v_globalinst_2 : (list globalinst)), 
 		((FUNCS v_store_1) = v_funcinst_1) ->
@@ -6567,8 +6573,8 @@ Inductive Store_extension: store -> store -> Prop :=
 		List.Forall2 (fun (v_globalinst_1 : globalinst) (v_globalinst_1' : globalinst) => (Global_extension v_globalinst_1 v_globalinst_1')) (v_globalinst_1) (v_globalinst_1') ->
 		Store_extension v_store_1 v_store_2.
 
-(* Mutual Recursion at: ../specification/wasm-2.0/B-soundness.spectec:287.1-287.32 *)
-(* Auxiliary Definition at: ../specification/wasm-2.0/B-soundness.spectec:287.1-287.32 *)
+(* Mutual Recursion at: ../specification/wasm-2.0/B-soundness.spectec:295.1-295.32 *)
+(* Auxiliary Definition at: ../specification/wasm-2.0/B-soundness.spectec:295.1-295.32 *)
 Fixpoint fun_types__of (var_0 : (list val)) : (list valtype) :=
 	match var_0 return (list valtype) with
 		| [] => []
@@ -6583,7 +6589,7 @@ Fixpoint fun_types__of (var_0 : (list val)) : (list valtype) :=
 		| ((VAL_REF_HOST_ADDR v_a) :: v_val') => ([VALTYPE_EXTERNREF] ++ (fun_types__of v_val'))
 	end.
 
-(* Auxiliary Definition at: ../specification/wasm-2.0/B-soundness.spectec:295.1-296.32 *)
+(* Auxiliary Definition at: ../specification/wasm-2.0/B-soundness.spectec:303.1-304.32 *)
 Definition fun_is__const (v_admininstr : admininstr) : bool :=
 	match v_admininstr return bool with
 		| (AI_CONST v_numtype v_val_) => true
@@ -6591,15 +6597,15 @@ Definition fun_is__const (v_admininstr : admininstr) : bool :=
 		| v_admininstr => false
 	end.
 
-(* Mutual Recursion at: ../specification/wasm-2.0/B-soundness.spectec:301.1-302.41 *)
-(* Auxiliary Definition at: ../specification/wasm-2.0/B-soundness.spectec:301.1-302.41 *)
+(* Mutual Recursion at: ../specification/wasm-2.0/B-soundness.spectec:309.1-310.41 *)
+(* Auxiliary Definition at: ../specification/wasm-2.0/B-soundness.spectec:309.1-310.41 *)
 Fixpoint fun_const__list (var_0 : (list admininstr)) : bool :=
 	match var_0 return bool with
 		| [] => true
 		| (v_admininstr :: v_admininstr') => ((fun_is__const v_admininstr) && (fun_const__list v_admininstr'))
 	end.
 
-(* Auxiliary Definition at: ../specification/wasm-2.0/B-soundness.spectec:307.1-308.38 *)
+(* Auxiliary Definition at: ../specification/wasm-2.0/B-soundness.spectec:315.1-316.38 *)
 Definition fun_terminal__form (var_0 : (list admininstr)) : bool :=
 	match var_0 return bool with
 		| v_admininstr => ((fun_const__list v_admininstr) || (v_admininstr == [AI_TRAP]))
