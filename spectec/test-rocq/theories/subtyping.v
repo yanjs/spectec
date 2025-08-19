@@ -588,3 +588,18 @@ Proof.
   move=> ts1 ts2 ts3 ts4 txs tys tzs H1 H2.
   eapply (instrtype_sub_compose_le _ _ _ _ _ _ _ _ H1) in H2 as [H3 H4]; auto.
 Qed.
+
+
+Lemma instrtype_sub_cancel_left : forall t ts1 ts2 txs tys,
+  (((t::ts1) :-> (t::ts2)) <ti: (txs :-> tys)) ->
+  ((ts1 :-> ts2) <ti: (txs :-> tys)).
+Proof.
+  move=> t ts1 ts2 txs tys H1.
+  eapply instrtype_sub_trans in H1.
+  eauto.
+  exists [t], [t], ts1, ts2.
+  split; auto.
+  split; auto.
+  split. apply resulttype_sub_refl.
+  split; apply resulttype_sub_refl.
+Qed.

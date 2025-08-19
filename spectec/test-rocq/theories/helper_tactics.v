@@ -155,10 +155,6 @@ Ltac removeinstSimpler H :=
 	eapply length_app_nil in H as H1; eauto;
 	rewrite H1 in H; rewrite <- app_right_nil in H.
 
-Lemma app_cat : forall {A : Type} (xs ys: seq A),
-  (xs ++ ys)%list = xs ++ ys.
-Proof. auto. Qed.
-
 Lemma list_cons_eq : forall {A : Type} (x y : A) (xs ys : seq A),
   [x] ++ xs = [y] ++ ys -> x = y /\ xs = ys.
 Proof.

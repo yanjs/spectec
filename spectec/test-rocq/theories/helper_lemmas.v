@@ -623,3 +623,25 @@ Proof.
     	apply IHi.
 		simpl in HSize. by apply Nat.succ_lt_mono.
 Qed.
+
+
+Lemma app_cat : forall {A : Type} (xs ys: seq A),
+  (xs ++ ys)%list = xs ++ ys.
+Proof. auto. Qed.
+
+Definition prepend_label (v_C: context) (v_t: resulttype) :=
+({| C_TYPES := []; C_FUNCS := []; C_GLOBALS := []; C_TABLES := []; C_MEMS := []; C_ELEMS := []; C_DATAS := []; C_LOCALS := []; C_LABELS := [v_t]; C_RETURN := None |} @@ v_C).
+
+Lemma lookup_label_0: forall v_C (t: resulttype),
+lookup_total (C_LABELS (prepend_label v_C t)) 0 = t.
+Proof.
+	move=> v_C t.
+	unfold lookup_total.
+	unfold C_LABELS, prepend_label, _append, Append_context, _append_context.
+	unfold _append, Append_List_.
+	unfold C_LABELS.
+	rewrite app_cat.
+	rewrite cat1s.
+	unfold ListDef.nth.
+	eauto.
+Qed.
