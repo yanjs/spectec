@@ -5103,7 +5103,7 @@ Inductive Module_ok: module -> Prop :=
 		(v_imt = (fun_memsxt v_ixt)) ->
 		Module_ok (MODULE v_type v_import v_func v_global v_table v_mem v_elem v_data v_start v_export).
 
-(* Auxiliary Definition at: ../specification/wasm-2.0/8-reduction.spectec:220.1-222.15 *)
+(* Auxiliary Definition at: ../specification/wasm-2.0/8-reduction.spectec:222.1-224.15 *)
 Definition fun_coec_ref__admininstr (v_ref : ref) : admininstr :=
 	match v_ref return admininstr with
 		| (REF_NULL v_0) => (AI_REF_NULL v_0)
@@ -5111,16 +5111,16 @@ Definition fun_coec_ref__admininstr (v_ref : ref) : admininstr :=
 		| (REF_HOST_ADDR v_0) => (AI_REF_HOST_ADDR v_0)
 	end.
 
-(* Type Coercion Definition at: ../specification/wasm-2.0/8-reduction.spectec:220.1-222.15 *)
+(* Type Coercion Definition at: ../specification/wasm-2.0/8-reduction.spectec:222.1-224.15 *)
 Coercion fun_coec_ref__admininstr : ref >-> admininstr.
 
-(* Inductive Relations Definition at: ../specification/wasm-2.0/8-reduction.spectec:220.1-222.15 *)
+(* Inductive Relations Definition at: ../specification/wasm-2.0/8-reduction.spectec:222.1-224.15 *)
 Inductive Step_pure_before_ref_is_null_false: (list admininstr) -> Prop :=
 	| step_ref_is_null_true_0 : forall (v_ref : ref) (v_rt : reftype), 
 		(v_ref = (REF_NULL v_rt)) ->
 		Step_pure_before_ref_is_null_false [(v_ref : admininstr); AI_REF_IS_NULL].
 
-(* Inductive Relations Definition at: ../specification/wasm-2.0/8-reduction.spectec:272.1-274.15 *)
+(* Inductive Relations Definition at: ../specification/wasm-2.0/8-reduction.spectec:274.1-276.15 *)
 Inductive Step_pure_before_vtestop_false: (list admininstr) -> Prop :=
 	| step_vtestop_true_0_I32 : forall (v_c : (vec_ V128)) (v_N : res_N) (v_ci_1 : (list (uN 32))), 
 		(v_ci_1 = (fun_lanes_ (X (JNN_I32 : lanetype) (mk_dim v_N)) v_c)) ->
@@ -5256,7 +5256,9 @@ Inductive Step_pure: (list admininstr) -> (list admininstr) -> Prop :=
 		((fun_proj_uN_0 32 v_c) = 0) ->
 		Step_pure [(AI_CONST I32 v_c); (AI_IFELSE v_bt v_instr_1 v_instr_2)] [(AI_BLOCK v_bt v_instr_2)]
 	| step_label_vals : forall (v_n : n) (v_instr : (list instr)) (v_val : (list val)), Step_pure [(AI_LABEL_ v_n v_instr (List.map (fun (v_val : val) => (v_val : admininstr)) v_val))] (List.map (fun (v_val : val) => (v_val : admininstr)) v_val)
-	| step_br_zero : forall (v_n : n) (v_instr' : (list instr)) (v_val' : (list val)) (v_val : (list val)) (v_instr : (list instr)), Step_pure [(AI_LABEL_ v_n v_instr' ((List.map (fun (v_val' : val) => (v_val' : admininstr)) v_val') ++ ((List.map (fun (v_val : val) => (v_val : admininstr)) v_val) ++ ([(AI_BR (mk_uN _ 0))] ++ (List.map (fun (v_instr : instr) => (v_instr : admininstr)) v_instr)))))] ((List.map (fun (v_val : val) => (v_val : admininstr)) v_val) ++ (List.map (fun (v_instr' : instr) => (v_instr' : admininstr)) v_instr'))
+	| step_br_zero : forall (v_n : n) (v_instr' : (list instr)) (v_val' : (list val)) (v_val : (list val)) (v_instr : (list instr)), 
+		((List.length v_val) = v_n) ->
+		Step_pure [(AI_LABEL_ v_n v_instr' ((List.map (fun (v_val' : val) => (v_val' : admininstr)) v_val') ++ ((List.map (fun (v_val : val) => (v_val : admininstr)) v_val) ++ ([(AI_BR (mk_uN _ 0))] ++ (List.map (fun (v_instr : instr) => (v_instr : admininstr)) v_instr)))))] ((List.map (fun (v_val : val) => (v_val : admininstr)) v_val) ++ (List.map (fun (v_instr' : instr) => (v_instr' : admininstr)) v_instr'))
 	| step_br_succ : forall (v_n : n) (v_instr' : (list instr)) (v_val : (list val)) (v_l : labelidx) (v_instr : (list instr)), Step_pure [(AI_LABEL_ v_n v_instr' ((List.map (fun (v_val : val) => (v_val : admininstr)) v_val) ++ ([(AI_BR (mk_uN _ ((fun_proj_uN_0 32 v_l) + 1)))] ++ (List.map (fun (v_instr : instr) => (v_instr : admininstr)) v_instr))))] ((List.map (fun (v_val : val) => (v_val : admininstr)) v_val) ++ [(AI_BR v_l)])
 	| step_br_if_true : forall (v_c : (uN 32)) (v_l : labelidx), 
 		((fun_proj_uN_0 32 v_c) <> 0) ->
@@ -5271,7 +5273,9 @@ Inductive Step_pure: (list admininstr) -> (list admininstr) -> Prop :=
 		((fun_proj_uN_0 32 v_i) >= (List.length v_l)) ->
 		Step_pure [(AI_CONST I32 v_i); (AI_BR_TABLE v_l v_l')] [(AI_BR v_l')]
 	| step_frame_vals : forall (v_n : n) (v_f : frame) (v_val : (list val)), Step_pure [(AI_FRAME_ v_n v_f (List.map (fun (v_val : val) => (v_val : admininstr)) v_val))] (List.map (fun (v_val : val) => (v_val : admininstr)) v_val)
-	| step_return_frame : forall (v_n : n) (v_f : frame) (v_val' : (list val)) (v_val : (list val)) (v_instr : (list instr)), Step_pure [(AI_FRAME_ v_n v_f ((List.map (fun (v_val' : val) => (v_val' : admininstr)) v_val') ++ ((List.map (fun (v_val : val) => (v_val : admininstr)) v_val) ++ ([AI_RETURN] ++ (List.map (fun (v_instr : instr) => (v_instr : admininstr)) v_instr)))))] (List.map (fun (v_val : val) => (v_val : admininstr)) v_val)
+	| step_return_frame : forall (v_n : n) (v_f : frame) (v_val' : (list val)) (v_val : (list val)) (v_instr : (list instr)), 
+		((List.length v_val) = v_n) ->
+		Step_pure [(AI_FRAME_ v_n v_f ((List.map (fun (v_val' : val) => (v_val' : admininstr)) v_val') ++ ((List.map (fun (v_val : val) => (v_val : admininstr)) v_val) ++ ([AI_RETURN] ++ (List.map (fun (v_instr : instr) => (v_instr : admininstr)) v_instr)))))] (List.map (fun (v_val : val) => (v_val : admininstr)) v_val)
 	| step_return_label : forall (v_n : n) (v_instr' : (list instr)) (v_val : (list val)) (v_instr : (list instr)), Step_pure [(AI_LABEL_ v_n v_instr' ((List.map (fun (v_val : val) => (v_val : admininstr)) v_val) ++ ([AI_RETURN] ++ (List.map (fun (v_instr : instr) => (v_instr : admininstr)) v_instr))))] ((List.map (fun (v_val : val) => (v_val : admininstr)) v_val) ++ [AI_RETURN])
 	| step_trap_vals : forall (v_val : (list val)) (v_instr : (list instr)), 
 		((v_val <> []) \/ (v_instr <> [])) ->
@@ -5711,7 +5715,7 @@ Definition fun_blocktype (v_state : state) (v_blocktype : blocktype) : functype 
 		| v_z, (_IDX v_x) => (fun_type v_z v_x)
 	end.
 
-(* Inductive Relations Definition at: ../specification/wasm-2.0/8-reduction.spectec:127.1-129.15 *)
+(* Inductive Relations Definition at: ../specification/wasm-2.0/8-reduction.spectec:128.1-130.15 *)
 Inductive Step_read_before_call_indirect_trap: config -> Prop :=
 	| step_call_indirect_call_0 : forall (v_z : state) (v_i : (uN 32)) (v_x : idx) (v_y : idx) (v_a : addr), 
 		((fun_proj_uN_0 32 v_i) < (List.length (TAB_REFS (fun_table v_z v_x)))) ->
@@ -5720,13 +5724,13 @@ Inductive Step_read_before_call_indirect_trap: config -> Prop :=
 		((fun_type v_z v_y) = (FUNC_TYPE (lookup_total (fun_funcinst v_z) v_a))) ->
 		Step_read_before_call_indirect_trap (mk_config v_z [(AI_CONST I32 v_i); (AI_CALL_INDIRECT v_x v_y)]).
 
-(* Inductive Relations Definition at: ../specification/wasm-2.0/8-reduction.spectec:432.1-435.14 *)
+(* Inductive Relations Definition at: ../specification/wasm-2.0/8-reduction.spectec:434.1-437.14 *)
 Inductive Step_read_before_table_fill_zero: config -> Prop :=
 	| step_table_fill_trap_0 : forall (v_z : state) (v_i : (uN 32)) (v_val : val) (v_n : n) (v_x : idx), 
 		(((fun_proj_uN_0 32 v_i) + v_n) > (List.length (TAB_REFS (fun_table v_z v_x)))) ->
 		Step_read_before_table_fill_zero (mk_config v_z [(AI_CONST I32 v_i); (v_val : admininstr); (AI_CONST I32 (mk_uN _ v_n)); (AI_TABLE_FILL v_x)]).
 
-(* Inductive Relations Definition at: ../specification/wasm-2.0/8-reduction.spectec:437.1-441.15 *)
+(* Inductive Relations Definition at: ../specification/wasm-2.0/8-reduction.spectec:439.1-443.15 *)
 Inductive Step_read_before_table_fill_succ: config -> Prop :=
 	| step_table_fill_zero_0 : forall (v_z : state) (v_i : (uN 32)) (v_val : val) (v_n : n) (v_x : idx), 
 		(~(Step_read_before_table_fill_zero (mk_config v_z [(AI_CONST I32 v_i); (v_val : admininstr); (AI_CONST I32 (mk_uN _ v_n)); (AI_TABLE_FILL v_x)]))) ->
@@ -5736,13 +5740,13 @@ Inductive Step_read_before_table_fill_succ: config -> Prop :=
 		(((fun_proj_uN_0 32 v_i) + v_n) > (List.length (TAB_REFS (fun_table v_z v_x)))) ->
 		Step_read_before_table_fill_succ (mk_config v_z [(AI_CONST I32 v_i); (v_val : admininstr); (AI_CONST I32 (mk_uN _ v_n)); (AI_TABLE_FILL v_x)]).
 
-(* Inductive Relations Definition at: ../specification/wasm-2.0/8-reduction.spectec:448.1-451.14 *)
+(* Inductive Relations Definition at: ../specification/wasm-2.0/8-reduction.spectec:450.1-453.14 *)
 Inductive Step_read_before_table_copy_zero: config -> Prop :=
 	| step_table_copy_trap_0 : forall (v_z : state) (v_j : (uN 32)) (v_i : (uN 32)) (v_n : n) (v_x : idx) (v_y : idx), 
 		((((fun_proj_uN_0 32 v_i) + v_n) > (List.length (TAB_REFS (fun_table v_z v_y)))) \/ (((fun_proj_uN_0 32 v_j) + v_n) > (List.length (TAB_REFS (fun_table v_z v_x))))) ->
 		Step_read_before_table_copy_zero (mk_config v_z [(AI_CONST I32 v_j); (AI_CONST I32 v_i); (AI_CONST I32 (mk_uN _ v_n)); (AI_TABLE_COPY v_x v_y)]).
 
-(* Inductive Relations Definition at: ../specification/wasm-2.0/8-reduction.spectec:453.1-458.15 *)
+(* Inductive Relations Definition at: ../specification/wasm-2.0/8-reduction.spectec:455.1-460.15 *)
 Inductive Step_read_before_table_copy_le: config -> Prop :=
 	| step_table_copy_zero_0 : forall (v_z : state) (v_j : (uN 32)) (v_i : (uN 32)) (v_n : n) (v_x : idx) (v_y : idx), 
 		(~(Step_read_before_table_copy_zero (mk_config v_z [(AI_CONST I32 v_j); (AI_CONST I32 v_i); (AI_CONST I32 (mk_uN _ v_n)); (AI_TABLE_COPY v_x v_y)]))) ->
@@ -5752,7 +5756,7 @@ Inductive Step_read_before_table_copy_le: config -> Prop :=
 		((((fun_proj_uN_0 32 v_i) + v_n) > (List.length (TAB_REFS (fun_table v_z v_y)))) \/ (((fun_proj_uN_0 32 v_j) + v_n) > (List.length (TAB_REFS (fun_table v_z v_x))))) ->
 		Step_read_before_table_copy_le (mk_config v_z [(AI_CONST I32 v_j); (AI_CONST I32 v_i); (AI_CONST I32 (mk_uN _ v_n)); (AI_TABLE_COPY v_x v_y)]).
 
-(* Inductive Relations Definition at: ../specification/wasm-2.0/8-reduction.spectec:460.1-464.15 *)
+(* Inductive Relations Definition at: ../specification/wasm-2.0/8-reduction.spectec:462.1-466.15 *)
 Inductive Step_read_before_table_copy_gt: config -> Prop :=
 	| step_table_copy_le_0 : forall (v_z : state) (v_j : (uN 32)) (v_i : (uN 32)) (v_n : n) (v_x : idx) (v_y : idx), 
 		(~(Step_read_before_table_copy_le (mk_config v_z [(AI_CONST I32 v_j); (AI_CONST I32 v_i); (AI_CONST I32 (mk_uN _ v_n)); (AI_TABLE_COPY v_x v_y)]))) ->
@@ -5766,13 +5770,13 @@ Inductive Step_read_before_table_copy_gt: config -> Prop :=
 		((((fun_proj_uN_0 32 v_i) + v_n) > (List.length (TAB_REFS (fun_table v_z v_y)))) \/ (((fun_proj_uN_0 32 v_j) + v_n) > (List.length (TAB_REFS (fun_table v_z v_x))))) ->
 		Step_read_before_table_copy_gt (mk_config v_z [(AI_CONST I32 v_j); (AI_CONST I32 v_i); (AI_CONST I32 (mk_uN _ v_n)); (AI_TABLE_COPY v_x v_y)]).
 
-(* Inductive Relations Definition at: ../specification/wasm-2.0/8-reduction.spectec:471.1-474.14 *)
+(* Inductive Relations Definition at: ../specification/wasm-2.0/8-reduction.spectec:473.1-476.14 *)
 Inductive Step_read_before_table_init_zero: config -> Prop :=
 	| step_table_init_trap_0 : forall (v_z : state) (v_j : (uN 32)) (v_i : (uN 32)) (v_n : n) (v_x : idx) (v_y : idx), 
 		((((fun_proj_uN_0 32 v_i) + v_n) > (List.length (ELEM_REFS (fun_elem v_z v_y)))) \/ (((fun_proj_uN_0 32 v_j) + v_n) > (List.length (TAB_REFS (fun_table v_z v_x))))) ->
 		Step_read_before_table_init_zero (mk_config v_z [(AI_CONST I32 v_j); (AI_CONST I32 v_i); (AI_CONST I32 (mk_uN _ v_n)); (AI_TABLE_INIT v_x v_y)]).
 
-(* Inductive Relations Definition at: ../specification/wasm-2.0/8-reduction.spectec:476.1-480.15 *)
+(* Inductive Relations Definition at: ../specification/wasm-2.0/8-reduction.spectec:478.1-482.15 *)
 Inductive Step_read_before_table_init_succ: config -> Prop :=
 	| step_table_init_zero_0 : forall (v_z : state) (v_j : (uN 32)) (v_i : (uN 32)) (v_n : n) (v_x : idx) (v_y : idx), 
 		(~(Step_read_before_table_init_zero (mk_config v_z [(AI_CONST I32 v_j); (AI_CONST I32 v_i); (AI_CONST I32 (mk_uN _ v_n)); (AI_TABLE_INIT v_x v_y)]))) ->
@@ -5782,13 +5786,13 @@ Inductive Step_read_before_table_init_succ: config -> Prop :=
 		((((fun_proj_uN_0 32 v_i) + v_n) > (List.length (ELEM_REFS (fun_elem v_z v_y)))) \/ (((fun_proj_uN_0 32 v_j) + v_n) > (List.length (TAB_REFS (fun_table v_z v_x))))) ->
 		Step_read_before_table_init_succ (mk_config v_z [(AI_CONST I32 v_j); (AI_CONST I32 v_i); (AI_CONST I32 (mk_uN _ v_n)); (AI_TABLE_INIT v_x v_y)]).
 
-(* Inductive Relations Definition at: ../specification/wasm-2.0/8-reduction.spectec:612.1-615.14 *)
+(* Inductive Relations Definition at: ../specification/wasm-2.0/8-reduction.spectec:614.1-617.14 *)
 Inductive Step_read_before_memory_fill_zero: config -> Prop :=
 	| step_memory_fill_trap_0 : forall (v_z : state) (v_i : (uN 32)) (v_val : val) (v_n : n), 
 		(((fun_proj_uN_0 32 v_i) + v_n) > (List.length (MEM_BYTES (fun_mem v_z (mk_uN _ 0))))) ->
 		Step_read_before_memory_fill_zero (mk_config v_z [(AI_CONST I32 v_i); (v_val : admininstr); (AI_CONST I32 (mk_uN _ v_n)); AI_MEMORY_FILL]).
 
-(* Inductive Relations Definition at: ../specification/wasm-2.0/8-reduction.spectec:617.1-621.15 *)
+(* Inductive Relations Definition at: ../specification/wasm-2.0/8-reduction.spectec:619.1-623.15 *)
 Inductive Step_read_before_memory_fill_succ: config -> Prop :=
 	| step_memory_fill_zero_0 : forall (v_z : state) (v_i : (uN 32)) (v_val : val) (v_n : n), 
 		(~(Step_read_before_memory_fill_zero (mk_config v_z [(AI_CONST I32 v_i); (v_val : admininstr); (AI_CONST I32 (mk_uN _ v_n)); AI_MEMORY_FILL]))) ->
@@ -5798,13 +5802,13 @@ Inductive Step_read_before_memory_fill_succ: config -> Prop :=
 		(((fun_proj_uN_0 32 v_i) + v_n) > (List.length (MEM_BYTES (fun_mem v_z (mk_uN _ 0))))) ->
 		Step_read_before_memory_fill_succ (mk_config v_z [(AI_CONST I32 v_i); (v_val : admininstr); (AI_CONST I32 (mk_uN _ v_n)); AI_MEMORY_FILL]).
 
-(* Inductive Relations Definition at: ../specification/wasm-2.0/8-reduction.spectec:628.1-631.14 *)
+(* Inductive Relations Definition at: ../specification/wasm-2.0/8-reduction.spectec:630.1-633.14 *)
 Inductive Step_read_before_memory_copy_zero: config -> Prop :=
 	| step_memory_copy_trap_0 : forall (v_z : state) (v_j : (uN 32)) (v_i : (uN 32)) (v_n : n), 
 		((((fun_proj_uN_0 32 v_i) + v_n) > (List.length (MEM_BYTES (fun_mem v_z (mk_uN _ 0))))) \/ (((fun_proj_uN_0 32 v_j) + v_n) > (List.length (MEM_BYTES (fun_mem v_z (mk_uN _ 0)))))) ->
 		Step_read_before_memory_copy_zero (mk_config v_z [(AI_CONST I32 v_j); (AI_CONST I32 v_i); (AI_CONST I32 (mk_uN _ v_n)); AI_MEMORY_COPY]).
 
-(* Inductive Relations Definition at: ../specification/wasm-2.0/8-reduction.spectec:633.1-638.15 *)
+(* Inductive Relations Definition at: ../specification/wasm-2.0/8-reduction.spectec:635.1-640.15 *)
 Inductive Step_read_before_memory_copy_le: config -> Prop :=
 	| step_memory_copy_zero_0 : forall (v_z : state) (v_j : (uN 32)) (v_i : (uN 32)) (v_n : n), 
 		(~(Step_read_before_memory_copy_zero (mk_config v_z [(AI_CONST I32 v_j); (AI_CONST I32 v_i); (AI_CONST I32 (mk_uN _ v_n)); AI_MEMORY_COPY]))) ->
@@ -5814,7 +5818,7 @@ Inductive Step_read_before_memory_copy_le: config -> Prop :=
 		((((fun_proj_uN_0 32 v_i) + v_n) > (List.length (MEM_BYTES (fun_mem v_z (mk_uN _ 0))))) \/ (((fun_proj_uN_0 32 v_j) + v_n) > (List.length (MEM_BYTES (fun_mem v_z (mk_uN _ 0)))))) ->
 		Step_read_before_memory_copy_le (mk_config v_z [(AI_CONST I32 v_j); (AI_CONST I32 v_i); (AI_CONST I32 (mk_uN _ v_n)); AI_MEMORY_COPY]).
 
-(* Inductive Relations Definition at: ../specification/wasm-2.0/8-reduction.spectec:640.1-644.15 *)
+(* Inductive Relations Definition at: ../specification/wasm-2.0/8-reduction.spectec:642.1-646.15 *)
 Inductive Step_read_before_memory_copy_gt: config -> Prop :=
 	| step_memory_copy_le_0 : forall (v_z : state) (v_j : (uN 32)) (v_i : (uN 32)) (v_n : n), 
 		(~(Step_read_before_memory_copy_le (mk_config v_z [(AI_CONST I32 v_j); (AI_CONST I32 v_i); (AI_CONST I32 (mk_uN _ v_n)); AI_MEMORY_COPY]))) ->
@@ -5828,13 +5832,13 @@ Inductive Step_read_before_memory_copy_gt: config -> Prop :=
 		((((fun_proj_uN_0 32 v_i) + v_n) > (List.length (MEM_BYTES (fun_mem v_z (mk_uN _ 0))))) \/ (((fun_proj_uN_0 32 v_j) + v_n) > (List.length (MEM_BYTES (fun_mem v_z (mk_uN _ 0)))))) ->
 		Step_read_before_memory_copy_gt (mk_config v_z [(AI_CONST I32 v_j); (AI_CONST I32 v_i); (AI_CONST I32 (mk_uN _ v_n)); AI_MEMORY_COPY]).
 
-(* Inductive Relations Definition at: ../specification/wasm-2.0/8-reduction.spectec:651.1-654.14 *)
+(* Inductive Relations Definition at: ../specification/wasm-2.0/8-reduction.spectec:653.1-656.14 *)
 Inductive Step_read_before_memory_init_zero: config -> Prop :=
 	| step_memory_init_trap_0 : forall (v_z : state) (v_j : (uN 32)) (v_i : (uN 32)) (v_n : n) (v_x : idx), 
 		((((fun_proj_uN_0 32 v_i) + v_n) > (List.length (DATA_BYTES (fun_data v_z v_x)))) \/ (((fun_proj_uN_0 32 v_j) + v_n) > (List.length (MEM_BYTES (fun_mem v_z (mk_uN _ 0)))))) ->
 		Step_read_before_memory_init_zero (mk_config v_z [(AI_CONST I32 v_j); (AI_CONST I32 v_i); (AI_CONST I32 (mk_uN _ v_n)); (AI_MEMORY_INIT v_x)]).
 
-(* Inductive Relations Definition at: ../specification/wasm-2.0/8-reduction.spectec:656.1-660.15 *)
+(* Inductive Relations Definition at: ../specification/wasm-2.0/8-reduction.spectec:658.1-662.15 *)
 Inductive Step_read_before_memory_init_succ: config -> Prop :=
 	| step_memory_init_zero_0 : forall (v_z : state) (v_j : (uN 32)) (v_i : (uN 32)) (v_n : n) (v_x : idx), 
 		(~(Step_read_before_memory_init_zero (mk_config v_z [(AI_CONST I32 v_j); (AI_CONST I32 v_i); (AI_CONST I32 (mk_uN _ v_n)); (AI_MEMORY_INIT v_x)]))) ->

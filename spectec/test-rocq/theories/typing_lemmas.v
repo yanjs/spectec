@@ -1148,7 +1148,8 @@ Ltac unfold_principal_typing H :=
   unfold ai_principal_typing in H;
   unfold fun_coec_val__admininstr in H;
   unfold value_principal_typing in H;
-  unfold value_typing_data in H.
+  unfold value_typing_data in H;
+  unfold fun_coec_ref__admininstr in H.
 
 Lemma ai_value_typing_iff: forall v_S v_C (v_val: wasm.val) ts1 ts2,
   value_principal_typing v_S v_val ts1 ts2 ->
@@ -1306,7 +1307,7 @@ Proof.
 	}
 Qed.
 
-Lemma construct_ais_vals : forall v_S v_C v_C' (v_vals: seq wasm.val) v_ft,
+Lemma construct_ais_vals' : forall v_S v_C v_C' (v_vals: seq wasm.val) v_ft,
 	Admin_instrs_ok v_S v_C (map fun_coec_val__admininstr v_vals) v_ft ->
 	Admin_instrs_ok v_S v_C' (map fun_coec_val__admininstr v_vals) v_ft.
 Proof.
@@ -1367,6 +1368,17 @@ Proof.
 			idtac
 		].
 	}
+Qed.
+
+Lemma construct_ais_trap : forall v_S v_C v_ft,
+Admin_instrs_ok v_S v_C [(AI_TRAP )] v_ft.
+Proof.
+	move=> v_S v_C v_ft.
+	destruct_functypes.
+	eapply (AIs_ok_seq _ _ [] AI_TRAP).
+	eapply ais_empty_typing.
+	eapply resulttype_sub_refl.
+	eapply AI_ok_trap.
 Qed.
 
 (*

@@ -55,13 +55,13 @@ Qed.
 
 Lemma valtype_sub_non_bot: forall v (v_valtype: valtype),
   (v_valtype <tv: v) ->
-  (v_valtype != VALTYPE_BOT) ->
+  (v_valtype <> VALTYPE_BOT) ->
   v = v_valtype.
 Proof.
   move=> v v_valtype H Hneb.
   destruct v_valtype;
   inversion H; auto.
-  discriminate.
+  contradict Hneb; auto.
 Qed.
 
 Lemma resulttype_sub_refl : forall ts, ts <ts: ts.
@@ -580,6 +580,65 @@ Proof.
   by constructor.
 Qed.
 
+Lemma instrtype_sub_compose_ge : forall ts1 ts2 ts3' ts3 ts4 txs tys tzs,
+  ((ts1 :-> (ts2 ++ ts3')) <ti: (txs :-> tys)) ->
+  ((ts3 :-> ts4) <ti: (tys :-> tzs)) ->
+  (size ts3 = size ts3') ->
+  ((ts1 :-> (ts2 ++ ts4)) <ti: (txs :-> tzs) /\ (ts3' <ts: ts3)).
+Proof.
+  move=> ts1 ts2 ts3' ts3 ts4 txs tys tzs H1 H2 Hsize.
+  unfold instrtype_sub in H1, H2.
+  destruct H1 as [tp1' [tp1 [ts1' [ts2ts3''  [H1e1 [H1e2 [H1s1 [H1s2 H1s3]]]]]]]].
+  destruct H2 as [tp2' [tp2 [ts3'' [ts4'' [H2e1 [H2e2 [H2s1 [H2s2 H2s3]]]]]]]].
+
+  subst.
+  eapply (resulttype_sub_app _ _ _ _ H1s1) in H1s3.
+  eapply (resulttype_sub_app _ _ _ _ H2s1) in H2s2.
+  rewrite H2e1 in H1s3.
+  eapply (resulttype_sub_trans _ _ _ H1s3) in H2s2.
+  rewrite catA in H2s2.
+  inversion H2s2; subst.
+  rewrite -!size_length in H1.
+  rewrite size_cat in H1.
+  rewrite (size_cat tp2) in H1.
+  rewrite Hsize in H1.
+  apply Nat.add_cancel_r in H1.
+  eapply (resulttype_sub_app' _ _ _ _ H1) in H2s2 as [H3 _].
+
+  split.
+  {
+    unfold instrtype_sub.
+    eexists tp1', (take (size tp1') tp2), ts1', (drop (size tp1') tp2 ++ ts4'').
+    assert (size tp1 = size tp1'). { by inversion H1s1. }
+
+    split. auto.
+    split.
+    {
+      rewrite catA.
+      by rewrite cat_take_drop.
+    }
+    rewrite -(cat_take_drop (size tp1') tp2) in H3.
+    eapply (resulttype_sub_app') in H3 as [H4 H5].
+    2: {
+      rewrite -!size_length.
+      symmetry.
+      apply size_takel.
+      rewrite -H1.
+      apply size_subseq.
+      apply prefix_subseq.
+    }
+    split. auto.
+    split. auto.
+    eapply resulttype_sub_app; auto.
+  }
+  eapply (Forall2_drop _ _ _ (size tp2)) in H2.
+  rewrite drop_size_cat in H2.
+  rewrite -H1 in H2.
+  rewrite drop_size_cat in H2.
+  unfold Resulttype_subtype.
+  by constructor.
+Qed.
+
 Lemma instrtype_sub_compose1 : forall ts1 ts2 ts3 ts4 txs tys tzs,
   ((ts1 :-> ts2) <ti: (txs :-> tys)) ->
   (((ts3 ++ ts2) :-> ts4) <ti: (tys :-> tzs)) ->
@@ -589,6 +648,14 @@ Proof.
   eapply (instrtype_sub_compose_le _ _ _ _ _ _ _ _ H1) in H2 as [H3 H4]; auto.
 Qed.
 
+Lemma instrtype_sub_compose2 : forall ts1 ts2 ts3 ts4 txs tys tzs,
+  ((ts1 :-> (ts2 ++ ts3)) <ti: (txs :-> tys)) ->
+  ((ts3 :-> ts4) <ti: (tys :-> tzs)) ->
+  ((ts1 :-> (ts2 ++ ts4)) <ti: (txs :-> tzs)).
+Proof.
+  move=> ts1 ts2 ts3 ts4 txs tys tzs H1 H2.
+  eapply (instrtype_sub_compose_ge _ _ _ _ _ _ _ _ H1) in H2 as [H3 H4]; auto.
+Qed.
 
 Lemma instrtype_sub_cancel_left : forall t ts1 ts2 txs tys,
   (((t::ts1) :-> (t::ts2)) <ti: (txs :-> tys)) ->

@@ -91,6 +91,7 @@ rule Step_pure/label-vals:
 ;; TODO: may want a label context instead of bubbling up
 rule Step_pure/br-zero:
   (LABEL_ n `{instr'*} val'* val^n (BR 0) instr*)  ~>  val^n instr'*
+  -- if |val^n| = n
 
 rule Step_pure/br-succ:
   (LABEL_ n `{instr'*} val* (BR $(l+1)) instr*)  ~>  val* (BR l)
@@ -140,6 +141,7 @@ rule Step_pure/frame-vals:
 
 rule Step_pure/return-frame:
   (FRAME_ n `{f} val'* val^n RETURN instr*)  ~>  val^n
+  -- if |val^n| = n
 
 rule Step_pure/return-label:
   (LABEL_ n `{instr'*} val* RETURN instr*)  ~>  val* RETURN
