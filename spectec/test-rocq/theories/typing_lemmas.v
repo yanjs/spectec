@@ -1013,6 +1013,13 @@ Ltac do_ais_typing_inversion H :=
   lazymatch type of H with
   | Admin_instrs_ok _ _ [] _ =>
     eapply ais_empty_typing in H
+  | Admin_instrs_ok _ _ [map fun_coec_val__admininstr ?v_vals] ( ?t1s :-> ?t2s ) =>
+    let t1s_sup := fresh t1s "_sup" in
+	let t2s_sub := fresh t2s "_sub" in
+	let Hai := fresh "Hai" in
+	let Hsub := fresh "Hsub" in
+    eapply ais_single_typing_inversion in H
+	  as [t1s_sup [t2s_sub [Hai Hsub]]]
   | Admin_instrs_ok _ _ [?v_ai] ( ?t1s :-> ?t2s ) =>
     let t1s_sup := fresh t1s "_sup" in
 	let t2s_sub := fresh t2s "_sub" in
@@ -1379,6 +1386,273 @@ Proof.
 	eapply ais_empty_typing.
 	eapply resulttype_sub_refl.
 	eapply AI_ok_trap.
+Qed.
+
+
+Definition value_extra (v_S: store) (v_val: wasm.val) : Prop :=
+  match v_val with
+  | VAL_REF_FUNC_ADDR v_funcaddr => ∃ v_ft : functype, 
+    Externaddrs_ok v_S (EXTADDR_FUNC v_funcaddr) (EXT_FUNC v_ft)
+  | _ => True
+  end.
+
+Lemma value_principal_typing_inversion: forall v_S v_val t1s t2s,
+    value_principal_typing v_S v_val t1s t2s ->
+	exists (v_t: valtype),
+	  (t1s = []) /\ (t2s = [v_t]) /\ (value_extra v_S v_val) /\ (v_t <> VALTYPE_BOT).
+Proof.
+	move => v_S v_val t1s t2s HType.
+	unfold value_extra.
+	destruct v_val; unfold_principal_typing HType.
+	4: destruct HType as [HType [v_ft Heok]].
+	all: inversion HType; subst; clear HType.
+	- exists (v_numtype); repeat eexists; eauto.
+	  destruct v_numtype; unfold fun_coec_numtype__valtype; discriminate.
+	- exists (v_vectype); repeat eexists; eauto.
+	  destruct v_vectype; unfold fun_coec_vectype__valtype; discriminate.
+	- exists (v_reftype); repeat eexists; eauto.
+	  destruct v_reftype; unfold fun_coec_reftype__valtype; discriminate.
+	- exists (VALTYPE_FUNCREF); repeat eexists; eauto.
+	  discriminate.
+	- exists (VALTYPE_EXTERNREF); repeat eexists; eauto.
+	  discriminate.
+Qed.
+
+Lemma ais_vals_typing_inversion: forall v_S v_C v_vals t1s t2s,
+	Admin_instrs_ok v_S v_C (map fun_coec_val__admininstr v_vals) (t1s :-> t2s) ->
+	exists (v_ts: list valtype),
+	(([] :-> v_ts) <ti: (t1s :-> t2s)) /\
+	(Forall2 (fun v_val v_t => value_principal_typing v_S v_val [] [v_t]) v_vals v_ts).
+Proof.
+	move=> v_S v_C v_vals t1s t2s HType.
+	move: t1s t2s HType.
+
+	induction v_vals using last_ind.
+	{
+		move => t1s t2s HType.
+		exists [].
+		split.
+		- eapply ais_empty_typing in HType.
+		  exists t1s, t2s, [], [].
+		  split. by rewrite cats0.
+		  split. by rewrite cats0.
+		  split; auto.
+		  split; by eapply resulttype_sub_refl.
+		- constructor.
+	}
+	{
+		move => t1s t2s HType.
+		rewrite map_rcons in HType.
+		rewrite -cats1 in HType.
+		typing_inversion HType.
+		eapply IHv_vals in H1 as [v_ts [Hsub Hforall]].
+		typing_inversion H2.
+	    eapply value_principal_typing_iff_ai in Hai.
+		pose proof Hai as Hai_0.
+		eapply value_principal_typing_inversion in Hai
+		  as [v_t [He1 [He2 [Hextra Hnb]]]]; subst.
+		rewrite -(cats0 v_ts) in Hsub.
+		eapply (instrtype_sub_compose2 _ _ [] _ _ _ _ Hsub) in Hsub0.
+		  
+		exists (v_ts ++ [v_t]).
+		split. auto.
+		rewrite -cats1.
+		eapply Forall2_app. eauto.
+		constructor. auto.
+		constructor.
+	}
+Qed.
+
+Ltac vals_typing_inversion H :=
+  match type of H with
+  | Admin_instrs_ok ?v_S ?v_C (map fun_coec_val__admininstr ?v_vals) (?t1s :-> ?t2s) =>
+	let v_ts := fresh "v_ts" in
+	let Hsub := fresh "Hsub" in
+	let Hforall := fresh "Hforall" in
+	eapply ais_vals_typing_inversion in H as [v_ts [Hsub Hforall]]
+  | _ => idtac
+  end.
+
+Lemma construct_ai_val: forall v_S v_C (v_val: wasm.val) t1s t2s t1s' t2s',
+	value_principal_typing v_S v_val t1s t2s ->
+	((t1s :-> t2s) <ti: (t1s' :-> t2s')) ->
+	Admin_instr_ok v_S v_C (v_val : admininstr) (t1s' :-> t2s').
+Proof.
+	move => v_S v_C v_val t1s t2s t1s' t2s' HType Hsub.
+	unfold_principal_typing HType.
+	destruct v_val.
+	2: destruct v_vectype.
+	4: destruct HType as [HType [v_ft Heok]].
+	all: inversion HType; subst; clear HType.
+	all: unfold_instrtype_sub Hsub;
+	  eapply resulttype_sub_empty in Hsub1; subst.
+	all: eapply AI_ok_weakening; auto.
+	- eapply (AI_ok_instr _ _ (instr_CONST _ _)).
+	  by econstructor.
+	  by eapply resulttype_sub_refl.
+	  by eapply Hsub2.
+	- eapply (AI_ok_instr _ _ (instr_VCONST _ _)).
+	  by econstructor.
+	  by eapply resulttype_sub_refl.
+	  by eapply Hsub2.
+	- eapply (AI_ok_instr _ _ (instr_REF_NULL _)).
+	  by econstructor.
+	  by eapply resulttype_sub_refl.
+	  by eapply Hsub2.
+	- econstructor; eauto.
+	  by eapply resulttype_sub_refl.
+	  by eapply Hsub2.
+	- econstructor; eauto.
+	  by eapply resulttype_sub_refl.
+	  by eapply Hsub2.
+Qed.
+
+Lemma construct_ais_vals: forall v_S v_C (v_vals: list wasm.val) t1s t2s ts,
+	(([] :-> ts) <ti: (t1s :-> t2s)) ->
+	(Forall2 (fun v_val t => value_principal_typing v_S v_val [] [t]) v_vals ts) ->
+	Admin_instrs_ok v_S v_C (map fun_coec_val__admininstr v_vals) (t1s :-> t2s).
+Proof.
+	move => v_S v_C v_vals t1s t2s ts Hsub Hforall.
+	move: t1s t2s ts Hsub Hforall.
+	induction v_vals using last_ind.
+	{
+		move => t1s t2s ts Hsub Hforall.
+		inversion Hforall; subst.
+		unfold_instrtype_sub Hsub; subst.
+		eapply ais_empty_typing.
+		eapply resulttype_sub_app; auto.
+		eapply resulttype_sub_trans; eauto.
+	}
+	{
+		induction ts using last_ind.
+		{
+			move => Hsub Hforall.
+			inversion Hforall; subst.
+			rewrite -cats1 in H0.
+			destruct_list_eq H0.
+		}
+		{
+			clear IHts.
+			move => Hsub Hforall.
+			rewrite -!cats1 in Hforall.
+			eapply Forall2_app' in Hforall as [H1 H2].
+			2: {
+				apply Forall2_length in Hforall.
+				rewrite !last_length in Hforall.
+				by inversion Hforall.
+			} 
+			rewrite map_rcons.
+			rewrite -cats1.
+			induction t2s using last_ind.
+			{
+				unfold_instrtype_sub Hsub.
+				destruct_list_eq H0; subst.
+				inversion Hsub2.
+				rewrite -size_length in H3.
+				rewrite size_rcons in H3.
+				discriminate.
+			}
+			clear IHt2s.
+
+			rewrite -!cats1 in Hsub.
+			unfold_instrtype_sub Hsub; subst.
+			eapply resulttype_sub_empty in Hsub1; subst.
+			eapply (resulttype_sub_app _ _ _ _ Hsub0) in Hsub2.
+			rewrite -H0 in Hsub2.
+			rewrite catA in Hsub2.
+			eapply (resulttype_sub_app') in Hsub2 as [Hsub3 Hsub4].
+			2: {
+				inversion Hsub2.
+				rewrite !last_length in H4.
+				by inversion H4.
+			}
+
+			rewrite cats0.
+			eapply (AIs_ok_seq _ _ _ _ _ _ t2s).
+			2: {
+				rewrite -cats1.
+				rewrite <-(cats0 t2s) at 1.
+				eapply AI_ok_weakening.
+				2: by apply resulttype_sub_refl.
+				2: by apply resulttype_sub_refl.
+				2: by apply Hsub4.
+				inversion H2.
+				by apply ai_value_typing_iff.
+			}
+			eapply (IHv_vals _ t2s ts); auto.
+			eexists ts0, ts0_sub, [], (drop (size ts0) t2s).
+			split. by rewrite cats0.
+			split.
+			{
+				rewrite <-(cat_take_drop (size ts0) t2s) at 1.
+				rewrite -!app_cat.
+				rewrite app_inv_tail_iff.
+				assert (take (size ts0) (t2s ++ [x1]) = take (size ts0) t2s).
+				{
+					eapply takel_cat.
+					inversion Hsub3.
+					rewrite -!size_length in H4.
+					rewrite -H4.
+					rewrite size_cat.
+					eapply leq_addr.
+				}
+				rewrite -H.
+				rewrite H0.
+				inversion Hsub0.
+				rewrite -size_length in H5.
+				by rewrite take_size_cat.
+			}
+			split. auto.
+			split. by apply resulttype_sub_refl.
+			pose proof Hsub3 as Hsub3_0.
+			rewrite -(cat_take_drop (size ts0) t2s) in Hsub3.
+			eapply resulttype_sub_app' in Hsub3 as [Hsub5 Hsub6]; auto.
+			rewrite -!size_length.
+			rewrite size_takel; auto.
+			inversion Hsub3_0.
+			rewrite -!size_length in H4.
+			rewrite -H4.
+			rewrite size_cat.
+			eapply leq_addr.
+		}
+	}
+Qed.
+
+Ltac vp_typing_inversion H :=
+  match type of H with
+  | value_principal_typing ?v_S ?v_val ?t1s ?t2s =>
+    let v_t := fresh "v_t" in
+	let He1 := fresh "He1" in
+	let He2 := fresh "He2" in
+	let Hve := fresh "Hve" in
+	let Hnb := fresh "Hnb" in
+	eapply value_principal_typing_inversion in H as [v_t [He1 [He2 [Hve Hnb]]]];
+	subst
+  | _ => idtac
+  end.
+
+Lemma resulttype_sub_single_inversion: forall t1 t2,
+	([t1] <ts: [t2]) ->
+	(t1 <tv: t2).
+Proof.
+	move => t1 t2 Hsub.
+	inversion Hsub; subst; clear Hsub.
+	inversion H2; subst.
+	auto.
+Qed.
+
+Lemma construct_ais_instrtype_sub: forall v_S v_C v_ais t1s t2s t1s' t2s',
+	Admin_instrs_ok v_S v_C v_ais (t1s :-> t2s) ->
+	((t1s :-> t2s) <ti: (t1s' :-> t2s')) ->
+	Admin_instrs_ok v_S v_C v_ais (t1s' :-> t2s').
+Proof.
+	move => v_S v_C v_ais t1s t2s t1s' t2s' HType Hsub.
+	unfold_instrtype_sub Hsub; subst.
+	eapply (AIs_ok_sub _ _ _ _ _ (ts_sub ++ t1s) (ts_sub ++ t2s)).
+	- eapply AIs_ok_frame; eauto.
+	- eapply resulttype_sub_app; eauto.
+	- eapply resulttype_sub_app; eauto.
+	  eapply resulttype_sub_refl.
 Qed.
 
 (*

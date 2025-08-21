@@ -648,6 +648,15 @@ Proof.
   eapply (instrtype_sub_compose_le _ _ _ _ _ _ _ _ H1) in H2 as [H3 H4]; auto.
 Qed.
 
+Lemma instrtype_sub_compose0 : forall ts1 ts2 ts3 txs tys tzs,
+  ((ts1 :-> ts2) <ti: (txs :-> tys)) ->
+  ((ts2 :-> ts3) <ti: (tys :-> tzs)) ->
+  ((ts1 :-> ts3) <ti: (txs :-> tzs)).
+Proof.
+  move=> ts1 ts2 ts3 txs tys tzs H1 H2.
+  eapply (instrtype_sub_compose1 _ _ [] _ _ _ _ H1) in H2; auto.
+Qed.
+
 Lemma instrtype_sub_compose2 : forall ts1 ts2 ts3 ts4 txs tys tzs,
   ((ts1 :-> (ts2 ++ ts3)) <ti: (txs :-> tys)) ->
   ((ts3 :-> ts4) <ti: (tys :-> tzs)) ->
@@ -669,4 +678,59 @@ Proof.
   split; auto.
   split. apply resulttype_sub_refl.
   split; apply resulttype_sub_refl.
+Qed.
+
+Lemma instrtype_sub_empty : forall txs tys,
+  (([] :-> []) <ti: (txs :-> tys)) ->
+  (txs <ts: tys).
+Proof.
+  move => txs tys H.
+  unfold instrtype_sub in H.
+  destruct H as [tp1' [tp1 [ts1' [ts2'' [H1e1 [H1e2 [H1s1 [H1s2 H1s3]]]]]]]].
+  subst.
+  eapply resulttype_sub_app; auto.
+  eapply resulttype_sub_trans; eauto.
+Qed.
+
+Lemma instrtype_sub_sub_empty : forall txs tys,
+  ((txs :-> tys) <ti: ([] :-> [])) ->
+  (txs = [] /\ tys = []).
+Proof.
+  move => txs tys H.
+  unfold instrtype_sub in H.
+  destruct H as [tp1' [tp1 [ts1' [ts2'' [H1e1 [H1e2 [H1s1 [H1s2 H1s3]]]]]]]].
+  destruct_list_eq H1e1.
+  destruct_list_eq H1e2.
+  subst.
+  eapply resulttype_sub_empty in H1s3.
+  eapply resulttype_empty_sub in H1s2.
+  auto.
+Qed.
+
+Lemma instrtype_sub_sub_empty1 : forall txs tys tzs,
+  ((txs :-> tys) <ti: ([] :-> tzs)) ->
+  (txs = [] /\ (tys <ts: tzs)).
+Proof.
+  move => txs tys tzs H.
+  unfold instrtype_sub in H.
+  destruct H as [tp1' [tp1 [ts1' [ts2'' [H1e1 [H1e2 [H1s1 [H1s2 H1s3]]]]]]]].
+  destruct_list_eq H1e1.
+  subst.
+  eapply resulttype_empty_sub in H1s1.
+  eapply resulttype_empty_sub in H1s2.
+  subst. split; auto.
+Qed.
+
+Lemma instrtype_sub_sub_empty2 : forall txs tys tzs,
+  ((txs :-> tys) <ti: (tzs :-> [])) ->
+  (tys = [] /\ (tzs <ts: txs)).
+Proof.
+  move => txs tys tzs H.
+  unfold instrtype_sub in H.
+  destruct H as [tp1' [tp1 [ts1' [ts2'' [H1e1 [H1e2 [H1s1 [H1s2 H1s3]]]]]]]].
+  destruct_list_eq H1e2.
+  subst.
+  eapply resulttype_sub_empty in H1s1.
+  eapply resulttype_sub_empty in H1s3.
+  subst. split; auto.
 Qed.
