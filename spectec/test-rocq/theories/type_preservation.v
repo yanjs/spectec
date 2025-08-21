@@ -2618,8 +2618,7 @@ Proof.
 	- eapply Step_pure__cvtop_val_preserves; eauto.
 	- eapply Step_pure__ref_is_null_true_preserves; eauto.
 	- eapply Step_pure__ref_is_null_false_preserves; eauto.
-	(*
-	- eapply Step_pure__local_tee_preserves; eauto. *)
+	72: eapply Step_pure__local_tee_preserves; eauto.
 Admitted.
 
 Lemma t_read_preservation: forall v_s v_f v_ais v_ais' v_C v_t1 t1s t2s lab ret,
