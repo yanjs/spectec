@@ -645,3 +645,18 @@ Proof.
 	unfold ListDef.nth.
 	eauto.
 Qed.
+
+Lemma lookup_label_1: forall v_C (t: resulttype) n,
+lookup_total (C_LABELS (prepend_label v_C t)) (n + 1) =
+lookup_total (C_LABELS v_C) (n).
+Proof.
+	move=> v_C t n.
+	unfold lookup_total.
+	unfold C_LABELS, prepend_label, _append, Append_context, _append_context.
+	unfold _append, Append_List_.
+	unfold C_LABELS.
+	rewrite app_cat.
+	rewrite cat1s.
+	rewrite addn1.
+	reflexivity.
+Qed.

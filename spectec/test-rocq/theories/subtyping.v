@@ -639,6 +639,24 @@ Proof.
   by constructor.
 Qed.
 
+
+Lemma instrtype_sub_compose_ge' : forall ts1 ts2 ts3 ts4 txs tys tzs,
+  ((ts1 :-> ts2) <ti: (txs :-> tys)) ->
+  ((ts3 :-> ts4) <ti: (tys :-> tzs)) ->
+  (size ts3 <= size ts2) ->
+  ((ts1 :-> ((take (size ts2 - size ts3) ts2) ++ ts4)) <ti: (txs :-> tzs) /\
+    ((drop (size ts2 - size ts3) ts2) <ts: ts3)).
+Proof.
+  move=> ts1 ts2 ts3 ts4 txs tys tzs H1 H2 Hsize.
+  rewrite -(cat_take_drop (size ts2 - size ts3) ts2) in H1.
+  eapply (instrtype_sub_compose_ge _ _ _ _ _ _ _ _ H1) in H2 as [H3 Hs].
+  split; auto.
+  rewrite size_drop.
+  eapply subKn in Hsize.
+  auto.
+Qed.
+
+
 Lemma instrtype_sub_compose1 : forall ts1 ts2 ts3 ts4 txs tys tzs,
   ((ts1 :-> ts2) <ti: (txs :-> tys)) ->
   (((ts3 ++ ts2) :-> ts4) <ti: (tys :-> tzs)) ->
@@ -733,4 +751,55 @@ Proof.
   eapply resulttype_sub_empty in H1s1.
   eapply resulttype_sub_empty in H1s3.
   subst. split; auto.
+Qed.
+
+Lemma instrtype_sub_iff_resulttype_sub : forall ts1 ts2,
+  (ts1 <ts: ts2) <->
+  (([] :-> ts1) <ti: ([] :-> ts2)).
+Proof.
+  move => ts1 ts2.
+  split.
+  {
+    move => H.
+    exists [], [], [], ts2.
+    split; auto.
+    split; auto.
+    split. eapply resulttype_sub_refl.
+    split. eapply resulttype_sub_refl.
+    eauto.
+  }
+  {
+    move => H.
+    unfold instrtype_sub in H.
+    destruct H as [tp1' [tp1 [ts1' [ts2'' [H1e1 [H1e2 [H1s1 [H1s2 H1s3]]]]]]]].
+    destruct_list_eq H1e1.
+    subst.
+    eapply resulttype_empty_sub in H1s1.
+    subst. auto.
+  }
+Qed.
+(*
+Lemma instrtype_sub_compose_le : forall ts1 ts2' ts2 ts3 ts4 txs tys tzs,
+  ((ts1 :-> ts2') <ti: (txs :-> tys)) ->
+  (((ts3 ++ ts2) :-> ts4) <ti: (tys :-> tzs)) ->
+  (size ts2 = size ts2') ->
+  (((ts3 ++ ts1) :-> ts4) <ti: (txs :-> tzs)) /\ (ts2' <ts: ts2).
+  *)
+Lemma instrtype_sub_extend : forall t1s t2s txs tys tzs, 
+  (t1s :-> t2s) <ti: (txs :-> tys) ->
+  exists t3s, ((t3s ++ t1s) :-> tzs) <ti: (txs :-> tzs).
+Proof.
+  move => t1s t2s txs tys tzs Hsub.
+  pose proof Hsub.
+  unfold instrtype_sub in Hsub.
+  destruct Hsub as [ts' [ts [t1s' [t2s' [
+    H1 [H2 [H3 [H4 H5]]]
+  ]]]]].
+  assert ((tys :-> tzs) <ti: (tys :-> tzs)). {
+    by eapply instrtype_sub_refl.
+  }
+  subst.
+  eapply (instrtype_sub_compose_le _ _ _ _ _ _ _ _ H) in H0 as [H1 H2].
+  2: by inversion H5.
+  by exists ts.
 Qed.
