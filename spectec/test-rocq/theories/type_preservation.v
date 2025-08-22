@@ -2212,8 +2212,8 @@ Lemma t_preservation_vs_type: forall s f ais s' f' ais' C C' v_t1 lab ret t1s t2
     Module_instance_ok s' (F_MODULE f') C' ->
 	v_t1 = (C_LOCALS (upd_label (upd_local_return C (v_t1 ++ (C_LOCALS C)) ret) lab)) -> 
 	Forall2 (fun v_t v_val => Val_ok s v_val v_t) v_t1 (F_LOCALS f) ->
-    Admin_instrs_ok s (upd_label (upd_local_return C (v_t1 ++ (C_LOCALS C)) ret) lab) ais (mk_functype t1s t2s) ->
-    Forall2 (fun v_t v_val0 => Val_ok s v_val0 v_t) v_t1 (F_LOCALS f') 
+    Admin_instrs_ok s (upd_label (upd_local_return C (v_t1 ++ (C_LOCALS C)) ret) lab) ais (t1s :-> t2s) ->
+    Forall2 (fun v_t v_val0 => Val_ok s' v_val0 v_t) v_t1 (F_LOCALS f') 
 	/\ length v_t1 = length (F_LOCALS f').
 Admitted.
 (* Proof.
@@ -2252,7 +2252,7 @@ Admitted.
 		rewrite list_update_same_unchanged => //=; try rewrite List.map_length => //=.
 		simpl. by rewrite list_update_length.
 Qed. *)
-(*
+
 Lemma store_extension_reduce: forall s f ais s' f' ais' C tf loc lab ret,
     Step (mk_config (mk_state s f) ais) (mk_config (mk_state s' f') ais') ->
     Module_instance_ok s (F_MODULE f) C ->
@@ -2620,7 +2620,7 @@ Admitted.
 				inversion H42.
 				decomp.
 				apply H48.
-Qed. *) *)
+Qed. *)
 	
 Lemma reduce_inst_unchanged: forall s f ais s' f' ais',
     Step (mk_config (mk_state s f) ais) (mk_config (mk_state s' f') ais') ->
@@ -2881,6 +2881,7 @@ Proof.
 		eapply (AI_ok_instr _ _ (CONST (I32) v_n') (mk_functype [] [(I32)])).
 		apply const.
 Qed. *)
+Admitted.
 
 (* Ultimate goal of project *)				
 Theorem t_preservation: forall c1 ts c2,
@@ -2888,12 +2889,24 @@ Theorem t_preservation: forall c1 ts c2,
 	Config_ok c1 ts ->
 	Config_ok c2 ts.
 Proof.
-	move => c1 ts c2 HReduce HType.
+	move => c1 ts c2 HReduce HConfig1.
 	destruct c1; destruct v_state as [store1 frame1].
 	destruct c2; destruct v_state as [store2 frame2].
-	inversion HType; clear HType. inversion H3; clear H3.
-	inversion H4; clear H4. inversion H5; clear H5.
-	inversion H18; clear H18. inversion H5.
+	(* Config_ok c1 *)
+	inversion HConfig1; clear HConfig1.
+	rename H3 into HStore1.
+	rename H4 into HThread1.
+	(* Store_ok store1 *)
+	inversion HStore1.
+	(* Thread_ok store1 None frame1 l (mk_list _ v_t) *)
+	inversion HThread1; clear HThread1.
+	rename H17 into HFrame1.
+	(* Frame_ok store1 frame1 v_C *)
+	inversion HFrame1; clear HFrame1.
+	rename H17 into HModuleInst1.
+	rename H22 into HAIs1.
+	(* Module_instance_ok store1 v_moduleinst v_C0 *)
+	inversion HModuleInst1.
 	subst.
 
 	remember {|
@@ -2927,48 +2940,54 @@ Proof.
 		C_RETURN := None
 	|} as v_C0.
 
-	assert (Store_extension store1 store2 /\ Store_ok store2).
+	assert (Store_extension store1 store2 /\ Store_ok store2) as
+	[HStore_extension HStore2].
 	{
-		admit.
-(*
 		apply (store_extension_reduce 
 			store1  
-			{|LOCALS := v_val;F_MODULE := v_moduleinst|} 
-			v__ store2 frame2 v__0 v_C0 (mk_functype [::] ts) 
+			{|F_LOCALS := v_val;F_MODULE := v_moduleinst|} 
+			l
+			store2
+			frame2
+			l0
+			v_C0
+			([] :-> (mk_list valtype v_t)) 
 			(_append v_t1 (C_LOCALS v_C0)) 
-			(C_LABELS (upd_local_return v_C0 (_append v_t1 (C_LOCALS v_C0)) (_append (option_map [eta Some] None) (C_RETURN v_C0))))
-			(_append (Some None) (C_RETURN v_C0))) => //.
-*)
+			(C_LABELS
+				(upd_local_return v_C0
+					(_append v_t1 (C_LOCALS v_C0))
+					(_append (option_map [eta (mk_list _)] None)
+						(C_RETURN v_C0))))
+			(_append (None) (C_RETURN v_C0))); auto; by subst.
 	}
-	destruct H.
 	apply reduce_inst_unchanged in HReduce as HModuleInst.
 	destruct frame2 as [locals2 module2].
 	simpl in HModuleInst.
 	assert (Module_instance_ok store2 v_moduleinst v_C0). {
 		apply (module_inst_typing_extension store1); eauto.
 	}
+
 	apply mk_Config_ok; auto.
 	rewrite Heqframe1 in HModuleInst; simpl in HModuleInst.
 	rewrite <- HModuleInst.
 	eapply mk_Thread_ok; auto.
-	
-	destruct frame1.
-	eapply (mk_Frame_ok store2 locals2 v_moduleinst v_C0 v_t1); eauto.
-	apply (t_preservation_vs_type) with (v_t1 := v_t1) (C := v_C0) (C' := v_C0) 
-		(lab:= (C_LABELS (upd_local_return v_C0 (_append v_t1 (C_LOCALS v_C0)) (_append (option_map [eta Some] None) (C_RETURN v_C0))))) 
-		(ret:= (_append (Some None) (C_RETURN v_C0))) (t1s := []) (t2s := ts) in HReduce as H10; try destruct H10; try apply Forall2_length in H10; repeat split => //.
-	- apply H3.
-	- apply H0.
-	- by rewrite Heqf.
-	- by rewrite <- HModuleInst.
-	- simpl. apply inst_t_context_local_empty in H1. rewrite H1. by rewrite -> app_nil_r.
-	- by rewrite Heqf.
-	- apply H11.
+	{
+		eapply (mk_Frame_ok store2 locals2 v_moduleinst v_C0 v_t1); eauto;
+		apply (t_preservation_vs_type) with
+			(v_t1 := v_t1)
+			(C := v_C0)
+			(C' := v_C0) 
+			(lab:= (C_LABELS (upd_local_return v_C0
+				(_append v_t1 (C_LOCALS v_C0))
+				(_append (option_map [eta (mk_list _)] None) (C_RETURN v_C0))))) 
+			(ret:= (_append (None) (C_RETURN v_C0)))
+			(t1s := [])
+			(t2s := (mk_list valtype v_t))
+			in HReduce as [HVals2 HLengthLocals];
+			try (solve [subst; auto | subst; simpl; try rewrite cats0; auto]).
+	}
+	subst.
+
 	(* Actual Typing proof *)
-	rewrite <- upd_return_is_same_as_append; simpl.
-	rewrite <- upd_local_is_same_as_append; simpl.
-	fold_upd_context.
-	rewrite -> _append_option_none_left.
-	rewrite upd_label_unchanged_typing.
-	eapply t_preservation_type; eauto; try rewrite -> Heqf; eauto.
+	eapply t_preservation_type; eauto.
 Qed.
