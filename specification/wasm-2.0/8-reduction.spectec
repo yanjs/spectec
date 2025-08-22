@@ -68,10 +68,14 @@ def $blocktype(z, _IDX x) = $type(z, x)
 rule Step_read/block:
   z; val^k (BLOCK bt instr*)  ~>  (LABEL_ n `{eps} val^k instr*)
   -- if $blocktype(z, bt) = t_1^k -> t_2^n
+  -- if |t_1^k| = |val^k|
+  -- if |t_2^n| = n
 
 rule Step_read/loop:
   z; val^k (LOOP bt instr*)  ~>  (LABEL_ k `{LOOP bt instr*} val^k instr*)
   -- if $blocktype(z, bt) = t_1^k -> t_2^n
+  -- if |t_1^k| = |val^k|
+  -- if |t_2^n| = n
 
 rule Step_pure/if-true:
   (CONST I32 c) (IF bt instr_1* ELSE instr_2*)  ~>  (BLOCK bt instr_1*)

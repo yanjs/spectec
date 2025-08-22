@@ -1470,6 +1470,11 @@ Ltac vals_typing_inversion H :=
 	let Hsub := fresh "Hsub" in
 	let Hforall := fresh "Hforall" in
 	eapply ais_vals_typing_inversion in H as [v_ts [Hsub Hforall]]
+  | Admin_instrs_ok ?v_S ?v_C (ListDef.map (fun x => fun_coec_val__admininstr x) ?v_vals) (?t1s :-> ?t2s) =>
+	let v_ts := fresh "v_ts" in
+	let Hsub := fresh "Hsub" in
+	let Hforall := fresh "Hforall" in
+	eapply ais_vals_typing_inversion in H as [v_ts [Hsub Hforall]]
   | _ => idtac
   end.
 
