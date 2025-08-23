@@ -85,9 +85,6 @@ Definition upd_return C ret :=
 Definition upd_local_return C loc ret :=
 	upd_return (upd_local C loc) ret. 
 
-Definition upd_label_local_return C loc lab ret := 
-	upd_label (upd_local_return C loc ret) lab.
-
 Definition upd_local_label_return C loc lab ret := 
 	upd_return (upd_label (upd_local C loc) lab) ret.
 
@@ -1151,12 +1148,12 @@ Definition value_principal_typing := value_typing_data (eq).
 
 Ltac unfold_principal_typing H :=
   unfold instr_principal_typing in H;
-  unfold fun_coec_instr__admininstr in H;
+  try (unfold fun_coec_instr__admininstr in H);
   unfold ai_principal_typing in H;
-  unfold fun_coec_val__admininstr in H;
+  try (unfold fun_coec_val__admininstr in H);
   unfold value_principal_typing in H;
   unfold value_typing_data in H;
-  unfold fun_coec_ref__admininstr in H.
+  try (unfold fun_coec_ref__admininstr in H).
 
 Lemma ai_value_typing_iff: forall v_S v_C (v_val: wasm.val) ts1 ts2,
   value_principal_typing v_S v_val ts1 ts2 ->

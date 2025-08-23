@@ -122,12 +122,15 @@ rule Data_instance_ok:
 relation Module_instance_ok: store |- moduleinst : context
 
 rule Module_instance_ok:
-  S |- { TYPES functype*, FUNCS funcaddr*, GLOBALS globaladdr*, TABLES tableaddr*, MEMS memaddr*, EXPORTS exportinst* } : {TYPES functype*, FUNCS functype'*, GLOBALS globaltype*, TABLES tabletype*, MEMS memtype*}
+  S |- { TYPES functype*, FUNCS funcaddr*, GLOBALS globaladdr*, TABLES tableaddr*, MEMS memaddr*, ELEMS elemaddr*, DATAS dataaddr*, EXPORTS exportinst* } :
+    {TYPES functype*, FUNCS functype'*, GLOBALS globaltype*, TABLES tabletype*, MEMS memtype*, ELEMS reftype*}
     -- (Functype_ok: |- functype : OK)*
     -- (Externaddrs_ok: S |- FUNC funcaddr : FUNC functype')*
     -- (Externaddrs_ok: S |- TABLE tableaddr : TABLE tabletype)*
-    -- (Externaddrs_ok: S |- GLOBAL globaladdr : GLOBAL globaltype)*
     -- (Externaddrs_ok: S |- MEM memaddr : MEM memtype)*
+    -- (Externaddrs_ok: S |- GLOBAL globaladdr : GLOBAL globaltype)*
+    -- (Element_instance_ok: S |- S.ELEMS[elemaddr] : reftype )*
+    -- (Data_instance_ok: S |- S.DATAS[dataaddr] : OK)*
     -- (Export_instance_ok: S |- exportinst : OK)*
     ;; TODO disjoint exportinst.name
 
@@ -147,7 +150,8 @@ relation Store_ok: |- store : OK
 
 rule Store_ok:
   |- S : OK
-  -- if S = {FUNCS funcinst*, GLOBALS globalinst*, TABLES tableinst*, MEMS meminst*}
+  -- if S = {FUNCS funcinst*, GLOBALS globalinst*, TABLES tableinst*,
+    MEMS meminst*, ELEMS eleminst*, DATAS datainst*}
   -- (Function_instance_ok: S |- funcinst : functype)*
   -- (Global_instance_ok: S |- globalinst : globaltype)*
   -- (Table_instance_ok: S |- tableinst : tabletype)*

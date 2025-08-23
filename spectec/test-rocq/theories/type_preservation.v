@@ -58,6 +58,19 @@ Ltac extract_premise :=
   | _ => idtac
 end.
 
+Ltac destruct_all :=
+  repeat match goal with
+  | H: exists t, ?P |- _ =>
+    let extr := fresh "extr" in
+    let Hextr := fresh "Hextr" in
+    destruct H as [extr Hextr]
+  | H: ?P /\ ?Q |- _ =>
+    let H1 := fresh "H1" in
+    let H2 := fresh "H2" in
+    destruct H as [H1 H2]
+  | _ => idtac
+end.
+
 Ltac invert_ais_typing :=
   destruct_functypes;
   repeat match goal with
@@ -2204,6 +2217,13 @@ Admitted.
 		eapply Memory_instance_ok__; repeat split => //=; eauto.
 Qed. *) *)
 
+Lemma fold_prepend_label : forall C lab lab1,
+	prepend_label (upd_label C lab) lab1 =
+	upd_label C ([lab1] ++ lab).
+Proof.
+	auto.
+Qed.
+
 Lemma t_preservation_vs_type: forall s f ais s' f' ais' C C' v_t1 lab ret t1s t2s,
     Step (mk_config (mk_state s f) ais) (mk_config (mk_state s' f') ais') ->
     Store_ok s -> 
@@ -2213,30 +2233,48 @@ Lemma t_preservation_vs_type: forall s f ais s' f' ais' C C' v_t1 lab ret t1s t2
 	v_t1 = (C_LOCALS (upd_label (upd_local_return C (v_t1 ++ (C_LOCALS C)) ret) lab)) -> 
 	Forall2 (fun v_t v_val => Val_ok s v_val v_t) v_t1 (F_LOCALS f) ->
     Admin_instrs_ok s (upd_label (upd_local_return C (v_t1 ++ (C_LOCALS C)) ret) lab) ais (t1s :-> t2s) ->
-    Forall2 (fun v_t v_val0 => Val_ok s' v_val0 v_t) v_t1 (F_LOCALS f') 
+    Forall2 (fun v_t v_val => Val_ok s' v_val v_t) v_t1 (F_LOCALS f')
 	/\ length v_t1 = length (F_LOCALS f').
-Admitted.
-(* Proof.
+Proof.
 	move => s f ais s' f' ais' C C' v_t1 
 		lab ret t1s t2s HReduce HStore HStore' HMInst HMInst' HValTypeEq HValOK HType.
+	simpl in HValTypeEq;
+	rewrite -HValTypeEq in HType; clear HValTypeEq.
 	remember (mk_config (mk_state s f) ais) as c1.
 	remember (mk_config (mk_state s' f') ais') as c2.
 	generalize dependent t2s. generalize dependent t1s.
 	generalize dependent lab. generalize dependent ais'. generalize dependent ais.
-	induction HReduce; try intros; try (induction v_z; subst); 
-	try (apply config_same in Heqc1; apply config_same in Heqc2; 
-		destruct Heqc1 as [Hbefore1 [Hbefore2 Hbefore3]]; 
-		destruct Heqc2 as [Hafter1 [Hafter2 Hafter3]]; split; subst => //; try apply Forall2_length in HValOK as ? => //).
-	- (* Label Context *)
-		injection Heqc1 as ?.
-		injection Heqc2 as ?; subst.
-		apply_composition_typing_single HType.
-		apply Label_typing in H4_comp; destruct H4_comp as [ts [ts2' [? [? [? ?]]]]]; subst.
-		rewrite upd_label_overwrite in H2; simpl in H2.
-		simpl in HValTypeEq.
+	induction HReduce; try intros;
+	try (destruct v_z; subst);
+	try (destruct v_z'; subst);
+	try (apply config_same in Heqc1 as [Hbefore1 [Hbefore2 Hbefore3]];
+		apply config_same in Heqc2 as [Hafter1  [Hafter2  Hafter3]]);
+	subst; auto;
+	try apply Forall2_length in HValOK as ?; auto.
+Admitted.
+(*
+	{ (* Label Context *)
+		typing_inversion HType.
+		Opaque fun_coec_instr__admininstr.
+		unfold_principal_typing Hai.
+		destruct_all.
+		rewrite fold_prepend_label in H2.
 		eapply IHHReduce; eauto.
-	- (* Local Set *)
-		rewrite -> Forall2_Val_ok_is_same_as_map in HValOK; rewrite -> Forall2_Val_ok_is_same_as_map.
+	}
+	{ (* Frame Context *)
+		typing_inversion HType.
+		Opaque fun_coec_instr__admininstr.
+		unfold_principal_typing Hai.
+		destruct_all.
+		inversion H0; subst.
+		inversion H4; subst.
+		eapply IHHReduce; eauto.
+
+
+	}
+	{ (* Local Set *)
+		rewrite -> Forall2_Val_ok_is_same_as_map in HValOK;
+		rewrite -> Forall2_Val_ok_is_same_as_map.
 		induction v_val.
 		apply_composition_typing_and_single HType.
 		apply AI_const_typing in  H4_comp0.
@@ -2251,6 +2289,7 @@ Admitted.
 		rewrite HUpdate.
 		rewrite list_update_same_unchanged => //=; try rewrite List.map_length => //=.
 		simpl. by rewrite list_update_length.
+	}
 Qed. *)
 
 Lemma store_extension_reduce: forall s f ais s' f' ais' C tf loc lab ret,
@@ -2883,6 +2922,7 @@ Proof.
 Qed. *)
 Admitted.
 
+
 (* Ultimate goal of project *)				
 Theorem t_preservation: forall c1 ts c2,
 	Step c1 c2 ->
@@ -2911,7 +2951,7 @@ Proof.
 
 	remember {|
 		FUNCS := v_funcinst; GLOBALS := v_globalinst; TABLES := v_tableinst;
-		MEMS := v_meminst; ELEMS := [];	DATAS := []
+		MEMS := v_meminst; ELEMS := v_eleminst;	DATAS := v_datainst
 	|} as store1.
 	remember {|
 		MODULE_TYPES := v_functype0;
@@ -2919,8 +2959,8 @@ Proof.
 		MODULE_GLOBALS := v_globaladdr;
 		MODULE_TABLES := v_tableaddr;
 		MODULE_MEMS := v_memaddr;
-		MODULE_ELEMS := [];
-		MODULE_DATAS := [];
+		MODULE_ELEMS := v_elemaddr;
+		MODULE_DATAS := v_dataaddr;
 		MODULE_EXPORTS := v_exportinst
 	|} as v_moduleinst.
 	remember {|
@@ -2933,7 +2973,7 @@ Proof.
 		C_GLOBALS := v_globaltype0;
 		C_TABLES := v_tabletype0;
 		C_MEMS := v_memtype0;
-		C_ELEMS := [];
+		C_ELEMS := v_reftype0;
 		C_DATAS := [];
 		C_LOCALS := [];
 		C_LABELS := [];
@@ -2958,7 +2998,7 @@ Proof.
 					(_append v_t1 (C_LOCALS v_C0))
 					(_append (option_map [eta (mk_list _)] None)
 						(C_RETURN v_C0))))
-			(_append (None) (C_RETURN v_C0))); auto; by subst.
+			(_append (None) (C_RETURN v_C0))); auto; subst; auto.
 	}
 	apply reduce_inst_unchanged in HReduce as HModuleInst.
 	destruct frame2 as [locals2 module2].
