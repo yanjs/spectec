@@ -125,11 +125,12 @@ Proof.
 Qed.  
 
 Lemma Forall2_nth {A : Type} {B : Type} (l : list A) (l' : list B) (R : A -> B -> Prop) :
-      Forall2 R l l' -> length l = length l' /\ (forall i d d', (i < length l)%coq_nat -> R (List.nth i l d) (List.nth i l' d')).
+      Forall2 R l l' -> length l = length l' /\ (forall i d d', (i < length l) -> R (List.nth i l d) (List.nth i l' d')).
 Proof.
 	move => H.
 	split. apply (Forall2_length) in H. apply H.
 	move => i d d' H'.
+	move/ltP in H'.
 	generalize dependent i. induction H; move => i HLength. 
 		+ apply Nat.nlt_0_r in HLength. exfalso. apply HLength.
 		+ destruct i. 
@@ -138,11 +139,12 @@ Proof.
 Qed.
 
 Lemma Forall2_nth2 {A : Type} {B : Type} (l : list A) (l' : list B) (R : A -> B -> Prop) :
-      Forall2 R l l' -> length l = length l' /\ (forall i d d', (i < length l')%coq_nat -> R (List.nth i l d) (List.nth i l' d')).
+      Forall2 R l l' -> length l = length l' /\ (forall i d d', (i < length l') -> R (List.nth i l d) (List.nth i l' d')).
 Proof.
 	move => H.
 	split. apply (Forall2_length) in H. apply H.
 	move => i d d' H'.
+	move/ltP in H'.
 	generalize dependent i. induction H; move => i HLength. 
 		+ apply Nat.nlt_0_r in HLength. exfalso. apply HLength.
 		+ destruct i. 

@@ -639,6 +639,15 @@ Proof.
   by constructor.
 Qed.
 
+Lemma instrtype_sub_compose_eq : forall ts1 ts2 ts2' ts3 txs tys tzs,
+  ((ts1 :-> ts2) <ti: (txs :-> tys)) ->
+  ((ts2' :-> ts3) <ti: (tys :-> tzs)) ->
+  (size ts2 = size ts2') ->
+  ((ts1 :-> ts3) <ti: (txs :-> tzs)) /\ (ts2 <ts: ts2').
+Proof.
+  move=> ts1 ts2 ts2' ts3 txs tys tzs H1 H2 Hsize.
+  eapply instrtype_sub_compose_le with (ts3 := []); eauto.
+Qed.
 
 Lemma instrtype_sub_compose_ge' : forall ts1 ts2 ts3 ts4 txs tys tzs,
   ((ts1 :-> ts2) <ti: (txs :-> tys)) ->
@@ -753,15 +762,15 @@ Proof.
   subst. split; auto.
 Qed.
 
-Lemma instrtype_sub_iff_resulttype_sub : forall ts1 ts2,
+Lemma instrtype_sub_iff_resulttype_sub : forall ts1 ts2 ts3,
   (ts1 <ts: ts2) <->
-  (([] :-> ts1) <ti: ([] :-> ts2)).
+  ((ts3 :-> ts1) <ti: (ts3 :-> ts2)).
 Proof.
   move => ts1 ts2.
   split.
   {
     move => H.
-    exists [], [], [], ts2.
+    eexists [], [], ts3, ts2.
     split; auto.
     split; auto.
     split. eapply resulttype_sub_refl.
@@ -772,10 +781,47 @@ Proof.
     move => H.
     unfold instrtype_sub in H.
     destruct H as [tp1' [tp1 [ts1' [ts2'' [H1e1 [H1e2 [H1s1 [H1s2 H1s3]]]]]]]].
-    destruct_list_eq H1e1.
     subst.
-    eapply resulttype_empty_sub in H1s1.
-    subst. auto.
+    inversion H1s2; subst.
+    rewrite -!size_length in H1.
+    rewrite size_cat in H1.
+    rewrite -{1}(add0n (size ts1')) in H1.
+    rewrite Nat.add_cancel_r in H1.
+    symmetry in H1.
+    eapply size0nil in H1; subst.
+    eapply resulttype_empty_sub in H1s1; subst.
+    auto.
+  }
+Qed.
+
+
+Lemma instrtype_sub_iff_resulttype_sub' : forall ts1 ts2 ts3,
+  (ts1 <ts: ts2) <->
+  ((ts2 :-> ts3) <ti: (ts1 :-> ts3)).
+Proof.
+  move => ts1 ts2.
+  split.
+  {
+    move => H.
+    eexists [], [], ts1, ts3.
+    split; auto.
+    split; auto.
+    split. eapply resulttype_sub_refl.
+    split. eauto. eapply resulttype_sub_refl.
+  }
+  {
+    move => H.
+    unfold instrtype_sub in H.
+    destruct H as [tp1' [tp1 [ts1' [ts2'' [H1e1 [H1e2 [H1s1 [H1s2 H1s3]]]]]]]].
+    subst.
+    inversion H1s3; subst.
+    rewrite -!size_length in H1.
+    rewrite size_cat in H1.
+    rewrite -{2}(add0n (size ts2'')) in H1.
+    rewrite Nat.add_cancel_r in H1.
+    eapply size0nil in H1; subst.
+    eapply resulttype_sub_empty in H1s1; subst.
+    auto.
   }
 Qed.
 (*

@@ -1,4 +1,4 @@
-From Stdlib Require Import String List Unicode.Utf8 NArith Arith.
+From Stdlib Require Import String List Unicode.Utf8 NArith Arith Logic.Eqdep.
 Require Import Stdlib.Program.Equality.
 From RecordUpdate Require Import RecordSet.
 
@@ -100,6 +100,7 @@ Ltac fold_upd_context :=
 		replace (upd_return (upd_local C ret) loc) with
 			(upd_local_return C ret loc); try by destruct C
 	end.
+	*)
 	  
 Lemma upd_label_overwrite: forall C l1 l2,
 	upd_label (upd_label C l1) l2 = upd_label C l2.
@@ -108,28 +109,40 @@ Proof.
 Qed.
 
 Lemma upd_label_is_same_as_append: forall v_C lab,
-	upd_label v_C (_append lab (C_LABELS v_C)) = _append {| C_TYPES := []; C_FUNCS := []; C_GLOBALS := []; C_TABLES := []; C_MEMS := []; C_ELEMS := [];
-	C_DATAS := []; C_LOCALS := []; C_LABELS := lab; C_RETURN := None |} v_C.
+	upd_label v_C (lab @@ (C_LABELS v_C)) = {| C_TYPES := []; C_FUNCS := []; C_GLOBALS := []; C_TABLES := []; C_MEMS := []; C_ELEMS := [];
+	C_DATAS := []; C_LOCALS := []; C_LABELS := lab; C_RETURN := None |} @@ v_C.
 Proof.
 	move => v_C lab. reflexivity.
 Qed.
 
 Lemma upd_local_is_same_as_append: forall v_C loc,
-	upd_local v_C (_append loc (C_LOCALS v_C))  = _append {| C_TYPES := []; C_FUNCS := []; C_GLOBALS := []; C_TABLES := []; C_MEMS := []; C_ELEMS := [];
-	C_DATAS := []; C_LOCALS := loc; C_LABELS := []; C_RETURN := None |} v_C.
+	upd_local v_C (loc @@ (C_LOCALS v_C))  = {| C_TYPES := []; C_FUNCS := []; C_GLOBALS := []; C_TABLES := []; C_MEMS := []; C_ELEMS := [];
+	C_DATAS := []; C_LOCALS := loc; C_LABELS := []; C_RETURN := None |} @@ v_C.
 Proof.
 	move => v_C loc. reflexivity.
 Qed.
 
 Lemma upd_local_return_is_same_as_append: forall v_C loc ret,
-	upd_local_return v_C (_append loc (C_LOCALS v_C)) (_append ret (C_RETURN v_C)) 
-	= upd_return (upd_local v_C (_append loc (C_LOCALS v_C))) (_append ret (C_RETURN ((upd_local v_C (_append loc (C_LOCALS v_C)))))).
+	upd_local_return v_C (loc @@ (C_LOCALS v_C)) (ret @@ (C_RETURN v_C)) 
+	= {|
+		C_TYPES := [];
+		C_FUNCS := [];
+		C_GLOBALS := [];
+		C_TABLES := [];
+		C_MEMS := [];
+		C_ELEMS := [];
+		C_DATAS := [];
+		C_LOCALS := loc;
+		C_LABELS := [];
+		C_RETURN := ret
+	|} @@ v_C.
 Proof. reflexivity. Qed.
 
 
 Lemma upd_return_is_same_as_append: forall v_C ret,
-	upd_return v_C (_append ret (C_RETURN v_C)) = _append {| C_TYPES := []; C_FUNCS := []; C_GLOBALS := []; C_TABLES := []; C_MEMS := []; C_ELEMS := [];
-	C_DATAS := []; C_LOCALS := []; C_LABELS := []; C_RETURN := ret |} v_C.
+	upd_return v_C (ret @@ (C_RETURN v_C)) =
+	{| C_TYPES := []; C_FUNCS := []; C_GLOBALS := []; C_TABLES := []; C_MEMS := []; C_ELEMS := [];
+	C_DATAS := []; C_LOCALS := []; C_LABELS := []; C_RETURN := ret |} @@ v_C.
 Proof.
 	move => v_C ret. reflexivity.
 Qed.
@@ -158,14 +171,18 @@ Proof.
 		rewrite <- Heqlab => //=. 
 Qed.
 
-(*
 Definition typeof (v_val : val): valtype :=
 	match v_val with
 		| VAL_CONST t _ => t
-	end.
+		| VAL_VCONST t _ => t
+		| VAL_REF_NULL t => t
+		| VAL_REF_FUNC_ADDR _ => VALTYPE_FUNCREF
+		| VAL_REF_HOST_ADDR _ => VALTYPE_EXTERNREF
+		end.
 	
+(*
 Lemma typeof_default_inverse: forall (v_t : list valtype),
-	List.map typeof (List.map [eta fun_default_] v_t) = v_t.
+	List.map typeof (List.map [fun t => the (fun_default_ t)] v_t) = v_t.
 Proof.
 	move => v_t.
 	induction v_t => //=.
@@ -193,7 +210,7 @@ Proof.
 		- induction v. apply mk_Val_ok.
 		- rewrite H2. by apply IHv_t1.
 Qed.
-*) *)
+*)
 (*
 Lemma instrs_empty_same_type: forall C t1 t2,
 	Instrs_ok C [] (mk_functype t1 t2) ->
@@ -502,7 +519,6 @@ match v_ai with
 	  v_ft = ([v_nt: valtype; v_nt: valtype] :-> [VALTYPE_I32])
 	| (AI_CVTOP v_nt_1 v_nt_2 _) =>
 	  v_ft = ([v_nt_2: valtype] :-> [v_nt_1: valtype])
-	(*| (AI_EXTEND v_0 v_1) *)
 	| (AI_VCONST (v_vectype) _ ) =>
 	  v_ft = ([] :-> [v_vectype : valtype])
 	(*| (AI_VVUNOP v_0 v_1)
@@ -526,7 +542,10 @@ match v_ai with
 	| (AI_VCVTOP v_0 v_1 v_2)*)
 	| (AI_REF_NULL (v_rt)) =>
 	  v_ft = ([] :-> [v_rt : valtype])
-	(*| (AI_REF_FUNC v_0)*)
+	| (AI_REF_FUNC v_x) =>
+	  exists v_fty, v_ft = ([] :-> [VALTYPE_FUNCREF]) /\
+		((fun_proj_uN_0 32 v_x) < (List.length (C_FUNCS v_C))) /\
+		((lookup_total (C_FUNCS v_C) (fun_proj_uN_0 32 v_x)) = v_fty)
 	| AI_REF_IS_NULL =>
 	  exists v_rt,
 	  v_ft = ([v_rt] :-> [VALTYPE_I32])
@@ -542,35 +561,116 @@ match v_ai with
 	  exists v_t, v_ft = ([v_t] :-> [v_t]) /\
 	    ((fun_proj_uN_0 32 v_x) < (List.length (C_LOCALS v_C))) /\
 	    ((lookup_total (C_LOCALS v_C) (fun_proj_uN_0 32 v_x)) = v_t)
-	(*| (AI_GLOBAL_GET v_0)
-	| (AI_GLOBAL_SET v_0)
-	| (AI_TABLE_GET v_0)
-	| (AI_TABLE_SET v_0)
-	| (AI_TABLE_SIZE v_0)
-	| (AI_TABLE_GROW v_0)
-	| (AI_TABLE_FILL v_0)
-	| (AI_TABLE_COPY v_0 v_1)
-	| (AI_TABLE_INIT v_0 v_1)
-	| (AI_ELEM_DROP v_0)
-	| (AI_LOAD v_0 v_1 v_2)
-	| (AI_STORE v_0 v_1 v_2)
-	| (AI_VLOAD v_0 v_1 v_2)
+	| (AI_GLOBAL_GET v_x) =>
+	  exists v_t v_mut, v_ft = ([] :-> [v_t]) /\
+	  	((fun_proj_uN_0 32 v_x) < (List.length (C_GLOBALS v_C))) /\
+		((lookup_total (C_GLOBALS v_C) (fun_proj_uN_0 32 v_x)) = (mk_globaltype v_mut v_t))
+	| (AI_GLOBAL_SET v_x) =>
+	  exists v_t, v_ft = ([v_t] :-> []) /\
+	  	((fun_proj_uN_0 32 v_x) < (List.length (C_GLOBALS v_C))) /\
+		((lookup_total (C_GLOBALS v_C) (fun_proj_uN_0 32 v_x)) = (mk_globaltype (Some MUT) v_t))
+	| (AI_TABLE_GET v_x) =>
+	  exists (v_rt: reftype) v_lim, v_ft = ([VALTYPE_I32] :-> [(v_rt : valtype)]) /\
+	  	((fun_proj_uN_0 32 v_x) < (List.length (C_TABLES v_C))) /\
+		((lookup_total (C_TABLES v_C) (fun_proj_uN_0 32 v_x)) = (mk_tabletype v_lim v_rt))
+	| (AI_TABLE_SET v_x) =>
+	  exists (v_rt: reftype) v_lim, v_ft = ([VALTYPE_I32; (v_rt : valtype)] :-> []) /\
+	  	((fun_proj_uN_0 32 v_x) < (List.length (C_TABLES v_C))) /\
+		((lookup_total (C_TABLES v_C) (fun_proj_uN_0 32 v_x)) = (mk_tabletype v_lim v_rt))
+	| (AI_TABLE_SIZE v_x) =>
+	  exists (v_rt: reftype) v_lim, v_ft = ([] :-> [VALTYPE_I32]) /\
+	  	((fun_proj_uN_0 32 v_x) < (List.length (C_TABLES v_C))) /\
+		((lookup_total (C_TABLES v_C) (fun_proj_uN_0 32 v_x)) = (mk_tabletype v_lim v_rt))
+	| (AI_TABLE_GROW v_x) =>
+	  exists (v_rt: reftype) v_lim, v_ft = ([(v_rt : valtype); VALTYPE_I32] :-> [VALTYPE_I32]) /\
+	  	((fun_proj_uN_0 32 v_x) < (List.length (C_TABLES v_C))) /\
+		((lookup_total (C_TABLES v_C) (fun_proj_uN_0 32 v_x)) = (mk_tabletype v_lim v_rt))
+	| (AI_TABLE_FILL v_x) =>
+	  exists (v_rt: reftype) v_lim, v_ft = ([VALTYPE_I32; (v_rt : valtype); VALTYPE_I32] :-> []) /\
+	  	((fun_proj_uN_0 32 v_x) < (List.length (C_TABLES v_C))) /\
+		((lookup_total (C_TABLES v_C) (fun_proj_uN_0 32 v_x)) = (mk_tabletype v_lim v_rt))
+	| (AI_TABLE_COPY v_x_1 v_x_2) =>
+	  exists (v_rt: reftype) v_lim_1 v_lim_2, v_ft = ([VALTYPE_I32; VALTYPE_I32; VALTYPE_I32] :-> []) /\
+	  	((fun_proj_uN_0 32 v_x_1) < (List.length (C_TABLES v_C))) /\
+		((lookup_total (C_TABLES v_C) (fun_proj_uN_0 32 v_x_1)) = (mk_tabletype v_lim_1 v_rt))/\
+	  	((fun_proj_uN_0 32 v_x_2) < (List.length (C_TABLES v_C))) /\
+		((lookup_total (C_TABLES v_C) (fun_proj_uN_0 32 v_x_2)) = (mk_tabletype v_lim_2 v_rt))
+	| (AI_TABLE_INIT v_x_1 v_x_2) =>
+	  exists (v_rt: reftype) v_lim, v_ft = ([VALTYPE_I32; VALTYPE_I32; VALTYPE_I32] :-> []) /\
+	  	((fun_proj_uN_0 32 v_x_1) < (List.length (C_TABLES v_C))) /\
+		((lookup_total (C_TABLES v_C) (fun_proj_uN_0 32 v_x_1)) = (mk_tabletype v_lim v_rt))/\
+	  	((fun_proj_uN_0 32 v_x_2) < (List.length (C_ELEMS v_C))) /\
+		((lookup_total (C_ELEMS v_C) (fun_proj_uN_0 32 v_x_2)) = v_rt)
+	| (AI_ELEM_DROP v_x) =>
+	  exists (v_rt: reftype), v_ft = ([] :-> []) /\
+	  	((fun_proj_uN_0 32 v_x) < (List.length (C_ELEMS v_C))) /\
+		((lookup_total (C_ELEMS v_C) (fun_proj_uN_0 32 v_x)) = v_rt)
+	| (AI_LOAD v_nt None v_memarg) =>
+	  exists v_mt, v_ft = ([VALTYPE_I32] :-> [(v_nt : valtype)]) /\
+	  	(0 < (List.length (C_MEMS v_C))) /\
+		((lookup_total (C_MEMS v_C) 0) = v_mt) /\
+		((fun_size (v_nt : valtype)) <> None) /\
+		(((2 ^ (fun_proj_uN_0 32 (ALIGN v_memarg))) : nat) <= (((the (fun_size (v_nt : valtype))) : nat) / (8 : nat)))
+	| (AI_LOAD I32 (Some (op_ (mk_sz v_M) v_sx)) v_memarg) =>
+	  exists v_mt, v_ft = ([VALTYPE_I32] :-> [(VALTYPE_I32)]) /\
+	  	(0 < (List.length (C_MEMS v_C))) /\
+		((lookup_total (C_MEMS v_C) 0) = v_mt) /\
+		(((2 ^ (fun_proj_uN_0 32 (ALIGN v_memarg))) : nat) <= ((v_M : nat) / (8 : nat)))
+	| (AI_LOAD I64 (Some (op_ (mk_sz v_M) v_sx)) v_memarg) =>
+	  exists v_mt, v_ft = ([VALTYPE_I32] :-> [VALTYPE_I64]) /\
+	  	(0 < (List.length (C_MEMS v_C))) /\
+		((lookup_total (C_MEMS v_C) 0) = v_mt) /\
+		(((2 ^ (fun_proj_uN_0 32 (ALIGN v_memarg))) : nat) <= ((v_M : nat) / (8 : nat)))
+	| (AI_STORE v_nt None v_memarg) =>
+	  exists v_mt, v_ft = ([VALTYPE_I32; (v_nt : valtype)] :-> []) /\
+	  	(0 < (List.length (C_MEMS v_C))) /\
+		((lookup_total (C_MEMS v_C) 0) = v_mt) /\
+		((fun_size (v_nt : valtype)) <> None) /\
+		(((2 ^ (fun_proj_uN_0 32 (ALIGN v_memarg))) : nat) <= (((the (fun_size (v_nt : valtype))) : nat) / (8 : nat)))
+	| (AI_STORE v_Inn (Some (mk_sz v_M)) v_memarg) =>
+	  exists v_mt, v_ft = ([VALTYPE_I32; (v_Inn : valtype)] :-> []) /\
+	  	(0 < (List.length (C_MEMS v_C))) /\
+		((lookup_total (C_MEMS v_C) 0) = v_mt) /\
+		(((2 ^ (fun_proj_uN_0 32 (ALIGN v_memarg))) : nat) <= ((v_M : nat) / (8 : nat)))
+	(*| (AI_VLOAD v_0 v_1 v_2)
 	| (AI_VLOAD_LANE v_0 v_1 v_2 v_3)
 	| (AI_VSTORE v_0 v_1)
-	| (AI_VSTORE_LANE v_0 v_1 v_2 v_3)
-	| AI_MEMORY_SIZE
-	| AI_MEMORY_GROW
-	| AI_MEMORY_FILL
-	| AI_MEMORY_COPY
-	| (AI_MEMORY_INIT v_0)
-	| (AI_DATA_DROP v_0) *)
+	| (AI_VSTORE_LANE v_0 v_1 v_2 v_3)*)
+	| AI_MEMORY_SIZE =>
+	  exists v_mt, v_ft = ([] :-> [VALTYPE_I32]) /\
+	  	(0 < (List.length (C_MEMS v_C))) /\
+		((lookup_total (C_MEMS v_C) 0) = v_mt)
+	| AI_MEMORY_GROW =>
+	  exists v_mt, v_ft = ([VALTYPE_I32] :-> [VALTYPE_I32]) /\
+	  	(0 < (List.length (C_MEMS v_C))) /\
+		((lookup_total (C_MEMS v_C) 0) = v_mt)
+	| AI_MEMORY_FILL =>
+	  exists v_mt, v_ft = ([VALTYPE_I32; VALTYPE_I32; VALTYPE_I32] :-> []) /\
+	  	(0 < (List.length (C_MEMS v_C))) /\
+		((lookup_total (C_MEMS v_C) 0) = v_mt)
+	| AI_MEMORY_COPY =>
+	  exists v_mt, v_ft = ([VALTYPE_I32; VALTYPE_I32; VALTYPE_I32] :-> []) /\
+	  	(0 < (List.length (C_MEMS v_C))) /\
+		((lookup_total (C_MEMS v_C) 0) = v_mt)
+	| (AI_MEMORY_INIT v_x) =>
+	  exists v_mt, v_ft = ([VALTYPE_I32; VALTYPE_I32; VALTYPE_I32] :-> []) /\
+		(0 < (List.length (C_MEMS v_C))) /\
+		((lookup_total (C_MEMS v_C) 0) = v_mt) /\
+		((fun_proj_uN_0 32 v_x) < (List.length (C_DATAS v_C))) /\
+		((lookup_total (C_DATAS v_C) (fun_proj_uN_0 32 v_x)) = OK)
+	| (AI_DATA_DROP v_x) =>
+	  v_ft = ([] :-> []) /\
+		((fun_proj_uN_0 32 v_x) < (List.length (C_DATAS v_C))) /\
+		((lookup_total (C_DATAS v_C) (fun_proj_uN_0 32 v_x)) = OK)
 	| (AI_REF_FUNC_ADDR v_funcaddr) =>
 	  exists v_functype,
 	  v_ft = ([] :-> [VALTYPE_FUNCREF]) /\
 	  (Externaddrs_ok v_S (EXTADDR_FUNC v_funcaddr) (EXT_FUNC v_functype))
 	| (AI_REF_HOST_ADDR _) =>
 	  v_ft = ([] :-> [VALTYPE_EXTERNREF])
-	(*| AI_CALL_ADDR (v_funcaddr : funcaddr) : admininstr *)
+	| (AI_CALL_ADDR v_funcaddr) =>
+		exists t t', v_ft = (t :-> t') /\
+		(Externaddrs_ok v_S (EXTADDR_FUNC v_funcaddr) (EXT_FUNC (t :-> t')))
 	| (AI_LABEL_ v_n v_instrs v_ais) =>
 	  exists t t',
 	  v_ft = ([] :-> t') /\
@@ -606,6 +706,12 @@ Proof.
 	  solve [destruct_disjunctions;
 	  repeat eexists; eauto].
 	}
+	{ (* LOAD None *)
+		destruct v_nt; repeat eexists; eauto.
+	}
+	{ (* STORE Some *)
+		destruct v_Inn; auto.
+	}
 Qed.
 
 Lemma ai_typing_inversion: forall (v_S: store) (v_C: context) v_ai t1s t2s,
@@ -621,9 +727,74 @@ Proof.
 		destruct v_instr.
 		all: unfold ai_principal_typing;
 		unfold fun_coec_instr__admininstr.
+		57: { (* LOAD *)
+			admit. (* Inversion not working for some reason
+			destruct o.
+			admit. 
+			{
+				destruct v_numtype;
+				destruct l; try destruct v_sz.
+				unfold op_ in H.
+				remember (op_ INN_I32 (mk_sz v_i) v_sx) as op.
+				inversion H; subst.
+				inversion H.
+				inversion_clear H.
+				all: inversion H.
+				all: do 2 eexists.
+				all: split; try eapply instrtype_sub_refl.
+				all: eexists.
+			}
+		    inversion H; subst.
+			(* I don't like this *)
+			apply Eqdep.EqdepTheory.inj_pair2 in H1; subst.
+			all: do 2 eexists; split; try eapply instrtype_sub_refl.
+			destruct v_numtype; repeat eexists; auto.
+			all: destruct o; try destruct l; try destruct v_sz.
+			inversion H1.
+			assert (o = None). {
+				
+			}
+			do 2 eexists.
+			destruct v_numtype.
+			all: split; try eapply instrtype_sub_refl.
+			all: destruct o; try auto.
+			all: try destruct l; try destruct v_sz.
+			remember (op_ INN_I32 (mk_sz v_i) v_sx) as so.
+			inversion H.
+			eexists.
+			repeat eexists; auto.
+			all: inversion H.
+			all: eexists v_mt.
+			inversion H.
+			all: inversion H; subst.
+			all: repeat eexists; auto.
+			inversion H.
+			{
+				do 2 eexists.
+			}
+			destruct o; destruct v_numtype; try (destruct l); try (destruct v_sz);
+			inversion H; subst.
+			do 2 eexists;
+			split; try eapply instrtype_sub_refl.
+			all: eexists.
+			1,2: destruct l; destruct v_sz.
+			all: repeat eexists; eauto.
+			inversion H; subst.
+			{
+				injection H1 as H2.
+			}
+			inversion H1.
+			do 2 eexists;
+			split.
+			2: eapply instrtype_sub_refl.
+			3: eapply instrtype_sub_refl.
+			all: eexists; split; auto.
+			destruct v_Inn; auto.
+			*)
+		}
 		all: inversion H; subst.
 		all: do 2 eexists.
-		all: split;
+		all: try (split;
 		[
 			first [
 				solve exact
@@ -631,15 +802,16 @@ Proof.
 				solve [simpl; eauto]
 			|
 				solve [destruct_disjunctions; repeat eexists; eauto]
+			|
+				solve [destruct v_numtype; repeat eexists; eauto]
 			]
 		|
-			solve [
 				exists []; do 3 eexists;
 				split; [|split; [|split; [|split]]];
 				try apply resulttype_sub_refl;
-				simpl; try exact
-			]
-	  	].
+				simpl; try exact;
+				try destruct v_Inn; auto
+	  	]).
 	}
 	{ (* trap *)
 	  exists t1s, t2s.
@@ -663,7 +835,7 @@ Proof.
 	{ (* call_addr *) (* TODO *)
 	  eexists _, _.
 	  split.
-	  - unfold ai_principal_typing; exact.
+	  - unfold ai_principal_typing; repeat eexists; eauto.
 	  - apply instrtype_sub_refl.
 	}
 	{ (* label *) (* TODO *)
@@ -694,7 +866,7 @@ Proof.
 		(v_t'_2).
 		split; [|split; [|split; [|split]]]; auto.
 	}
-Qed.
+Admitted.
 
 Lemma instrs_single_typing_inversion: forall (v_C: context) v_instr t1s t2s,
 Instrs_ok v_C [v_instr] (t1s :-> t2s) ->
@@ -1037,7 +1209,7 @@ Ltac do_ais_typing_inversion H :=
     eapply (ais_seq_typing_inversion _ _ v_ais v_ai) in H
 	  as [t3s [H1 H2]];
 	do_ais_typing_inversion H1
-  | Admin_instrs_ok _ _ (_ :: _) _ =>
+  | Admin_instrs_ok _ _ (_ :: (_ :: _)) _ =>
     repeat rewrite -(cat1s _ (_ :: _)) in H;
 	repeat rewrite !catA in H;
 	do_ais_typing_inversion H
@@ -1108,6 +1280,31 @@ Proof.
 	unfold injective.
 	move=> x1 x2 H.
 	destruct x1; destruct x2; try discriminate; inversion H; auto.
+Qed.
+
+Lemma construct_instrs_typing_single : forall v_C v_ai ts1 ts2 ts1' ts2',
+	Instr_ok v_C v_ai (ts1 :-> ts2) ->
+	((ts1 :-> ts2) <ti: (ts1' :-> ts2')) ->
+	Instrs_ok v_C [v_ai] (ts1' :-> ts2').
+Proof.
+	move=> v_C v_ai ts1 ts2 ts1' ts2' Hai Hsub.
+	unfold_instrtype_sub Hsub; subst.
+	eapply (instrs_ok_sub).
+	2: { eapply resulttype_sub_app; eauto. }
+	2: {
+		eapply resulttype_sub_app.
+		eapply resulttype_sub_refl.
+		eauto.
+	}
+	{
+		eapply instrs_ok_frame.
+		eapply (instrs_ok_seq _ []).
+		{
+			eapply instrs_empty_typing.
+			eapply resulttype_sub_refl.
+		}
+		eauto.
+	}
 Qed.
 
 Lemma construct_ais_typing_single : forall v_S v_C v_ai ts1 ts2 ts1' ts2',
@@ -1655,6 +1852,118 @@ Proof.
 	- eapply resulttype_sub_app; eauto.
 	- eapply resulttype_sub_app; eauto.
 	  eapply resulttype_sub_refl.
+Qed.
+
+
+
+Definition inst_match C C' : Prop :=
+	C_TYPES C = C_TYPES C' /\
+	C_FUNCS C = C_FUNCS C' /\
+	C_GLOBALS C = C_GLOBALS C' /\
+	C_TABLES C = C_TABLES C' /\
+	C_MEMS C = C_MEMS C' /\
+	C_ELEMS C = C_ELEMS C' /\
+	C_DATAS C = C_DATAS C'.
+
+Lemma construct_inst_match_label : forall C C' lab,
+	inst_match C C' -> inst_match C (upd_label C' lab).
+Proof.
+	intros.
+	unfold inst_match.
+	unfold inst_match in H.
+	destruct C'; simpl in *.
+	auto.
+Qed.
+
+Lemma construct_inst_match_return : forall C C' ret,
+	inst_match C C' -> inst_match C (upd_return C' ret).
+Proof.
+	intros.
+	unfold inst_match.
+	unfold inst_match in H.
+	destruct C'; simpl in *.
+	auto.
+Qed.
+
+Lemma construct_inst_match_local : forall C C' loc,
+	inst_match C C' -> inst_match C (upd_local C' loc).
+Proof.
+	intros.
+	unfold inst_match.
+	unfold inst_match in H.
+	destruct C'; simpl in *.
+	auto.
+Qed.
+
+Lemma construct_inst_match_local_return : forall C C' loc ret,
+	inst_match C C' -> inst_match C (upd_local_return C' loc ret).
+Proof.
+	intros.
+	unfold inst_match.
+	unfold inst_match in H.
+	destruct C'; simpl in *.
+	auto.
+Qed.
+
+Lemma construct_inst_prepend_label : forall C C' lab,
+	inst_match C C' -> inst_match C (prepend_label C' lab).
+Proof.
+	intros.
+	unfold inst_match.
+	unfold inst_match in H.
+	destruct C'; simpl in *.
+	auto.
+Qed.
+
+Ltac resolve_inst_match :=
+	repeat lazymatch goal with
+	| _ : _ |- inst_match _ (prepend_label _ _) =>
+		eapply construct_inst_prepend_label
+	| _ : _ |- inst_match _ (upd_local_return _ _ _) =>
+		eapply construct_inst_match_local_return
+	| _ : _ |- inst_match _ (upd_local _ _) =>
+		eapply construct_inst_match_local
+	| _ : _ |- inst_match _ (upd_return _ _) =>
+		eapply construct_inst_match_return
+	| _ : _ |- inst_match _ (upd_label _ _) =>
+		eapply construct_inst_match_label
+	| _ => idtac
+	end;
+	unfold inst_match;
+	simpl;
+	unfold _append;
+	simpl;
+	repeat eexists; auto.
+
+Lemma value_pt_iff_Val_ok : forall v_S v_val v_t,
+	value_principal_typing v_S v_val [] [v_t] <->
+	Val_ok v_S v_val v_t.
+Proof.
+	move => v_S v_val v_t.
+	split.
+	{
+		move => H.
+		destruct v_val;
+		unfold value_principal_typing, value_typing_data in H.
+		4: destruct H as [H H1].
+		all: inversion H; subst; clear H.
+		all: try econstructor.
+		{
+			eapply ok_reftype with (v_r := REF_NULL _).
+			econstructor.
+		}
+		eapply ok_reftype with (v_r := REF_FUNC_ADDR v_funcaddr) (v_rt := FUNCREF).
+		destruct H1; econstructor; eauto.
+		eapply ok_reftype with (v_r := REF_HOST_ADDR v_hostaddr) (v_rt := EXTERNREF).
+		econstructor.
+	}
+	{
+		move=> H.
+		destruct H; unfold value_principal_typing, value_typing_data, fun_coec_ref__val; eauto.
+		all: destruct v_r; inversion H; subst; auto.
+		split. inversion H2; subst; auto.
+		by exists v_ext.
+	}
 Qed.
 
 (*

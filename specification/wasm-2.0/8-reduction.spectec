@@ -75,7 +75,7 @@ rule Step_read/loop:
   z; val^k (LOOP bt instr*)  ~>  (LABEL_ k `{LOOP bt instr*} val^k instr*)
   -- if $blocktype(z, bt) = t_1^k -> t_2^n
   -- if |t_1^k| = |val^k|
-  -- if |t_2^n| = n
+  -- if |val^k| = k
 
 rule Step_pure/if-true:
   (CONST I32 c) (IF bt instr_1* ELSE instr_2*)  ~>  (BLOCK bt instr_1*)
@@ -138,6 +138,8 @@ rule Step_read/call_addr:
   -- if $funcinst(z)[a] = {TYPE (t_1^k -> t_2^n), MODULE mm, CODE func}
   -- if func = FUNC x (LOCAL t)* instr*
   -- if f = {LOCALS val^k ($default_(t))*, MODULE mm}
+  -- if |t_2^n| = n
+  -- if |val^k| = |t_1^k|
 
 
 rule Step_pure/frame-vals:
