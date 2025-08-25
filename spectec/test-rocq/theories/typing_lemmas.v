@@ -1966,6 +1966,60 @@ Proof.
 	}
 Qed.
 
+Lemma values_pt_iff_Vals_ok : forall v_S v_val v_ts,
+	Forall2
+		(λ (v_val : wasm.val) (v_t : valtype),
+		value_principal_typing v_S v_val [] [v_t]) v_val v_ts <->
+	Forall2
+	(λ (v_t0 : valtype) (v_val0 : wasm.val),
+		Val_ok v_S v_val0 v_t0) v_ts v_val.
+Proof.
+	move=> v_S v_val v_ts.
+	move: v_ts.
+	induction v_val.
+	{
+		split; move=>H; inversion H; subst; econstructor.
+	}
+	{
+		move=> v_ts.
+		destruct v_ts.
+		{
+			split; move=>H; inversion H.
+		}
+		split; move=>H; inversion H; subst; econstructor.
+		1,3: by eapply value_pt_iff_Val_ok.
+		all: by eapply IHv_val.
+	}
+Qed.
+
+Lemma Vals_ok_non_bot : forall v_S v_val v_ts,
+	Forall2	(λ (v_t0 : valtype) (v_val0 : wasm.val),
+		Val_ok v_S v_val0 v_t0) v_ts v_val ->
+	Forall (λ (v_t : valtype),
+		v_t <> VALTYPE_BOT) v_ts.
+Proof.
+	move=> v_S v_val v_ts H.
+	move : v_ts H.
+	induction v_val.
+	{
+		move=> v_ts H.
+		inversion H; subst; econstructor.
+	}
+	{
+		move=> v_ts H.
+		destruct v_ts.
+		{
+			inversion H.
+		}
+		inversion H; subst; econstructor.
+		2: by eapply IHv_val.
+		all: inversion H3; subst.
+		by destruct v_nt.
+		by destruct v_vt.
+		by destruct v_rt.
+	}
+Qed.
+
 (*
 Ltac apply_instrs_composition_typing_single H := 
 	let ts1 := fresh "ts1_comp" in

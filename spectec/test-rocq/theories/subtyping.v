@@ -64,6 +64,25 @@ Proof.
   contradict Hneb; auto.
 Qed.
 
+Lemma resulttype_sub_non_bot : forall v_ts v_ts2,
+	Forall (fun (v_t : valtype) =>
+		v_t <> VALTYPE_BOT) v_ts ->
+	v_ts <ts: v_ts2 ->
+	v_ts = v_ts2.
+Proof.
+	move=> v_ts v_ts2 Hf Hs.
+	move : v_ts2 Hf Hs.
+	induction v_ts. { move=> v_ts2 Hf Hs. inversion Hs; subst. inversion H2; auto. }
+	move=> v_ts2 Hf Hs.
+	destruct v_ts2.
+	{ inversion Hs; subst; inversion H2; auto. }
+	inversion Hf; subst.
+	inversion Hs; subst; inversion H4; subst.
+	f_equal.
+	symmetry; eapply valtype_sub_non_bot; eauto.
+	eapply IHv_ts; eauto. econstructor; eauto.
+Qed.
+
 Lemma resulttype_sub_refl : forall ts, ts <ts: ts.
 Proof.
   intros ts.
@@ -794,7 +813,6 @@ Proof.
   }
 Qed.
 
-
 Lemma instrtype_sub_iff_resulttype_sub' : forall ts1 ts2 ts3,
   (ts1 <ts: ts2) <->
   ((ts2 :-> ts3) <ti: (ts1 :-> ts3)).
@@ -848,4 +866,15 @@ Proof.
   eapply (instrtype_sub_compose_le _ _ _ _ _ _ _ _ H) in H0 as [H1 H2].
   2: by inversion H5.
   by exists ts.
+Qed.
+
+Lemma instrtype_sub_add_same: forall ts1 ts2 ts3,
+  (ts1 :-> ts2) <ti: ((ts3 ++ ts1) :-> (ts3 ++ ts2)).
+Proof.
+  move=> ts1 ts2 ts3.
+  eexists ts3, ts3, ts1, ts2.
+  split. auto.
+  split. auto.
+  split. by eapply resulttype_sub_refl.
+  split; by eapply resulttype_sub_refl.
 Qed.

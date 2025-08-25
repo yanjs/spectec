@@ -2749,16 +2749,16 @@ Proof.
 	72: eapply Step_pure__local_tee_preserves; eauto.
 Admitted.
 
-Lemma t_read_preservation: forall v_s v_f v_ais v_ais' v_C v_C' v_t1 t1s t2s,
+Lemma t_read_preservation: forall v_s v_f v_ais v_ais' v_C v_C' t1s t2s,
     Step_read (mk_config (mk_state v_s v_f) v_ais) v_ais' ->
     Store_ok v_s ->
     Module_instance_ok v_s (F_MODULE v_f) v_C ->
-	Forall2 (fun v_t v_val => Val_ok v_s v_val v_t) v_t1 (F_LOCALS v_f) ->
+	Forall2 (fun v_t v_val => Val_ok v_s v_val v_t) (C_LOCALS v_C') (F_LOCALS v_f) ->
 	inst_match v_C v_C' ->
     Admin_instrs_ok v_s v_C' v_ais (t1s :-> t2s) ->
     Admin_instrs_ok v_s v_C' v_ais' (t1s :-> t2s).
 Proof.
-	move => v_s v_f v_ais v_ais' v_C v_C' v_t1 t1s t2s HReduce HST.
+	move => v_s v_f v_ais v_ais' v_C v_C' t1s t2s HReduce HST.
 	move: v_C v_C' t1s t2s.
 	remember (mk_config (mk_state v_s v_f) v_ais) as c1.
 	induction HReduce;
@@ -2938,121 +2938,603 @@ Proof.
 			rewrite H5 in Hforall.
 			auto.
 		}
+		eapply values_pt_iff_Vals_ok in Hforall.
+		assert (v_ts = extr). {
+			eapply Vals_ok_non_bot in Hforall as Hnonbot.
+			eapply (resulttype_sub_non_bot _ _ Hnonbot) in Hsubs; subst.
+			auto.
+		}
+		subst.
 
 		eapply construct_ais_typing_single.
 		2: eapply Hsub0.
 		eapply AI_ok_frame.
 		2: auto.
 
-		inversion HST.
+		(* Thread_ok *)
+		inversion HST; subst.
 		eapply Forall2_nth in H4 as [_ H4].
 		simpl in *.
-		rewrite H1 in H.
-		eapply H4 in H.
-		rewrite H1 in H0; simpl in H0.
-		inversion H. unfold lookup_total in H0.
-		erewrite H0 in H17.
-		inversion H17.
-		rewrite H25 in H19.
-		subst.
-		Search v_C0.
+		eapply H4 with (d' := default_val) in H as Hfiok.
+		unfold lookup_total in H0;
+		erewrite H0 in Hfiok.
+		inversion Hfiok; subst.
 
-		eapply mk_Thread_ok with (v_C := v_C0).
+		eapply mk_Thread_ok with (v_C := ({|
+			C_TYPES := [];
+			C_FUNCS := [];
+			C_GLOBALS := [];
+			C_TABLES := [];
+			C_MEMS := [];
+			C_ELEMS := [];
+			C_DATAS := [];
+			C_LOCALS := extr ++ v_t;
+			C_LABELS := [];
+			C_RETURN := None
+			|} @@ v_C0)).
 		{
-			eapply mk_Frame_ok with (v_t := (List.map typeof v_val) ++ v_t).
-			2: {
+			eapply mk_Frame_ok with (v_t := extr ++ v_t); auto.
+			{
 				rewrite -!size_length.
 				rewrite !size_cat.
 				rewrite !size_map.
 				auto.
 			}
-			2: {
-				eapply Forall2_app.
-				{
-					clear Hsub Hsubs H5.
-					move: v_ts Hforall.
-					induction v_val; eauto.
-					move=> v_ts Hforall.
-					destruct v_ts; inversion Hforall; subst.
-					simpl; econstructor.
-					{
-						rewrite value_pt_iff_Val_ok in H5.
-						inversion H5; subst; unfold typeof; eauto.
-						inversion H1; subst; eauto.
-					}
-					eapply IHv_val; eauto.
-				}
-				{
-					clear H0.
-					induction v_t; eauto.
-					simpl.
-					econstructor.
-					{
-						destruct a; unfold fun_default_, the.
-						all: try econstructor.
-						
-						eapply ok_reftype with (v_r := REF_NULL _) (v_rt := FUNCREF); econstructor.
-						eapply ok_reftype with (v_r := REF_NULL _) (v_rt := EXTERNREF); econstructor.
-						inversion H2; subst; contradiction.
-					}
-					eapply IHv_t; eauto.
-					by inversion H2.
-				}
-			}
-			Search v_a.
+			subst.
+			eapply Forall2_app; auto.
+			clear H22 H0 Hfiok.
+			induction v_t; eauto.
+			simpl.
 			econstructor.
 			{
-				destruct v_s, v_minst.
-				econstructor.
+				destruct a; unfold fun_default_, the.
+				all: try econstructor.
+				
+				eapply ok_reftype with (v_r := REF_NULL _) (v_rt := FUNCREF); econstructor.
+				eapply ok_reftype with (v_r := REF_NULL _) (v_rt := EXTERNREF); econstructor.
+				inversion H2; subst; contradiction.
 			}
-			econstructor.
+			eapply IHv_t; eauto.
+			by inversion H2.
 		}
-		2: {
-			eapply construct_ais_typing_single.
-			2: eapply instrtype_sub_refl.
-			econstructor.
+		subst.
+		eapply construct_ais_typing_single.
+		2: eapply instrtype_sub_refl.
+		econstructor.
+		3: eauto.
+		{
 			eapply instrs_empty_typing; eapply resulttype_sub_refl.
 		}
+		subst.
+
+		eapply AIs_ok_instrs.
+
+		inversion H22; subst.
+		inversion H27; subst.
+		inversion H21; subst.
+		unfold _append, Append_context, _append_context, _append, Append_List_.
+		simpl.
+		unfold _append, Append_context, _append_context, _append, Append_List_ in H23.
+		simpl in H23.
+		rewrite !app_nil_r in H23.
+		rewrite !app_nil_r.
+		assert (injective (ListDef.map [eta LOCAL])) as map_local_inj.
 		{
-			econstructor.
-			Search v_minst.
-			inversion HIT1; subst.
+			eapply inj_map.
+			unfold injective.
+			move=> x1 x2 Hconstructor.
+			by inversion Hconstructor.
 		}
-		Opaque instrtype_sub.
-		destruct v_f; simpl in *;
-		destruct F_MODULE; simpl in *;
-		destruct v_s; simpl in *;
-		destruct v_C; simpl in *;
-		destruct v_C'; simpl in *;
-		unfold inst_match in Him; destruct_all; simpl in *; subst.
+		eapply map_local_inj in H16; subst.
+		auto.
+	}
+	{ (* Ref_func *)
+		typing_inversion HType.
+		simpl in Hai;
+		extract_premise. subst.
+
+		eapply construct_ais_typing_single.
+		2: eapply Hsub.
+		unfold fun_funcaddr in *; subst.
+
+		destruct v_f, v_s, v_C.
 		inversion HIT1; subst.
-		econstructor.
-		eapply Forall2_nth in H23 as [_ H23];
-		eapply (H23 _ _ _ ) in H.
+		simpl in *; subst.
+		simpl in *.
+		eapply Forall2_nth in H13 as [_ H13].
+		eapply (H13 _ default_val default_val) in H.
 		inversion H; subst; simpl in *.
 
-		eapply extaddr_ok_func with (v_minst := v_minst) (v_func := v_func).
-		{ eauto. }
-		simpl in *.
-		rewrite H6.
-		unfold lookup_total in *.
-		by erewrite H0.
+		eapply AI_ok_ref with
+			(v_functype := ListDef.nth (fun_proj_uN_0 32 v_x) C_FUNCS default_val).
 
+		econstructor; simpl in *; eauto.
 	}
-	{
+	{ (* Local_get *)
+		typing_inversion HType.
+		simpl in Hai;
+		extract_premise. subst.
 
+		eapply Forall2_nth in HValOK as [HLength HValOK].
+
+		destruct v_f; destruct v_C'; destruct v_C; destruct v_s;
+		unfold inst_match in Him; destruct_all;
+		subst; simpl in *; subst.
+		eapply HValOK with (d := default_val) (d' := default_val) in H1.
+		inversion HIT1; subst; simpl in *; subst.
+
+		eapply construct_ais_typing_single.
+		2: eapply Hsub.
+		inversion H1; subst; unfold fun_coec_val__admininstr;
+			unfold lookup_total in *.
+		1,2:
+			rewrite -H2;
+			rewrite -H3.
+		{
+			eapply AI_ok_instr with (v_instr := (instr_CONST v_nt v_c_t)).
+			econstructor.
+		}
+		{
+			eapply AI_ok_instr with (v_instr := (instr_VCONST v_vt v_c_t)).
+			destruct v_vt.
+			econstructor.
+		}
+		rewrite -H; rewrite -H2.
+		destruct v_r.
+		{
+			simpl.
+			inversion H3; subst.
+			eapply AI_ok_instr with (v_instr := (instr_REF_NULL v_rt)).
+			constructor.
+		}
+		all:
+			simpl;
+			inversion H3; subst;
+			econstructor; eauto.
 	}
-Admitted. (*
-	- eapply Step_read__local_get_preserves; eauto.
-	- eapply Step_read__global_get_preserves; eauto.
-	- eapply Step_read__load_num_trap_preserves; eauto.
-	- eapply Step_read__load_num_val_preserves; eauto.
-	- eapply Step_read__load_pack_trap_I32_preserves; eauto.
-	- eapply Step_read__load_pack_trap_I64_preserves; eauto.
-	- eapply Step_read__load_pack_val_I32_preserves; eauto.
-	- eapply Step_read__load_pack_val_I64_preserves; eauto.
-	- eapply Step_read__memory_size_preserves; eauto.
-Qed. *)
+	{ (* Global_get *)
+		typing_inversion HType.
+		simpl in Hai;
+		extract_premise. subst.
+
+		eapply construct_ais_typing_single.
+		2: eapply Hsub.
+
+		destruct v_f; destruct v_C'; destruct v_C; destruct v_s;
+		unfold inst_match in Him; destruct_all;
+		subst; simpl in *; subst.
+		inversion HIT1; subst; simpl in *; subst.
+
+		unfold fun_global, lookup_total in *.
+		eapply Forall2_nth in H21 as [_ Hglobal].
+		rewrite H20 in Hglobal.
+		eapply Hglobal with (d := default_val) (d' := default_val) in H1 as Hextglobal.
+
+		inversion Hextglobal; subst; unfold lookup_total in *; simpl in *.
+		rewrite H0 in H2; simpl in *.
+		rewrite H5; simpl in *.
+		inversion H2; subst; clear H2.
+
+		(* Failed to check if v_val has proper type. *)
+		admit.
+	}
+	{ (* Table_get *)
+		typing_inversion HType.
+		typing_inversion H2.
+		simpl in Hai;
+		extract_premise; subst.
+		typing_inversion H1;
+		simpl in Hai;
+		extract_premise; subst.
+		eapply (instrtype_sub_compose0 _ _ _ _ _ _ Hsub0) in Hsub.
+
+		eapply construct_ais_typing_single.
+		2: eapply Hsub.
+
+		destruct v_f; destruct v_C'; destruct v_C; destruct v_s;
+		unfold inst_match in Him; destruct_all;
+		subst; simpl in *; subst.
+		inversion HIT1; subst; simpl in *; subst.
+		unfold fun_table in *.
+
+		rewrite -H15 in H0.
+		eapply Forall2_nth in H16 as [_ H16].
+		eapply H16 with (d := default_val) (d' := default_val) in H0.
+
+		inversion H0; unfold lookup_total in *; subst; simpl in *.
+		rewrite H6; simpl.
+		rewrite H6 in H; simpl in H.
+		rewrite H3 in H7.
+
+		destruct v_tt'.
+		admit.
+	}
+	{ (* Table_size *)
+		typing_inversion HType.
+		simpl in Hai;
+		extract_premise; subst.
+		
+		eapply construct_ais_typing_single.
+		2: eapply Hsub.
+		
+		eapply AI_ok_instr with (v_instr := (instr_CONST I32 (mk_uN (fun_sizenn INN_I32)
+		(Datatypes.length (TAB_REFS (fun_table (mk_state v_s v_f) v_x)))))).
+		econstructor.
+	}
+	{ (* Table_fill *)
+		typing_inversion HType.
+
+		simpl in Hai; extract_premise.
+
+		typing_inversion H4.
+		eapply value_principal_typing_iff_ai in Hai.
+		eapply value_principal_typing_inversion in Hai
+		as [v_t [He1 [He2 [Hve Hnb]]]]; subst.
+
+		rewrite -(cats0 [VALTYPE_I32]) in Hsub.
+		eapply (instrtype_sub_compose2 _ _ _ _ _ _ _ Hsub) in Hsub0.
+		simpl in Hsub0.
+		
+		typing_inversion H3.
+		simpl in Hai; extract_premise.
+		rewrite -(cats0 [VALTYPE_I32; v_t]) in Hsub0.
+		eapply (instrtype_sub_compose2 _ _ _ _ _ _ _ Hsub0) in Hsub1.
+		simpl in Hsub1.
+
+		typing_inversion H2.
+		simpl in Hai; extract_premise.
+		eapply (instrtype_sub_compose_eq _ _ _ _ _ _ _ Hsub1) in Hsub2
+		as [Hsub2 Hsubs].
+		2: auto.
+
+		eapply ais_empty_typing.
+		by eapply instrtype_sub_empty.
+	}
+	{ (* Table_fill succ *)
+		typing_inversion HType.
+
+		simpl in Hai; extract_premise.
+		pose proof H4 as H4_0.
+
+		typing_inversion H4.
+		eapply value_principal_typing_iff_ai in Hai.
+		pose proof Hai as Hai_0.
+		eapply value_principal_typing_inversion in Hai
+		as [v_t [He1 [He2 [Hve Hnb]]]]; subst.
+
+		rewrite -(cats0 [VALTYPE_I32]) in Hsub.
+		pose proof Hsub0 as Hsub0_0.
+		eapply (instrtype_sub_compose2 _ _ _ _ _ _ _ Hsub) in Hsub0.
+		simpl in Hsub0.
+		
+		typing_inversion H3.
+		simpl in Hai; extract_premise.
+		rewrite -(cats0 [VALTYPE_I32; v_t]) in Hsub0.
+		pose proof Hsub1 as Hsub1_0.
+		eapply (instrtype_sub_compose2 _ _ _ _ _ _ _ Hsub0) in Hsub1.
+		simpl in Hsub1.
+		rewrite cats0 in Hsub0.
+
+		typing_inversion H2.
+		simpl in Hai; extract_premise.
+		pose proof Hsub2 as Hsub2_0.
+		eapply (instrtype_sub_compose_eq _ _ _ _ _ _ _ Hsub1) in Hsub2
+		as [Hsub2 Hsubs].
+		2: auto.
+
+		unfold_instrtype_sub Hsub0.
+		assert ([VALTYPE_I32; v_t] = ts12_sup).
+		{
+			eapply resulttype_sub_non_bot.
+			constructor. discriminate.
+			constructor. auto.
+			constructor. auto.
+		}
+		eapply resulttype_sub_empty in Hsub4.
+		subst.
+
+		rewrite !cats0 in Hsub.
+
+		pose proof Hsub as Hsub_0.
+		unfold_instrtype_sub Hsub.
+		eapply resulttype_sub_empty in Hsub4; subst.
+		rewrite cats0 in Hsub_0.
+
+		assert ([AI_CONST I32 v_i; v_val: admininstr; AI_TABLE_SET v_x;
+			AI_CONST I32 (mk_uN (fun_sizenn INN_I32) (fun_proj_uN_0 32 v_i + 1)); v_val: admininstr;
+			AI_CONST I32 (mk_uN (fun_sizenn INN_I32) (v_n - 1)); AI_TABLE_FILL v_x] =
+			[AI_CONST I32 v_i; v_val: admininstr; AI_TABLE_SET v_x] ++
+			[AI_CONST I32 (mk_uN (fun_sizenn INN_I32) (fun_proj_uN_0 32 v_i + 1)); v_val: admininstr;
+			AI_CONST I32 (mk_uN (fun_sizenn INN_I32) (v_n - 1)); AI_TABLE_FILL v_x]) as Happ. { auto. }
+
+		rewrite Happ.
+		rewrite !cats0.
+		eapply construct_ais_compose.
+		{
+			eapply construct_ais_compose with
+				(v_ais1 := [AI_CONST I32 v_i; v_val: admininstr]).
+			{
+				eapply construct_ais_compose with
+					(v_ais1 := [AI_CONST I32 v_i]).
+				{
+					eapply construct_ais_typing_single.
+					2: eapply Hsub_0.
+					eapply AI_ok_instr with (v_instr := (instr_CONST I32 v_i)).
+					econstructor.
+				}
+				eapply H4_0.
+			}
+			eapply construct_ais_typing_single.
+			eapply AI_ok_instr with (v_instr := (instr_TABLE_SET v_x)).
+			econstructor. eauto. eauto.
+			{
+				eapply instrtype_sub_trans with (tf2 := ([VALTYPE_I32; v_t] :-> [])).
+				{
+					eapply instrtype_sub_iff_resulttype_sub'.
+					eapply resulttype_sub_app' with
+					(ts1_sub := [VALTYPE_I32; v_t])
+					(ts1 := [VALTYPE_I32; extr: valtype])
+					in Hsubs as [Hsubs1 Hsubs2]; auto.
+				}
+				by eapply instrtype_sub_add_same.
+			}
+		}
+		eapply construct_ais_compose with
+			(v_ais1 := [AI_CONST I32 (mk_uN (fun_sizenn INN_I32) (fun_proj_uN_0 32 v_i + 1)); v_val: admininstr;
+		AI_CONST I32 (mk_uN (fun_sizenn INN_I32) (v_n - 1))]).
+		{
+			eapply construct_ais_compose with
+			(v_ais1 := [AI_CONST I32 (mk_uN (fun_sizenn INN_I32) (fun_proj_uN_0 32 v_i + 1)); v_val: admininstr]).
+			{
+				eapply construct_ais_compose with
+			(v_ais1 := [AI_CONST I32 (mk_uN (fun_sizenn INN_I32) (fun_proj_uN_0 32 v_i + 1))]).
+				{
+					eapply construct_ais_typing_single.
+					eapply AI_ok_instr with (v_instr := (instr_CONST I32
+						(mk_uN (fun_sizenn INN_I32) (fun_proj_uN_0 32 v_i + 1))
+					)).
+					econstructor.
+					by eapply instrtype_sub_add_same.
+				}
+				eapply construct_ais_typing_single.
+				eapply construct_ai_val. eauto. eapply instrtype_sub_refl.
+
+				rewrite -(cats0 (ts_sub ++ [VALTYPE_I32])).
+				by eapply instrtype_sub_add_same.
+			}
+			eapply construct_ais_typing_single.
+			eapply AI_ok_instr with (v_instr := (instr_CONST I32
+				(mk_uN (fun_sizenn INN_I32) (v_n - 1))
+			)).
+			econstructor.
+			rewrite -(cats0 ((ts_sub ++ [VALTYPE_I32]) ++ [v_t])).
+			by eapply instrtype_sub_add_same.
+		}
+		eapply construct_ais_typing_single.
+		eapply AI_ok_instr with (v_instr := (instr_TABLE_FILL v_x)).
+		econstructor; eauto.
+
+		eapply instrtype_sub_trans.
+		eapply Hsub2_0.
+
+		eapply instrtype_sub_iff_resulttype_sub'.
+		unfold_instrtype_sub Hsub1_0; eapply resulttype_sub_empty in Hsub4; subst.
+
+		eapply resulttype_sub_app.
+		2: eapply Hsub7.
+		rewrite -catA; simpl.
+		rewrite H2.
+		by rewrite cats0.
+	}
+	{ (* Table_copy *)
+		typing_inversion HType.
+		simpl in Hai; extract_premise.
+
+		typing_inversion H4.
+		simpl in Hai; extract_premise.
+		typing_inversion H3.
+		simpl in Hai; extract_premise.
+		typing_inversion H2.
+		simpl in Hai; extract_premise.
+
+		rewrite -(cats0 [VALTYPE_I32]) in Hsub.
+		eapply (instrtype_sub_compose2 _ _ _ _ _ _ _ Hsub) in Hsub0.
+		simpl in Hsub0.
+
+		rewrite -(cats0 [VALTYPE_I32; VALTYPE_I32]) in Hsub0.
+		eapply (instrtype_sub_compose2 _ _ _ _ _ _ _ Hsub0) in Hsub1.
+		simpl in Hsub1.
+
+		eapply (instrtype_sub_compose0 _ _ _ _ _ _ Hsub1) in Hsub2.
+
+		eapply ais_empty_typing.
+		by eapply instrtype_sub_empty.
+	}
+	{ (* Table_copy le *)
+		(* Too boring and complicated. Similar to Table_fill succ *)
+		admit.
+	}
+	{ (* Table_copy gt *)
+		(* Too boring and complicated. Similar to Table_fill succ *)
+		admit.
+	}
+	{ (* Table_init zero *)
+		typing_inversion HType.
+		simpl in Hai; extract_premise.
+
+		typing_inversion H4.
+		simpl in Hai; extract_premise.
+		typing_inversion H3.
+		simpl in Hai; extract_premise.
+		typing_inversion H2.
+		simpl in Hai; extract_premise.
+
+		rewrite -(cats0 [VALTYPE_I32]) in Hsub.
+		eapply (instrtype_sub_compose2 _ _ _ _ _ _ _ Hsub) in Hsub0.
+		simpl in Hsub0.
+
+		rewrite -(cats0 [VALTYPE_I32; VALTYPE_I32]) in Hsub0.
+		eapply (instrtype_sub_compose2 _ _ _ _ _ _ _ Hsub0) in Hsub1.
+		simpl in Hsub1.
+
+		eapply (instrtype_sub_compose0 _ _ _ _ _ _ Hsub1) in Hsub2.
+
+		eapply ais_empty_typing.
+		by eapply instrtype_sub_empty.
+	}
+	{ (* Table_init succ *)
+		(* Too boring and complicated. Similar to Table_fill succ *)
+		admit.
+	}
+	{ (* Load None *)
+		typing_inversion HType.
+		typing_inversion H1.
+		simpl in Hai; extract_premise.
+		typing_inversion H2.
+		destruct v_nt;
+		simpl in Hai; extract_premise.
+		all: eapply (instrtype_sub_compose0 _ _ _ _ _ _ Hsub) in Hsub0.
+		
+		all: eapply construct_ais_typing_single; eauto.
+		all: eapply AI_ok_instr with (v_instr := (instr_CONST _ v_c)).
+		all: econstructor.
+	}
+	{ (* Load INN_I32 *)
+		typing_inversion HType.
+		typing_inversion H1.
+		simpl in Hai; extract_premise.
+		typing_inversion H2.
+		simpl in Hai; extract_premise.
+		eapply (instrtype_sub_compose0 _ _ _ _ _ _ Hsub) in Hsub0.
+		
+		eapply construct_ais_typing_single; eauto.
+		eapply AI_ok_instr with (v_instr := (instr_CONST INN_I32
+			(fun_extend__ v_n (the (fun_size INN_I32)) v_sx v_c))).
+		econstructor.
+	}
+	{ (* Load INN_I64 *)
+		typing_inversion HType.
+		typing_inversion H1.
+		simpl in Hai; extract_premise.
+		typing_inversion H2.
+		simpl in Hai; extract_premise.
+		eapply (instrtype_sub_compose0 _ _ _ _ _ _ Hsub) in Hsub0.
+		
+		eapply construct_ais_typing_single; eauto.
+		eapply AI_ok_instr with (v_instr := (instr_CONST INN_I64
+			(fun_extend__ v_n (the (fun_size INN_I64)) v_sx v_c))).
+		econstructor.
+	}
+	(* SIMD instructions *) 
+	admit.	admit.	admit.	admit.	admit.
+	admit.	admit.	admit.	admit.	admit.
+	admit.	admit.	admit.	admit.
+	{ (* Memory_size *)
+		typing_inversion HType.
+		simpl in Hai; extract_premise.
+
+		eapply construct_ais_typing_single.
+		2: eapply Hsub.
+		eapply AI_ok_instr with
+			(v_instr := (instr_CONST I32 (mk_uN (fun_sizenn INN_I32) v_n))).
+		econstructor.
+	}
+	{ (* Memory_fill *)
+		typing_inversion HType.
+		simpl in Hai; extract_premise.
+
+		typing_inversion H4.
+		eapply ai_val_principal_typing_inversion in Hai; extract_premise.
+		subst.
+		typing_inversion H3.
+		simpl in Hai; extract_premise.
+		typing_inversion H2.
+		simpl in Hai; extract_premise.
+
+		rewrite -(cats0 [VALTYPE_I32]) in Hsub.
+		eapply (instrtype_sub_compose2 _ _ _ _ _ _ _ Hsub) in Hsub0.
+		simpl in Hsub0.
+
+		rewrite -(cats0 [VALTYPE_I32; extr]) in Hsub0.
+		eapply (instrtype_sub_compose2 _ _ _ _ _ _ _ Hsub0) in Hsub1.
+		simpl in Hsub1.
+
+		eapply (instrtype_sub_compose_eq _ _ _ _ _ _ _ Hsub1) in Hsub2
+			as [Hsub2 Hsubs].
+		2: eauto.
+
+		eapply ais_empty_typing.
+		by eapply instrtype_sub_empty.
+	}
+	{ (* Memory_fill succ *)
+		(* Too boring and complicated. Similar to Table_fill succ *)
+		admit.
+	}
+	{ (* Memory_copy *)
+		typing_inversion HType.
+		simpl in Hai; extract_premise.
+
+		typing_inversion H4.
+		simpl in Hai; extract_premise.
+		typing_inversion H3.
+		simpl in Hai; extract_premise.
+		typing_inversion H2.
+		simpl in Hai; extract_premise.
+
+		rewrite -(cats0 [VALTYPE_I32]) in Hsub.
+		eapply (instrtype_sub_compose2 _ _ _ _ _ _ _ Hsub) in Hsub0.
+		simpl in Hsub0.
+
+		rewrite -(cats0 [VALTYPE_I32; VALTYPE_I32]) in Hsub0.
+		eapply (instrtype_sub_compose2 _ _ _ _ _ _ _ Hsub0) in Hsub1.
+		simpl in Hsub1.
+
+		eapply (instrtype_sub_compose_eq _ _ _ _ _ _ _ Hsub1) in Hsub2
+			as [Hsub2 Hsubs].
+		2: eauto.
+
+		eapply ais_empty_typing.
+		by eapply instrtype_sub_empty.
+	}
+	{ (* Memory_copy le *)
+		(* Too boring and complicated. Similar to Table_fill succ *)
+		admit.
+	}
+	{ (* Memory_copy gt *)
+		(* Too boring and complicated. Similar to Table_fill succ *)
+		admit.
+	}
+	{ (* Memory_init 0 *)
+		typing_inversion HType.
+		simpl in Hai; extract_premise.
+
+		typing_inversion H4.
+		simpl in Hai; extract_premise.
+		typing_inversion H3.
+		simpl in Hai; extract_premise.
+		typing_inversion H2.
+		simpl in Hai; extract_premise.
+
+		rewrite -(cats0 [VALTYPE_I32]) in Hsub.
+		eapply (instrtype_sub_compose2 _ _ _ _ _ _ _ Hsub) in Hsub0.
+		simpl in Hsub0.
+
+		rewrite -(cats0 [VALTYPE_I32; VALTYPE_I32]) in Hsub0.
+		eapply (instrtype_sub_compose2 _ _ _ _ _ _ _ Hsub0) in Hsub1.
+		simpl in Hsub1.
+
+		eapply (instrtype_sub_compose_eq _ _ _ _ _ _ _ Hsub1) in Hsub2
+			as [Hsub2 Hsubs].
+		2: eauto.
+
+		eapply ais_empty_typing.
+		by eapply instrtype_sub_empty.
+	}
+	{ (* Memory_init succ *)
+		(* Too boring and complicated. Similar to Table_fill succ *)
+		admit.
+	}
+Admitted.
 
 Lemma t_preservation_type: forall v_s v_f v_ais v_s' v_f' v_ais' v_C v_t1 t1s t2s lab ret,
     Step (mk_config (mk_state v_s v_f) v_ais) (mk_config (mk_state v_s' v_f') v_ais') ->
