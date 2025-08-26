@@ -81,6 +81,13 @@ Ltac invert_ais_vals_typing H :=
   eapply ais_vals_typing_inversion in H
     as [t [Hsub HValsok]].
 
+Ltac invert_ais_single_ref_typing H :=
+  let t := fresh "t" in
+  let HValsok := fresh "HRefok" in
+  let Hsub := fresh "Hsub" in
+  eapply ais_single_ref_typing_inversion in H
+    as [t [Hsub HRefok]].
+
 Ltac invert_ais_typing :=
   destruct_functypes;
   repeat match goal with
@@ -94,6 +101,9 @@ Ltac invert_ais_typing :=
   | H: Admin_instrs_ok _ _ [fun_coec_val__admininstr _] ( _ :-> _ ) |- _ =>
     invert_ais_single_val_typing H;
 	idtac "invert_single_val"
+  | H: Admin_instrs_ok _ _ [fun_coec_ref__admininstr _] ( _ :-> _ ) |- _ =>
+    invert_ais_single_ref_typing H;
+	idtac "invert_single_ref"
   | H: Admin_instrs_ok _ _ (map fun_coec_val__admininstr _) ( _ :-> _ ) |- _ =>
     invert_ais_vals_typing H;
 	idtac "invert_vals"

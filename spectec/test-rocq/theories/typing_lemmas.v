@@ -1013,6 +1013,23 @@ Proof.
 	}
 Qed.
 
+Lemma ais_single_ref_typing_inversion: forall v_S v_C (v_ref: wasm.ref) ts1 ts2,
+  Admin_instrs_ok v_S v_C [v_ref: admininstr] (ts1 :-> ts2) ->
+  exists (t: reftype), 
+	(([] :-> [t: valtype]) <ti: (ts1 :-> ts2)) /\
+   	Ref_ok v_S v_ref t.
+Proof.
+	move => v_S v_C v_ref ts1 ts2 HType.
+	eapply ais_single_typing_inversion in HType as [t1 [t2 [Hai Hsub]]].
+	destruct v_ref; unfold ai_principal_typing, fun_coec_ref__admininstr in Hai.
+	2: destruct Hai as [v_ft [Hai Heok]].
+	all: inversion Hai; subst.
+	- exists v_reftype. split; auto. by constructor.
+	- exists FUNCREF. split; auto. econstructor; eauto.
+	- exists EXTERNREF. split; auto. econstructor; eauto.
+Qed.
+
+
 Lemma ais_single_val_typing_inversion: forall v_S v_C (v_val: wasm.val) ts1 ts2,
   Admin_instrs_ok v_S v_C [v_val: admininstr] (ts1 :-> ts2) ->
   exists t, 
@@ -1422,6 +1439,14 @@ Proof.
 		eapply H0.
 		by eapply ais_single_typing_inversion'.
 	}
+Qed.
+
+Lemma construct_ai_const_I32 : forall v_S v_C v_num,
+	Admin_instr_ok v_S v_C (AI_CONST I32 v_num) ([] :-> [VALTYPE_I32]).
+Proof.
+	move => v_S v_C v_num.
+	eapply AI_ok_instr with (v_instr := instr_CONST _ _).
+	econstructor.
 Qed.
 
 Lemma construct_ai_val : forall v_S v_C (v_val: wasm.val) v_t,
