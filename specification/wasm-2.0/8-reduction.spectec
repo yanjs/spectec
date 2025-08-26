@@ -177,8 +177,8 @@ rule Step/ctxt-label:
   -- Step: z; admininstr* ~> z'; admininstr'*
 
 rule Step/ctxt-frame:
-  s; f; (FRAME_ n `{f'} admininstr*)  ~>  s'; f; (FRAME_ n `{f'} admininstr'*)
-  -- Step: s; f'; admininstr* ~> s'; f'; admininstr'*
+  s; f; (FRAME_ n `{f'} admininstr*)  ~>  s'; f; (FRAME_ n `{f''} admininstr'*)
+  -- Step: s; f'; admininstr* ~> s'; f''; admininstr'*
 
 
 ;; Numeric instructions

@@ -1352,6 +1352,20 @@ Proof.
 	- eauto.
 Qed.
 
+Lemma construct_ais_subtyping : forall v_S v_C v_ais ts1 ts2 ts1' ts2',
+	Admin_instrs_ok v_S v_C v_ais (ts1 :-> ts2) ->
+	((ts1 :-> ts2) <ti: (ts1' :-> ts2')) ->
+	Admin_instrs_ok v_S v_C v_ais (ts1' :-> ts2').
+Proof.
+	move=> v_S v_C v_ais ts1 ts2 ts1' ts2' Hai Hsub.
+	unfold_instrtype_sub Hsub; subst.
+	eapply (AIs_ok_sub _ _).
+	- eapply AIs_ok_frame. by eapply Hai.
+	- eapply resulttype_sub_app; eauto.
+	- eapply resulttype_sub_app; eauto.
+	  by eapply resulttype_sub_refl.
+Qed.
+
 Ltac unfold_principal_typing H :=
   unfold instr_principal_typing in H;
   try (unfold fun_coec_instr__admininstr in H);
@@ -1763,6 +1777,17 @@ Ltac resolve_inst_match :=
 	simpl;
 	repeat eexists; auto.
 
+Lemma Val_ok_non_bot : forall v_S v_val v_t,
+	Val_ok v_S v_val v_t ->
+	v_t <> VALTYPE_BOT.
+Proof.
+	move=> v_S v_val v_t HValok.
+	inversion HValok; subst.
+	- destruct v_nt; discriminate.
+	- destruct v_vt; discriminate.
+	- destruct v_rt; discriminate.
+Qed.
+
 Lemma Vals_ok_non_bot : forall v_S v_val v_ts,
 	Forall2	(λ (v_t0 : valtype) (v_val0 : wasm.val),
 		Val_ok v_S v_val0 v_t0) v_ts v_val ->
@@ -1784,10 +1809,7 @@ Proof.
 		}
 		inversion H; subst; econstructor.
 		2: by eapply IHv_val.
-		all: inversion H3; subst.
-		by destruct v_nt.
-		by destruct v_vt.
-		by destruct v_rt.
+		eapply Val_ok_non_bot; eauto.
 	}
 Qed.
 

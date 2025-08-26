@@ -668,6 +668,22 @@ Proof.
   eapply instrtype_sub_compose_le with (ts3 := []); eauto.
 Qed.
 
+Lemma instrtype_sub_compose_le' : forall ts1 ts2 ts3 ts4 txs tys tzs,
+  ((ts1 :-> ts2) <ti: (txs :-> tys)) ->
+  ((ts3 :-> ts4) <ti: (tys :-> tzs)) ->
+  (size ts2 <= size ts3) ->
+  ((take (size ts3 - size ts2) ts3 ++ ts1) :-> ts4) <ti: (txs :-> tzs) /\
+    ((ts2 <ts: drop (size ts3 - size ts2) ts3)).
+Proof.
+  move=> ts1 ts2 ts3 ts4 txs tys tzs H1 H2 Hsize.
+  rewrite -(cat_take_drop (size ts3 - size ts2) ts3) in H2.
+  eapply (instrtype_sub_compose_le _ _ _ _ _ _ _ _ H1) in H2 as [H3 Hs].
+  split; auto.
+  rewrite size_drop.
+  eapply subKn in Hsize.
+  auto.
+Qed.
+
 Lemma instrtype_sub_compose_ge' : forall ts1 ts2 ts3 ts4 txs tys tzs,
   ((ts1 :-> ts2) <ti: (txs :-> tys)) ->
   ((ts3 :-> ts4) <ti: (tys :-> tzs)) ->
@@ -877,4 +893,15 @@ Proof.
   split. auto.
   split. by eapply resulttype_sub_refl.
   split; by eapply resulttype_sub_refl.
+Qed.
+
+Lemma resulttype_sub_cons: forall t t' ts ts',
+  (t :: ts) <ts: (t' :: ts') ->
+  (t <tv: t') /\ (ts <ts: ts').
+Proof.
+  move => t t' ts ts' Hs.
+  inversion Hs; subst.
+  inversion H2; subst.
+  split. auto.
+  constructor; auto.
 Qed.

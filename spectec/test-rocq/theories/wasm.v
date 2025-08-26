@@ -6098,9 +6098,9 @@ Inductive Step: config -> config -> Prop :=
 	| step_ctxt_label : forall (v_z : state) (v_n : n) (v_instr : (list instr)) (v_admininstr : (list admininstr)) (v_z' : state) (v_admininstr' : (list admininstr)), 
 		(Step (mk_config v_z v_admininstr) (mk_config v_z' v_admininstr')) ->
 		Step (mk_config v_z [(AI_LABEL_ v_n v_instr v_admininstr)]) (mk_config v_z' [(AI_LABEL_ v_n v_instr v_admininstr')])
-	| step_ctxt_frame : forall (v_s : store) (v_f : frame) (v_n : n) (v_f' : frame) (v_admininstr : (list admininstr)) (v_s' : store) (v_admininstr' : (list admininstr)), 
-		(Step (mk_config (mk_state v_s v_f') v_admininstr) (mk_config (mk_state v_s' v_f') v_admininstr')) ->
-		Step (mk_config (mk_state v_s v_f) [(AI_FRAME_ v_n v_f' v_admininstr)]) (mk_config (mk_state v_s' v_f) [(AI_FRAME_ v_n v_f' v_admininstr')])
+	| step_ctxt_frame : forall (v_s : store) (v_f : frame) (v_n : n) (v_f' : frame) (v_admininstr : (list admininstr)) (v_s' : store) (v_f'' : frame) (v_admininstr' : (list admininstr)), 
+		(Step (mk_config (mk_state v_s v_f') v_admininstr) (mk_config (mk_state v_s' v_f'') v_admininstr')) ->
+		Step (mk_config (mk_state v_s v_f) [(AI_FRAME_ v_n v_f' v_admininstr)]) (mk_config (mk_state v_s' v_f) [(AI_FRAME_ v_n v_f'' v_admininstr')])
 	| step_local_set : forall (v_z : state) (v_val : val) (v_x : idx), Step (mk_config v_z [(v_val : admininstr); (AI_LOCAL_SET v_x)]) (mk_config (fun_with_local v_z v_x v_val) [])
 	| step_global_set : forall (v_z : state) (v_val : val) (v_x : idx), Step (mk_config v_z [(v_val : admininstr); (AI_GLOBAL_SET v_x)]) (mk_config (fun_with_global v_z v_x v_val) [])
 	| step_table_set_trap : forall (v_z : state) (v_i : (uN 32)) (v_ref : ref) (v_x : idx), 
