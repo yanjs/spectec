@@ -24,6 +24,41 @@ Proof.
 	move => s i C HMInst. inversion HMInst => //=.
 Qed.
 
+Lemma lookup_global: forall v_a v_C v_C' v_mut v_vt v_S v_minst,
+	(v_a < (List.length (C_GLOBALS v_C'))) ->
+	lookup_total (C_GLOBALS v_C') v_a = mk_globaltype v_mut v_vt ->
+	Module_instance_ok v_S v_minst v_C ->
+	inst_match v_C v_C' ->
+	Store_ok v_S ->
+	(Val_ok v_S (GLOB_VALUE (lookup_total 
+		(GLOBALS v_S) (lookup_total (MODULE_GLOBALS v_minst) v_a))) (v_vt : valtype)).
+Proof.
+	move => v_a v_C v_C' v_mut v_vt v_S v_minst HLength HLookup HMIT Him HST.
+	inversion HST; subst.
+	inversion HMIT; subst.
+	simpl in *; rewrite /lookup_total in HLookup.
+	clear - HLength HLookup Him H3 H18.
+	inversion Him; destruct_all; simpl in *; subst.
+
+	eapply Forall2_nth in H18 as [Hl Hforall].
+	rewrite -Hl in HLength.
+	eapply Hforall with (d := default_val) (d' := default_val)
+		in HLength as Heok.
+	inversion Heok; subst; simpl in *.
+	erewrite HLookup in H0; inversion H0; subst; clear H0.
+
+	eapply Forall2_nth in H3 as [Hl2 Hforall2].
+	eapply Hforall2 with (d := default_val) (d' := default_val)
+		in H2 as Hgok.
+	inversion Hgok; subst; simpl in *; rewrite /lookup_total in H4.
+	simpl in H4.
+	erewrite H4 in H.
+	rewrite H0 in H.
+	inversion H; subst; clear H.
+
+	by rewrite /lookup_total H4 => //.
+Qed.
+
 Lemma bt_inversion : forall v_S v_C v_C' r_v_f (v_bt: blocktype) ts1 ts2 bt1 bt2,
 	Module_instance_ok v_S (F_MODULE r_v_f) v_C ->
 	Blocktype_ok v_C' v_bt (ts1 :-> ts2) ->
@@ -45,10 +80,10 @@ Proof.
 	unfold fun_type.
 	inversion Hf; subst;
 	inversion HB; subst.
-	rewrite -H in H16; simpl in H16.
+	rewrite -H in H17; simpl in H17.
 	destruct_all; subst.
-	rewrite H21 in H16.
-	by inversion H16.
+	rewrite H22 in H17.
+	by inversion H17.
 Qed.
 
 Lemma tc_func_reference2: forall v_S v_C v_minst idx tf v_type,
@@ -139,39 +174,62 @@ Proof.
 	- apply IHm.
 Qed.
 
-Lemma global_extension_same: forall s g v_globaltype,
-	Forall2
-	(fun (v_globalinst : globalinst) (v_globaltype : globaltype) => Global_instance_ok s v_globalinst v_globaltype) g v_globaltype ->
+Lemma global_extension_same: forall g,
 	Forall2 (fun v s => Global_extension v s) g g.
 Proof.
-	move => s g v_globaltype HGlobalInstOk.
-	generalize dependent v_globaltype.
-	induction g => //; move => v_globaltype HGlobalInstOk.
-	apply Forall2_cons_iff. split.
-	-
-		apply Forall2_length in HGlobalInstOk as ?. 
-		destruct v_globaltype => //=.
-		inversion HGlobalInstOk.
-		inversion H3; decomp; subst.
-		constructor. by right.
-	- destruct v_globaltype; inversion HGlobalInstOk. eapply IHg; eauto. 
+	move => g.
+	induction g.
+	- econstructor.
+	- econstructor.
+	  + destruct a.
+	    destruct GLOB_TYPE.
+	  	econstructor.
+		by right.
+	  + by eapply IHg.
+Qed.
+
+Lemma elem_extension_same: forall g,
+	Forall2 (fun v s => Elem_extension v s) g g.
+Proof.
+	move => g.
+	induction g.
+	- econstructor.
+	- econstructor.
+	  + destruct a.
+	    econstructor.
+		by left.
+	  + by eapply IHg.
+Qed.
+
+
+Lemma data_extension_same: forall g,
+	Forall2 (fun v s => Data_extension v s) g g.
+Proof.
+	move => g.
+	induction g.
+	- econstructor.
+	- econstructor.
+	  + destruct a.
+	    econstructor.
+		by left.
+	  + by eapply IHg.
 Qed.
 
 Lemma store_extension_same: forall s,
-	Store_ok s ->
     Store_extension s s.
 Proof.
-  move => s HST. 
-  inversion HST; decomp.
-Admitted.
-(*
-  apply (mk_Store_extension s s (FUNCS s) (TABLES s) (MEMS s) (GLOBALS s) (FUNCS s) [] (TABLES s) [] (MEMS s) [] (GLOBALS s) []).
-  repeat (split => //; try rewrite -> app_nil_r).
+  move => s.
+  eapply (mk_Store_extension s s
+  (FUNCS s) (TABLES s) (MEMS s) (GLOBALS s) (ELEMS s) (DATAS s)
+  (FUNCS s) [] (TABLES s) [] (MEMS s) [] (GLOBALS s) [] (ELEMS s) [] (DATAS s) [] ); eauto;
+  repeat (try by rewrite -> cats0).
   + by apply func_extension_same.
   + by apply table_extension_same.
   + by apply mem_extension_same.
-  + subst. eapply global_extension_same; eauto.
-Qed. *)
+  + by apply global_extension_same.
+  + by apply elem_extension_same.
+  + by apply data_extension_same.
+Qed.
 
 Lemma config_same: forall s f ais s' f' ais',
 	(mk_config (mk_state s f) ais) = (mk_config (mk_state s' f') ais') ->
@@ -189,22 +247,39 @@ Proof.
 	f_equal => //=. f_equal => //=.
 Qed.
 
-(*
-Lemma Forall2_global: forall v_S v_globaltype v_idx v_valtype v_val_0 v_val_,
+
+Lemma Forall2_global: forall v_g v_S v_globaltype v_idx v_valtype v_val_0 v_val_1,
+	v_g = (GLOBALS v_S) ->
 	Forall2
-	(fun (v_globalinst : globalinst) (v_globaltype : globaltype) => Global_instance_ok v_S v_globalinst v_globaltype) (GLOBALS v_S) v_globaltype -> 
-	(v_idx < length (GLOBALS v_S))%coq_nat ->
-	lookup_total (GLOBALS v_S) v_idx = 
-	{| GLOB_TYPE := mk_globaltype (Some MUT) v_valtype; VALUE := VAL_CONST v_valtype v_val_0 |} ->
-	Forall2 (fun v s => Global_extension v s) (GLOBALS v_S) (list_update_func (GLOBALS v_S) v_idx 
-		(fun g => g <| VALUE := (VAL_CONST v_valtype v_val_) |> )).
+	(fun (v_globalinst : globalinst) (v_globaltype : globaltype) => Global_instance_ok v_S v_globalinst v_globaltype) v_g v_globaltype -> 
+	(v_idx < length v_g) ->
+	lookup_total v_g v_idx = 
+	{| GLOB_TYPE := mk_globaltype (Some MUT) v_valtype; GLOB_VALUE := v_val_0 |} ->
+	Forall2 (fun v s => Global_extension v s) v_g (list_update_func v_g v_idx (fun g => g <| GLOB_VALUE := v_val_1 |> )).
 Admitted.
-(* Proof.
-	move => v_S v_globaltype v_idx v_val0 v_valtype v_val_.
-	destruct v_S as [funcs globals tables mems]; simpl.
+(*
+Proof.
+	move => v_S v_globaltype v_idx v_valtype v_val.
+	destruct v_S; simpl.
 	move: v_idx v_globaltype.
-	induction globals; move => v_idx v_globaltype HGlobalInstOk H H2 => //=.
+	induction GLOBALS; move => v_idx v_globaltype HGlobalInstOk H H2 => //=.
 	destruct v_idx => //=.
+	{
+		eapply Forall2_cons_iff.
+		unfold lookup_total in H2; simpl in H2; subst.
+		split.
+		- unfold set. simpl. econstructor. auto.
+		- eapply global_extension_same.
+	}
+	{
+		eapply Forall2_cons.
+		- destruct a, GLOB_TYPE, GLOB_VALUE; econstructor; eauto.
+		- destruct v_globaltype.
+		  + inversion HGlobalInstOk.
+		  + inversion HGlobalInstOk.
+		  	eapply IHGLOBALS; eauto.
+		  destruct 
+	}
 	
 	apply Forall2_cons_iff. unfold lookup_total in H2; simpl in H2; subst. split.
 	- unfold set. simpl. apply Global_extension__. left => //.
@@ -235,48 +310,38 @@ Admitted.
 			- simpl in H. apply Nat.succ_lt_mono in H. apply H.
 Qed. *)
 
-Lemma update_global_unchagned: forall v_S v_S' v_f v_x v_valtype v_val_,
+Lemma update_global_unchanged: forall v_S v_S' func v_idx,
 	v_S' =
-	v_S <| GLOBALS :=
-	list_update_func (GLOBALS v_S)
-	(lookup_total (MODULE_GLOBALS (F_MODULE v_f)) v_x)
-	[eta set VALUE (fun=> VAL_CONST v_valtype v_val_)] |> ->
+	v_S <| GLOBALS := list_update_func (GLOBALS v_S) v_idx func |> ->
 	FUNCS v_S = FUNCS v_S' /\
 	TABLES v_S = TABLES v_S' /\
 	length (GLOBALS v_S) = length (GLOBALS v_S') /\
-	MEMS v_S = MEMS v_S'.
+	MEMS v_S = MEMS v_S' /\
+	ELEMS v_S = ELEMS v_S' /\
+	DATAS v_S = DATAS v_S'.
 Proof. 
-	move => v_S v_S' v_f v_x v_valtype v_val' H.
-	destruct v_S'. unfold set in H. simpl in *.
-	injection H as ?; subst; repeat split => //=.
-	by erewrite <- list_update_length_func.
-Qed.
-
-Lemma update_mem_unchagned_func: forall v_S v_S' func v_idx,
-	v_S' = v_S <| MEMS := list_update_func (MEMS v_S) v_idx func |> ->
-	FUNCS v_S = FUNCS v_S' /\
-	TABLES v_S = TABLES v_S' /\
-	length (MEMS v_S) = length (MEMS v_S') /\
-	GLOBALS v_S = GLOBALS v_S'.
-Proof.
 	move => v_S v_S' func v_idx H.
-	destruct v_S'. unfold set in H. simpl in *.
-	injection H as ?; subst; repeat split => //=.
+	subst.
+	destruct v_S; simpl.
+	repeat split; eauto.
 	by erewrite <- list_update_length_func.
 Qed.
 
 Lemma update_mem_unchagned: forall v_S v_S' func v_idx,
-	v_S' = v_S <| MEMS := list_update (MEMS v_S) v_idx func |> ->
+	v_S' = v_S <| MEMS := list_update_func (MEMS v_S) v_idx func |> ->
 	FUNCS v_S = FUNCS v_S' /\
 	TABLES v_S = TABLES v_S' /\
 	length (MEMS v_S) = length (MEMS v_S') /\
-	GLOBALS v_S = GLOBALS v_S'.
+	GLOBALS v_S = GLOBALS v_S' /\
+	ELEMS v_S = ELEMS v_S' /\
+	DATAS v_S = DATAS v_S'.
 Proof.
 	move => v_S v_S' func v_idx H.
-	destruct v_S'. unfold set in H. simpl in *.
-	injection H as ?; subst; repeat split => //=.
-	by erewrite <- list_update_length.
-Qed. *)
+	subst.
+	destruct v_S; simpl.
+	repeat split; eauto.
+	by erewrite <- list_update_length_func.
+Qed.
 
 Lemma func_agree_extension: forall v_S v_S' v_funcaddr v_funcinst_1' v_funcinst_2 v_ft,
 	Externaddrs_ok v_S (EXTADDR_FUNC v_funcaddr) (EXT_FUNC v_ft) ->
@@ -522,8 +587,36 @@ Lemma vals_typing_extension: forall v_S v_S' v_t v_val,
 	Vals_ok v_S v_val v_t ->
 	Vals_ok v_S' v_val v_t.
 Proof.
+	rewrite /Vals_ok.
 	move => v_S v_S' v_t v_val Hs Hv1.
-Admitted.
+	inversion Hs; subst.
+	clear - Hv1 H12 H5.
+
+	assert (v_funcinst_1' = FUNCS v_S) as Heq. {
+		clear Hv1 H5.
+		induction H12; eauto.
+		by inversion H; subst.
+	}
+	clear H12; subst.
+
+	induction Hv1; auto.
+	constructor; auto.
+
+	inversion H; subst; eauto; try econstructor.
+	inversion H0; subst; try econstructor.
+	instantiate (1 := v_ext).
+	inversion H1; subst.
+	econstructor.
+	- rewrite H5. rewrite -size_length size_cat.
+		by eapply ltn_addr.
+	- rewrite H5.
+		rewrite /lookup_total -{1}app_cat.
+		move/ltP in H6.
+		rewrite (app_nth1 _ _ _ H6).
+		rewrite /lookup_total in H7.
+		eauto.
+Qed.
+
 (*
 Lemma global_instance_fine: forall s s' v_globaltype v_f v_x v_valtype v_val_,
     Forall2 (fun v vt => Global_instance_ok s v vt) (GLOBALS s) v_globaltype ->
@@ -793,6 +886,15 @@ Proof.
 	generalize dependent tf.
 	generalize dependent ais. generalize dependent ais'. 
 	generalize dependent f. generalize dependent f'.
+
+	pose proof func_extension_same as LemFuncSame.
+	pose proof mem_extension_same as LemMemSame.
+	pose proof table_extension_same as LemTableSame.
+	pose proof global_extension_same as LemGlobalSame.
+	pose proof elem_extension_same as LemElemSame.
+	pose proof data_extension_same as LemDataSame.
+	pose proof store_extension_same as LemStoreSame.
+
 	induction HReduce;
 	move => f' f ais' Heqc2 ais Heqc1 tf C' HType C HIT HMatch;
 	destruct tf as [[tf1] [tf2]].
@@ -808,7 +910,7 @@ Proof.
 		typing_inversion H2.
 		eapply IHHReduce; eauto.
 	}
-	- (* Label Context *) 
+	{ (* Label Context *) 
 		injection Heqc1 as H1.
 		injection Heqc2 as H2.
 		rewrite <- H in HType.
@@ -818,7 +920,8 @@ Proof.
 		destruct_all.
 		inversion H3; subst; clear H3.
 		eapply IHHReduce; eauto.
-	- (* Label Frame *)
+	}
+	{ (* Label Frame *)
 		injection Heqc1 as H1.
 		injection Heqc2 as H2.
 		rewrite <- H0 in HType.
@@ -831,339 +934,77 @@ Proof.
 		inversion H0; subst; clear H0.
 		eapply IHHReduce; eauto.
 		resolve_inst_match.
-	- (* Global Set *) 
+	}
+	{ (* Global Set *) 
 		destruct_all; subst.
-		typing_inversion HType.
-		typing_inversion H2.
-		unfold_principal_typing Hai.
-		destruct_all.
-		inversion H0; subst; clear H0.
+		invert_ais_typing.
+		resolve_all_pt.
+		join_subtyping_eq Hsub Hsub0.
+		eapply Val_ok_non_bot in HValok as Hnonbot.
+		eapply valtype_sub_non_bot in Hsubv; eauto.
+		subst.
+
 		remember  (s <| GLOBALS :=
-			list_update_func (GLOBALS s)
-		  	(lookup_total (MODULE_GLOBALS (F_MODULE f)) (fun_proj_uN_0 32 v_x))
-		  	[eta set GLOB_VALUE (fun=> v_val)] |>) as s'.
-Admitted.
-(*
+			list_update_func (GLOBALS s) (lookup_total (MODULE_GLOBALS (F_MODULE f)) (fun_proj_uN_0 32 v_x))
+			[eta set GLOB_VALUE (fun=> v_val)] |>) as s'.
 		split.
 		{
-			subst.
-			econstructor.
+			eapply mk_Store_extension with
+				(v_funcinst_2 := [])
+				(v_tableinst_2 := [])
+				(v_meminst_2 := [])
+				(v_globalinst_2 := [])
+				(v_eleminst_2 := [])
+				(v_datainst_2 := [])
+				(v_globalinst_1' := GLOBALS s')
+			; eauto;
+			try solve [
+				rewrite Heqs';
+				by rewrite cats0
+			].
+			by rewrite Heqs'; rewrite list_update_length_func.
+			destruct s eqn: Heqs. simpl.
+			rewrite Heqs'; simpl.
+			destruct C, C'; rewrite /inst_match in HMatch; destruct_all;
+			simpl in *.
+			inversion HStore; inversion H; clear H.
+			eapply Forall2_global with
+				(v_S := s)
+				(v_globaltype := v_globaltype)
+				(v_valtype := t)
+				; try by subst; eauto.
+			admit.
+			admit.
 		}
-		assert (Store_extension s s'). 
-		{
-			eapply Store_extension__ with (v_globalinst_1 := (GLOBALS s)) (v_globalinst_1' := (GLOBALS s')) (v_globalinst_2 := []); 
-			repeat split => //=; subst; simpl => //=; try rewrite <- app_right_nil => //=.
-			- by rewrite list_update_length_func.
-			- by eapply func_extension_same.
-			- by eapply table_extension_same.
-			- by eapply mem_extension_same.
-			- inversion HIT; decomp; subst; simpl in *. 
-				remember ((lookup_total v_globaladdr v_x)) as v.
-				apply Forall2_lookup2 in H12; destruct H12.
-				apply H5 in H1. inversion H1; destruct H17.
-				repeat rewrite -> app_assoc in H0; apply split_append_last in H0; destruct H0.
-				subst.
-				rewrite H in H16. injection H16 as ?; subst.
-				inversion HStore; decomp; subst. 
-				eapply Forall2_global; eauto. 
-		}
-		split => //=.
-		eapply module_inst_typing_extension with (v_S' := s') in HIT as HITS'; eauto.
-		apply update_global_unchagned in Heqs' as ?.
-		destruct H3 as [? [? [??]]].
-		inversion HIT; decomp; subst.
-		simpl in *.
-		inversion HStore; decomp; subst; simpl in *.
-		apply Forall2_lookup2 in H17; destruct H17.
-		apply H17 in H1.
-		inversion H1. destruct H29. simpl in *.
-		destruct H30.
-		eapply store_global_extension_store_typed; eauto.
-		- unfold set. simpl. reflexivity.
-		- rewrite <- H7. simpl. apply H30.
-		- simpl. by rewrite <- H7.
-	- (* Store Num Val *)
-		destruct H3; destruct H1; subst.
-		apply_composition_typing_and_single HType.
-		apply_composition_typing_and_single H4_comp.
-		apply AI_const_typing in H4_comp0.
-		apply AI_const_typing in H4_comp.
-		rewrite <- admin_instrs_ok_eq in H4_comp1.
-		apply Store_typing in H4_comp1; destruct H4_comp1 as [v_n [v_mt [v_inn [? [? [? [? [? ?]]]]]]]].
-		subst.
-		remember ((s <| MEMS :=
-		list_update_func (MEMS s)
-		  (lookup_total (MODULE_MEMS (F_MODULE f)) 0)
-		  (λ v_1 : meminst,
-			 v_1 <| BYTES :=
-			 list_slice_update (BYTES v_1) (v_i + OFFSET v_mo)%coq_nat
-			   (fun_size v_t / 8) (fun_bytes_ v_t v_c) |>) |>)) as s'.
-		assert (Store_extension s s').
-		{
-			eapply Store_extension__ with (v_meminst_1 := (MEMS s)) (v_meminst_1' := (MEMS s')) (v_meminst_2 := []);
-			repeat split; subst; simpl; try rewrite <- app_right_nil => //=.
-			- by rewrite list_update_length_func.
-			- by eapply func_extension_same.
-			- by eapply table_extension_same.
-			- (* Mem extension *)
-				inversion HIT; decomp; subst; simpl in *.
-				apply Forall2_lookup2 in H15; destruct H15. apply H7 in H0.
-				inversion H0; decomp; subst.
-				inversion HStore; decomp; subst; simpl in *.
-				eapply Forall2_list_update_func2; eauto.
-				- by apply mem_extension_same.
-				- unfold set; simpl. destruct v_mt'. apply mk_Mem_extension => //=.
-			- inversion HStore; decomp; subst; simpl in *.
-				eapply global_extension_same; eauto.
-		}
-		split => //=.
-		eapply update_mem_unchagned_func in Heqs' as ?; decomp.
-		subst; simpl in *.
-		destruct s. simpl in *.
-		inversion HStore; decomp; subst. 
-		injection H14 as ?; subst.
-		eapply Store_ok__OK; repeat split; simpl; eauto.
-		- erewrite list_update_length_func; eauto.
-		- apply Forall2_forall2; split => //=. move => x y HIn.
-			apply Forall2_forall2 in H15; destruct H15. apply H14 in HIn. inversion HIn; destruct H15 as [? [? ?]].
-			eapply Function_instance_ok__ with (v_C := v_C); repeat split => //=.
-			eapply module_inst_typing_extension; eauto.
-		- apply Forall2_forall2; split => //=. move => x y HIn.
-			apply Forall2_forall2 in H16; destruct H16. apply H14 in HIn. inversion HIn. destruct H16 as [? [? ?]].
-			eapply Global_instance_ok__; repeat split; eauto.
-		- apply Forall2_forall2; split => //=. move => x y HIn.
-			apply Forall2_forall2 in H17; destruct H17. apply H14 in HIn. inversion HIn; decomp; subst.
-			inversion H25. inversion H19; subst; destruct H27.
-			eapply Table_instance_ok__; repeat split; eauto.
-			apply Forall2_forall2; split => //=; move => x' y' HIn'. 
-			apply Forall2_forall2 in H24; destruct H24.
-			apply H24 in HIn'. 
-			apply Forall2_forall2 in HIn'; destruct HIn'.
-			apply Forall2_forall2; split => //=; move => x'' y'' HIn''.
-			apply H27 in HIn''. 
-			inversion HIn''; decomp; subst.
-			eapply Externaddrs_ok__func; eauto.
-		- eapply Forall2_list_update_func; eauto.
-			- apply Forall2_forall2; split => //=; move => x y HIn.
-				apply Forall2_forall2 in H18. apply H18 in HIn.
-				inversion HIn; decomp; subst.
-				eapply Memory_instance_ok__; eauto.
-			- 	
-				inversion H1; decomp; subst. simpl in *.
-				removeinstSimpler H27.
-				removeinstSimpler H28.
-				removeinstSimpler H30.
-				rewrite H7 in H21.
-				removeinstSimpler H29.
-				subst.
-				simpl in *.
-				apply Forall2_lookup in H33; destruct H33.
-				inversion HIT; decomp; subst; simpl in *.
-				apply Forall2_lookup2 in H37; destruct H37.
-				apply H26 in H0. inversion H0. destruct H41 as [? [? ?]]; simpl in H41.
-				simpl in H42. 
-				apply H19 in H41 as H'.
-				rewrite H42 in H'.
-				inversion H'. subst.
-				unfold set.
-				rewrite H42. simpl.
-				apply Forall2_lookup in H18; destruct H18.
-				apply H37 in H41.
-				inversion H41; decomp; subst.
-				rewrite H42 in H39.
-				injection H39 as ?.
-				rewrite H39.
-				rewrite H39 in H48.
-				inversion H48. inversion H46; decomp.
-				eapply Memory_instance_ok__; repeat split; eauto.
-	- (* Store Pack Val *)
-		destruct H3; destruct H1; subst.
-		apply_composition_typing_and_single HType.
-		apply_composition_typing_and_single H4_comp.
-		apply AI_const_typing in H4_comp0.
-		apply AI_const_typing in H4_comp.
-		rewrite <- admin_instrs_ok_eq in H4_comp1.
-		apply Store_typing in H4_comp1; destruct H4_comp1 as [v_n' [v_mt' [v_inn' [? [? [? [? [? ?]]]]]]]].
-		subst.
-		remember (s <| MEMS :=
-		list_update_func (MEMS s)
-		  (lookup_total (MODULE_MEMS (F_MODULE f)) 0)
-		  (λ v_1 : meminst,
-			 v_1 <| BYTES :=
-			 list_slice_update (BYTES v_1)
-			   (v_i + OFFSET v_mo)%coq_nat (v_n / 8)
-			   (fun_ibytes v_n
-				  (fun_wrap (fun_size (valtype__INN v_inn)) v_n v_c)) |>) |>) as s'.
-		assert (Store_extension s s').
-		{
-			eapply Store_extension__ with (v_meminst_1 := (MEMS s)) (v_meminst_1' := (MEMS s')) (v_meminst_2 := []);
-			repeat split; subst; simpl; try rewrite <- app_right_nil => //=.
-			- by rewrite list_update_length_func.
-			- by eapply func_extension_same.
-			- by eapply table_extension_same.
-			- (* Mem extension *)
-				inversion HIT; decomp; subst; simpl in *.
-				apply Forall2_lookup2 in H15; destruct H15. apply H7 in H0.
-				inversion H0; decomp; subst.
-				inversion HStore; decomp; subst; simpl in *.
-				eapply Forall2_list_update_func2; eauto.
-				- by apply mem_extension_same.
-				- unfold set; simpl. destruct v_mt'. apply mk_Mem_extension => //=.
-			- inversion HStore; decomp; subst; simpl in *.
-				eapply global_extension_same; eauto.
-		}
-		split => //=.
-		eapply update_mem_unchagned_func in Heqs' as ?; decomp.
-		subst; simpl in *.
-		destruct s. simpl in *.
-		inversion HStore; decomp; subst. 
-		injection H14 as ?; subst.
-		eapply Store_ok__OK; repeat split; simpl; eauto.
-		- erewrite list_update_length_func; eauto.
-		- apply Forall2_forall2; split => //=. move => x y HIn.
-			apply Forall2_forall2 in H15; destruct H15. apply H14 in HIn. inversion HIn; destruct H15 as [? [? ?]].
-			eapply Function_instance_ok__ with (v_C := v_C); repeat split => //=.
-			eapply module_inst_typing_extension; eauto.
-		- apply Forall2_forall2; split => //=. move => x y HIn.
-			apply Forall2_forall2 in H16; destruct H16. apply H14 in HIn. inversion HIn. destruct H16 as [? [? ?]].
-			eapply Global_instance_ok__; repeat split; eauto.
-		- apply Forall2_forall2; split => //=. move => x y HIn.
-			apply Forall2_forall2 in H17; destruct H17. apply H14 in HIn. inversion HIn; decomp; subst.
-			inversion H25. inversion H19; subst. destruct H27.
-			eapply Table_instance_ok__; repeat split; eauto.
-			apply Forall2_forall2; split => //=; move => x' y' HIn'. 
-			apply Forall2_forall2 in H24; destruct H24.
-			apply H24 in HIn'. 
-			apply Forall2_forall2 in HIn'; destruct HIn'.
-			apply Forall2_forall2; split => //=; move => x'' y'' HIn''.
-			apply H27 in HIn''. 
-			inversion HIn''; decomp; subst.
-			eapply Externaddrs_ok__func; eauto.
-		- eapply Forall2_list_update_func; eauto.
-			- apply Forall2_forall2; split => //=; move => x y HIn.
-				apply Forall2_forall2 in H18. apply H18 in HIn.
-				inversion HIn; decomp; subst.
-				eapply Memory_instance_ok__; eauto.
-			- 	
-				inversion H1; decomp; subst. simpl in *.
-				removeinstSimpler H27.
-				removeinstSimpler H28.
-				removeinstSimpler H30.
-				rewrite H7 in H21.
-				removeinstSimpler H29.
-				subst.
-				simpl in *.
-				apply Forall2_lookup in H33; destruct H33.
-				inversion HIT; decomp; subst; simpl in *.
-				apply Forall2_lookup2 in H37; destruct H37.
-				apply H26 in H0. inversion H0. destruct H41 as [? [? ?]]; simpl in H41.
-				simpl in H42. 
-				apply H19 in H41 as H'.
-				rewrite H42 in H'.
-				inversion H'. subst.
-				unfold set.
-				rewrite H42. simpl.
-				apply Forall2_lookup in H18; destruct H18.
-				apply H37 in H41.
-				inversion H41; decomp; subst.
-				rewrite H42 in H39.
-				injection H39 as ?.
-				rewrite H39.
-				rewrite H39 in H48.
-				inversion H48. inversion H46; decomp.
-				eapply Memory_instance_ok__; repeat split; eauto.
-	- (* Memory Grow Succeed *)
-		destruct H3; destruct H1; subst.
-		apply_composition_typing_and_single HType.
-		rewrite <- admin_instrs_ok_eq in H4_comp.
-		apply Grow_memory_typing in H4_comp; destruct H4_comp as [v_mt' [ts' [? [? [? ?]]]]].
-		subst.
-		remember (s <| MEMS :=
-		list_update (MEMS s)
-		  (lookup_total (MODULE_MEMS (F_MODULE f)) 0) v_mi |>) as s'.
-
-		assert (Store_extension s s').
-		{
-			eapply Store_extension__ with (v_meminst_1 := (MEMS s)) (v_meminst_1' := (MEMS s')) (v_meminst_2 := []);
-			repeat split; subst s'; simpl; try rewrite <- app_right_nil => //=.
-			- by rewrite list_update_length.
-			- by eapply func_extension_same.
-			- by eapply table_extension_same.
-			- (* Mem extension *)
-				inversion HIT; decomp; subst; simpl in *.
-				apply Forall2_lookup2 in H13; destruct H13. apply H5 in H0.
-				inversion H0; decomp; subst.
-				inversion HStore; decomp; subst; simpl in *.
-				eapply Forall2_list_update2; eauto.
-				- by apply mem_extension_same.
-				- unfold fun_mem in H.
-					inversion H; decomp; subst.
-					simpl in H15. rewrite <- H1 in H15. simpl in H15. rewrite H15 in H18.
-					injection H18 as ?; subst.
-					apply mk_Mem_extension => //=.
-					apply leadd.
-			- inversion HStore; decomp; subst; simpl in *.
-				eapply global_extension_same; eauto.
-		}
-		split => //=.
-		eapply update_mem_unchagned in Heqs' as ?; decomp.
-		subst; simpl in *.
-		destruct s. simpl in *.
-		inversion HStore; decomp; subst. 
-		injection H12 as ?; subst.
-		inversion H; decomp.
-		unfold fun_mem in H8.
-
-		eapply Store_ok__OK with (v_memtype := list_update v_memtype ((lookup_total (MODULE_MEMS (F_MODULE f)) 0)) (limits__ (v_i + v_n)%coq_nat v_j)); repeat split; simpl; eauto.
-		- erewrite list_update_length; rewrite list_update_length; eauto.
-		- apply Forall2_forall2; split => //=. move => x y HIn.
-			apply Forall2_forall2 in H13; destruct H13. apply H22 in HIn. inversion HIn. destruct H23 as [? [? ?]].
-			eapply Function_instance_ok__ with (v_C := v_C); repeat split => //=.
-			eapply module_inst_typing_extension; eauto.
-		- apply Forall2_forall2; split => //=. move => x y HIn.
-			apply Forall2_forall2 in H14; destruct H14. apply H22 in HIn. inversion HIn. destruct H23 as [? [? ?]].
-			eapply Global_instance_ok__; repeat split; eauto.
-		- apply Forall2_forall2; split => //=. move => x y HIn.
-			apply Forall2_forall2 in H15; destruct H15. apply H22 in HIn. inversion HIn; decomp; subst.
-			inversion H30. inversion H12; subst. destruct H24.
-			eapply Table_instance_ok__; repeat split; eauto.
-			apply Forall2_forall2; split => //=; move => x' y' HIn'. 
-			apply Forall2_forall2 in H29; destruct H29.
-			apply H20 in HIn'. 
-			apply Forall2_forall2 in HIn'; destruct HIn'.
-			apply Forall2_forall2; split => //=; move => x'' y'' HIn''.
-			apply H25 in HIn''. 
-			inversion HIn''; decomp; subst.
-			eapply Externaddrs_ok__func; eauto.
-		- 	
-			eapply Forall2_list_update_both; eauto.
-			- apply Forall2_forall2; split => //=; move => x y HIn.
-				apply Forall2_forall2 in H16; destruct H16. apply H22 in HIn.
-				inversion HIn; decomp; subst.
-				eapply Memory_instance_ok__; eauto.
-			-
-				subst.
-				eapply Memory_instance_ok__; split; eauto.
-				eapply Memtype_ok__OK.
-				eapply Limits_ok__; split; eauto.
-				simpl in H8.
-				inversion HIT; decomp; subst.
-				rewrite <- H12 in H8.
-				simpl in H8.
-				apply Forall2_lookup in H16; destruct H16.
-				simpl in H0.
-				apply Forall2_lookup2 in H28; destruct H28.
-				apply H28 in H0. inversion H0; decomp.
-				simpl in H33.
-				apply H17 in H33.
-				rewrite H8 in H33.
-				inversion H33.
-				destruct H38.
-				inversion H41.
-				inversion H42.
-				decomp.
-				apply H48.
-Qed. *)
+		admit.
+	}
+	{ (* Table Set *)
+		admit.
+	}
+	{ (* Table Grow *)
+		admit.
+	}
+	{ (* Elem Drop *)
+		admit.
+	}
+	{ (* Store None *)
+		admit.
+	}
+	{ (* Store Some I32 *)
+		admit.
+	}
+	{ (* Store Some I64 *)
+		admit.
+	}
+	(* SIMD instructions *)
+	admit. admit. admit. admit. admit.
+	{ (* Memory Grow *)
+		admit.
+	}
+	{ (* Data Drof *)
+		admit.
+	}
+Admitted.
 	
 Lemma reduce_inst_unchanged: forall s f ais s' f' ais',
     Step (mk_config (mk_state s f) ais) (mk_config (mk_state s' f') ais') ->
@@ -2123,7 +1964,7 @@ Proof.
 		C_TABLES := v_tabletype0;
 		C_MEMS := v_memtype0;
 		C_ELEMS := v_reftype0;
-		C_DATAS := [];
+		C_DATAS := v_datatype;
 		C_LOCALS := [];
 		C_LABELS := [];
 		C_RETURN := None
@@ -2145,7 +1986,7 @@ Proof.
 					(_append (option_map [eta (mk_list _)] None)
 						(C_RETURN v_C0)))
 			([] :-> (mk_list valtype v_t)) 
-			); auto; subst; auto.
+			). all:  subst; auto.
 		by resolve_inst_match.
 	}
 	apply reduce_inst_unchanged in HReduce as HModuleInst.
@@ -2171,7 +2012,7 @@ Proof.
 				C_TABLES := v_tabletype0;
 				C_MEMS := v_memtype0;
 				C_ELEMS := v_reftype0;
-				C_DATAS := [];
+				C_DATAS := v_datatype;
 				C_LOCALS := v_t1;
 				C_LABELS := [];
 				C_RETURN := None

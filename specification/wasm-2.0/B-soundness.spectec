@@ -123,7 +123,7 @@ relation Module_instance_ok: store |- moduleinst : context
 
 rule Module_instance_ok:
   S |- { TYPES functype*, FUNCS funcaddr*, GLOBALS globaladdr*, TABLES tableaddr*, MEMS memaddr*, ELEMS elemaddr*, DATAS dataaddr*, EXPORTS exportinst* } :
-    {TYPES functype*, FUNCS functype'*, GLOBALS globaltype*, TABLES tabletype*, MEMS memtype*, ELEMS reftype*}
+    {TYPES functype*, FUNCS functype'*, GLOBALS globaltype*, TABLES tabletype*, MEMS memtype*, ELEMS reftype*, DATAS datatype*}
     -- (Functype_ok: |- functype : OK)*
     -- (Externaddrs_ok: S |- FUNC funcaddr : FUNC functype')*
     -- (Externaddrs_ok: S |- TABLE tableaddr : TABLE tabletype)*
@@ -132,6 +132,7 @@ rule Module_instance_ok:
     -- (Element_instance_ok: S |- S.ELEMS[elemaddr] : reftype )*
     -- (Data_instance_ok: S |- S.DATAS[dataaddr] : OK)*
     -- (Export_instance_ok: S |- exportinst : OK)*
+    -- if |datatype*| = |dataaddr*|
     ;; TODO disjoint exportinst.name
 
 ;; Function instance
