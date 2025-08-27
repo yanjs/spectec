@@ -97,16 +97,16 @@ Ltac invert_ais_typing :=
   repeat lazymatch goal with
   | H: Admin_instrs_ok _ _ [] _ |- _ =>
     eapply ais_empty_typing in H;
-	idtac "invert_empty"
+	idtac
   | H: Admin_instrs_ok _ _ [fun_coec_val__admininstr _] ( _ :-> _ ) |- _ =>
     invert_ais_single_val_typing H;
-	idtac "invert_single_val"
+	idtac
   | H: Admin_instrs_ok _ _ [fun_coec_ref__admininstr _] ( _ :-> _ ) |- _ =>
     invert_ais_single_ref_typing H;
-	idtac "invert_single_ref"
+	idtac
   | H: Admin_instrs_ok _ _ (map fun_coec_val__admininstr _) ( _ :-> _ ) |- _ =>
     invert_ais_vals_typing H;
-	idtac "invert_vals"
+	idtac
   | H: Admin_instrs_ok _ _ [?v_ai] ( ?t1s :-> ?t2s ) |- _ =>
     let t1s' := fresh "t1s'" in
 	let t2s' := fresh "t2s'" in
@@ -114,13 +114,13 @@ Ltac invert_ais_typing :=
 	let Hsub := fresh "Hsub" in
     eapply ais_single_typing_inversion in H
 	  as [t1s' [t2s' [Hai Hsub]]];
-	idtac "invert_single"
+	idtac
   | H: Admin_instrs_ok _ _ (_ ++ _) _ |- _ =>
     let t3s := fresh "t3s" in
 	let HType1 := fresh "HType1" in
 	let HType2 := fresh "HType2" in
 	eapply ais_composition_typing in H as [t3s [HType1 HType2]];
-	idtac "invert_composition"
+	idtac
   | H: Admin_instrs_ok _ _ (_ :: ( _ :: _)) _ |- _ =>
     try rewrite -cat1s in H
   | _ => idtac
@@ -1029,5 +1029,5 @@ Proof.
 	- eapply Step_pure__ref_is_null_true_preserves; eauto.
 	- eapply Step_pure__ref_is_null_false_preserves; eauto.
 	72: eapply Step_pure__local_tee_preserves; eauto.
-	(* Rest are all simd instructions *)
+	(* The rest are all simd instructions *)
 Admitted.
