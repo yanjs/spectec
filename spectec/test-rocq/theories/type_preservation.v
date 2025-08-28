@@ -24,6 +24,31 @@ Proof.
 	move => s i C HMInst. inversion HMInst => //=.
 Qed.
 
+Lemma invert_globals: forall v_S v_minst C C',
+	Module_instance_ok v_S v_minst C ->
+	inst_match C C' ->
+	List.Forall2 (fun ga gt => 
+		exists v_mut v_valtype v_val,
+		(ga < (List.length (GLOBALS v_S))) /\
+		(gt = (mk_globaltype v_mut v_valtype)) /\
+		((lookup_total (GLOBALS v_S) ga) = {| GLOB_TYPE := (mk_globaltype v_mut v_valtype); GLOB_VALUE := v_val |})
+	) (MODULE_GLOBALS v_minst) (C_GLOBALS C').
+Proof.
+	move => v_S v_minst v_C v_C' HMi Him.
+	inversion HMi; subst; clear HMi.
+	clear - H7 Him.
+	destruct v_C'; rewrite /inst_match in Him; destruct_all; simpl in *; subst.
+
+	induction H7.
+	- eauto.
+	- econstructor.
+	  + inversion H; subst; clear H.
+	    by exists v_mut, v_valtype, v_val.
+	  + auto.
+Qed.
+
+
+
 Lemma lookup_global: forall v_a v_C v_C' v_mut v_vt v_S v_minst,
 	(v_a < (List.length (C_GLOBALS v_C'))) ->
 	lookup_total (C_GLOBALS v_C') v_a = mk_globaltype v_mut v_vt ->
@@ -174,6 +199,16 @@ Proof.
 	- apply IHm.
 Qed.
 
+Lemma global_extension_same_0: forall g,
+	Global_extension g g.
+Proof.
+	move => g.
+	destruct g.
+	destruct GLOB_TYPE.
+	econstructor.
+	by right.
+Qed.
+
 Lemma global_extension_same: forall g,
 	Forall2 (fun v s => Global_extension v s) g g.
 Proof.
@@ -247,68 +282,35 @@ Proof.
 	f_equal => //=. f_equal => //=.
 Qed.
 
-
-Lemma Forall2_global: forall v_g v_S v_globaltype v_idx v_valtype v_val_0 v_val_1,
-	v_g = (GLOBALS v_S) ->
-	Forall2
-	(fun (v_globalinst : globalinst) (v_globaltype : globaltype) => Global_instance_ok v_S v_globalinst v_globaltype) v_g v_globaltype -> 
+Lemma Forall2_global: forall v_g v_idx v_valtype v_val_0 v_val_1,
 	(v_idx < length v_g) ->
 	lookup_total v_g v_idx = 
 	{| GLOB_TYPE := mk_globaltype (Some MUT) v_valtype; GLOB_VALUE := v_val_0 |} ->
-	Forall2 (fun v s => Global_extension v s) v_g (list_update_func v_g v_idx (fun g => g <| GLOB_VALUE := v_val_1 |> )).
-Admitted.
-(*
+	Forall2 (fun v s => Global_extension v s) v_g
+	(list_update_func v_g v_idx (fun g => g <| GLOB_VALUE := v_val_1 |> )).
 Proof.
-	move => v_S v_globaltype v_idx v_valtype v_val.
-	destruct v_S; simpl.
-	move: v_idx v_globaltype.
-	induction GLOBALS; move => v_idx v_globaltype HGlobalInstOk H H2 => //=.
-	destruct v_idx => //=.
-	{
-		eapply Forall2_cons_iff.
-		unfold lookup_total in H2; simpl in H2; subst.
-		split.
-		- unfold set. simpl. econstructor. auto.
-		- eapply global_extension_same.
+	move => v_g v_i v_valtype v_val_0 v_val_1 HLength HLookup.
+	move: v_g HLength HLookup.
+	induction v_i.
+	{ (* i = 0 *)
+		move => v_g HLength HLookup.
+		destruct v_g; auto.
+		simpl.
+		econstructor.
+		{
+			rewrite /lookup_total in HLookup.
+			simpl in HLookup; subst.
+			econstructor.
+			by left.
+		}
+		eapply global_extension_same.
 	}
-	{
-		eapply Forall2_cons.
-		- destruct a, GLOB_TYPE, GLOB_VALUE; econstructor; eauto.
-		- destruct v_globaltype.
-		  + inversion HGlobalInstOk.
-		  + inversion HGlobalInstOk.
-		  	eapply IHGLOBALS; eauto.
-		  destruct 
-	}
-	
-	apply Forall2_cons_iff. unfold lookup_total in H2; simpl in H2; subst. split.
-	- unfold set. simpl. apply Global_extension__. left => //.
-		destruct v_globaltype; inversion HGlobalInstOk.
-		eapply global_extension_same; eauto. 
-	- apply Forall2_cons. 
-		-
-			apply Forall2_length in HGlobalInstOk as ?. 
-			destruct v_globaltype => //=.
-			inversion HGlobalInstOk.
-			inversion H5; decomp; subst.
-			inversion H13; subst.
-			apply Global_extension__. right => //.
-		- unfold lookup_total in H2. simpl in H2. 
-			destruct v_globaltype; inversion HGlobalInstOk.
-			eapply IHglobals => //=.
-			- 
-				apply Forall2_length in H6.
-				apply Forall2_forall2; split => //=.
-				apply H6.
-				move => x0 y0 Hin.
-				inversion HGlobalInstOk; subst.
-				apply Forall2_forall2 in H12; destruct H12.
-				apply H1 in Hin.
-				inversion Hin; decomp; subst.
-				inversion H11.
-				eapply Global_instance_ok__; repeat split => //=.
-			- simpl in H. apply Nat.succ_lt_mono in H. apply H.
-Qed. *)
+	move => v_g HLength HLookup.
+	destruct v_g; auto.
+	simpl.
+	econstructor; try eapply global_extension_same_0.
+	by eapply IHv_i.
+Qed.
 
 Lemma update_global_unchanged: forall v_S v_S' func v_idx,
 	v_S' =
@@ -345,131 +347,184 @@ Qed.
 
 Lemma func_agree_extension: forall v_S v_S' v_funcaddr v_funcinst_1' v_funcinst_2 v_ft,
 	Externaddrs_ok v_S (EXTADDR_FUNC v_funcaddr) (EXT_FUNC v_ft) ->
-	length (FUNCS v_S) = length v_funcinst_1' ->
-	FUNCS v_S' = (v_funcinst_1' ++ v_funcinst_2)%list -> 
+	FUNCS v_S' = (v_funcinst_1' ++ v_funcinst_2) -> 
     Forall2 (fun v s => Func_extension v s) (FUNCS v_S) v_funcinst_1' ->
     Externaddrs_ok v_S' (EXTADDR_FUNC v_funcaddr) (EXT_FUNC v_ft).
-Admitted.
-(* Proof.
-	move => v_S v_S' v_funcaddr v_funcinst_1' v_funcinst_2 v_ft HOk HLength HApp Hext.
-	inversion HOk; destruct H2; subst.
-	apply Forall2_nth in Hext; destruct Hext.
-	apply (H0 _ default_val default_val) in H2 as H2'.
-	unfold lookup_total in H3.
-	apply (Externaddrs_ok__func _ _ _ v_minst v_code_func).
+Proof.
+	move => v_S v_S' v_funcaddr v_funcinst_1' v_funcinst_2 v_ft HOk HApp Hext.
+	inversion HOk. subst.
+	apply Forall2_nth in Hext as [HLength Hext].
+	eapply (Hext _ default_val default_val) in H2 as H4.
+	eapply (extaddr_ok_func _ _ _ v_minst v_func).
 	apply (length_app_lt) with (l':=(FUNCS v_S')) (l2':= v_funcinst_2) in HLength => //=.
-	split. 
-	- apply (Nat.lt_le_trans _ _ _ H2 HLength).
+	- apply/ltP.
+	  eapply (Nat.lt_le_trans).
+	  apply/ltP. by eapply H2.
+	  eauto.
 	- unfold lookup_total.
-		rewrite H in H2.
+	  rewrite /lookup_total in H3.
+		rewrite H3 in H4.
+		rewrite HLength in H2.
+		move/ltP in H2.
 		apply app_nth1 with (l' := v_funcinst_2) (d := default_val) in H2.
+		rewrite app_cat in H2.
 		rewrite <- HApp in H2.
-		destruct default_val.
-		inversion H2'.
-		rewrite H2. 
-		rewrite <- H5.
-		apply H3.
-Qed. *)
+		rewrite H2.
+		inversion H4; subst.
+		auto.
+Qed.
 
 Lemma table_agree_extension: forall v_S v_S' v_tableaddr v_tableinst_1' v_tableinst_2 v_tabletype,
     Externaddrs_ok v_S (EXTADDR_TABLE v_tableaddr) (EXT_TABLE v_tabletype) ->
-	length (TABLES v_S) = length v_tableinst_1' ->
 	TABLES v_S' = (v_tableinst_1' ++ v_tableinst_2) -> 
 	Forall2 (fun v s => Table_extension v s) (TABLES v_S) v_tableinst_1' ->
     Externaddrs_ok v_S' (EXTADDR_TABLE v_tableaddr) (EXT_TABLE v_tabletype).
-Admitted.
-(* Proof.
-	move => v_S v_S' v_tableaddr v_tableinst_1' v_tableinst_2 v_tabletype HOk HLength HApp Hext.
-	inversion HOk; destruct H2; subst; destruct H3.
-	apply Forall2_lookup in Hext; destruct Hext.
-	apply H3 in H2 as H2'.
-	inversion H2'. 
-	eapply Externaddrs_ok__table.
-	apply (length_app_lt) with (l':=(TABLES v_S')) (l2':= v_tableinst_2) in HLength => //=.
-	split.
-	- apply (Nat.lt_le_trans _ _ _ H2 HLength).
-	-  
-		rewrite H1 in H2.
-		apply lookup_app with (l' := v_tableinst_2) in H2.
-		rewrite <- HApp in H2.
-		rewrite <- H2.
-		rewrite <- H5. split => //=.
-		rewrite <- H4 in H.
-		injection H as ?.
-		inversion H0. inversion H8. destruct H11.
-		subst.
-		injection H12 as ?.
-		apply Tabletype_sub__.
-		apply Limits_sub__.
-		subst.
-		unfold ge in H11. split.
-		unfold ge.
-		eapply Nat.le_trans; eauto.
-		apply H14.
-Qed. *)
+Proof.
+	move => v_S v_S' v_tableaddr v_tableinst_1' v_tableinst_2 v_tabletype HOk HApp Hext.
+	inversion HOk; subst.
+	eapply Forall2_nth in Hext as [HLength Hforall].
+	rewrite -!size_length in HLength.
+
+	eapply Hforall with (d := default_val) (d' := default_val) in H1 as HExt.
+	inversion HExt; subst.
+	inversion H4; subst.
+	inversion H5; subst.
+
+	rewrite /lookup_total in H3.
+	rewrite H3 in H.
+	inversion H; subst; clear H.
+
+	eapply extaddr_ok_table with
+		(v_tt' := mk_tabletype (mk_limits v_n2 (mk_uN 32 v_n_12)) v_rt0)
+		(v_ref := v_ref_2).
+	{
+		rewrite HApp.
+		rewrite -size_length size_cat -HLength.
+		by eapply ltn_addr.
+	}
+	{
+		rewrite HApp /lookup_total.
+		rewrite -size_length in H1.
+		rewrite HLength in H1.
+		move/ltP in H1.
+		eapply app_nth1 with
+		(d := default_val)
+		(l' := v_tableinst_2)
+		in H1.
+		rewrite H1 /lookup_total.
+		by rewrite -H0.
+	}
+	{
+		inversion H4; subst.
+		econstructor.
+		destruct v_n2.
+		econstructor.
+		- eapply leq_trans. by eapply H6. by simpl in H2.
+		- auto.
+	}
+Qed.
 
 Lemma global_agree_extension: forall v_S v_S' v_globaladdr v_globalinst_1' v_globalinst_2 v_globaltype,
     Externaddrs_ok v_S (EXTADDR_GLOBAL v_globaladdr) (EXT_GLOBAL v_globaltype) ->
-	length (GLOBALS v_S) = length v_globalinst_1' ->
 	GLOBALS v_S' = (v_globalinst_1' ++ v_globalinst_2) -> 
 	Forall2 (fun v s => Global_extension v s) (GLOBALS v_S) v_globalinst_1' ->
     Externaddrs_ok v_S' (EXTADDR_GLOBAL v_globaladdr) (EXT_GLOBAL v_globaltype).
-Admitted.
-(* Proof.
-	move => v_S v_S' v_globaladdr v_globalinst_1' v_globalinst_2 v_globaltype HOk HLength HApp Hext.
-	inversion HOk; destruct H2; subst.
-	apply Forall2_lookup in Hext; destruct Hext.
-	apply H0 in H2 as H2'.
-	inversion H2'.
-	eapply Externaddrs_ok__global with (v_val_ := v_c2).
-	apply (length_app_lt) with (l':=(GLOBALS v_S')) (l2':= v_globalinst_2) in HLength => //=.
-	split.
-	- apply (Nat.lt_le_trans _ _ _ H2 HLength).
-	- 
-		rewrite H in H2.
-		apply lookup_app with (l' := v_globalinst_2) in H2.
-		rewrite <- HApp in H2.
-		rewrite <- H2.
-		rewrite <- H1 in H3.
-		injection H3 as ?.
-		subst => //=.
-Qed. *)
+Proof.
+	move => v_S v_S' v_globaladdr v_globalinst_1' v_globalinst_2 v_globaltype HOk HApp Hext.
+	inversion HOk; subst.
+	apply Forall2_lookup in Hext as [HLength Hext].
+	move/ltP in H2.
+	eapply Hext in H2 as HG.
+
+	assert (v_globaladdr < Datatypes.length (GLOBALS v_S')).
+	{
+		rewrite HApp.
+		rewrite -size_length size_cat.
+		rewrite -!size_length in HLength.
+		rewrite -HLength.
+		eapply ltn_addr.
+		by move/ltP in H2.
+	}
+	inversion HG; subst; destruct H4; subst.
+	{
+		econstructor; auto.
+		{
+			rewrite HApp /lookup_total.
+			rewrite HLength in H2.
+			eapply app_nth1 with
+				(d := default_val)
+				(l' := v_globalinst_2)
+			in H2.
+			rewrite H2.
+			rewrite /lookup_total in H1.
+			rewrite -H1.
+			rewrite H3 in H0; inversion H0.
+			eauto.
+		}
+	}
+	{
+		econstructor; auto.
+		{
+			rewrite HApp /lookup_total.
+			rewrite HLength in H2.
+			eapply app_nth1 with
+				(d := default_val)
+				(l' := v_globalinst_2)
+			in H2.
+			rewrite H2.
+			rewrite /lookup_total in H1.
+			rewrite -H1.
+			rewrite H3 in H0; inversion H0.
+			eauto.
+		}
+	}
+Qed.
 
 Lemma mem_agree_extension: forall v_S v_S' v_memaddr v_meminst_1' v_meminst_2 v_memtype,
     Externaddrs_ok v_S (EXTADDR_MEM v_memaddr) (EXT_MEM v_memtype) ->
-	length (MEMS v_S) = length v_meminst_1' ->
 	MEMS v_S' = (v_meminst_1' ++ v_meminst_2) -> 
 	Forall2 (fun v s => Mem_extension v s) (MEMS v_S) v_meminst_1' ->
     Externaddrs_ok v_S' (EXTADDR_MEM v_memaddr) (EXT_MEM v_memtype).
-Admitted.
-(* Proof.
-	move => v_S v_S' v_memaddr v_meminst_1' v_meminst_2 v_memtype HOk HLength HApp Hext.
-	inversion HOk; destruct H2; subst; destruct H3 as [? ?].
-	apply Forall2_lookup in Hext; destruct Hext.
-	apply H3 in H2 as H2'.
-	inversion H2'. 
-	eapply Externaddrs_ok__mem.
-	apply (length_app_lt) with (l':=(MEMS v_S')) (l2':= v_meminst_2) in HLength => //=.
-	split.
-	- apply (Nat.lt_le_trans _ _ _ H2 HLength).
-	-  
-		rewrite H1 in H2.
-		apply lookup_app with (l' := v_meminst_2) in H2.
-		rewrite <- HApp in H2.
-		rewrite <- H2.
-		rewrite <- H5. repeat split => //=. 
-		rewrite <- H4 in H.
-		injection H as ?.
-		inversion H0. inversion H8. destruct H11.
-		subst.
-		injection H12 as ?.
-		apply Limits_sub__.
-		subst.
-		unfold ge in H11. split.
-		unfold ge.
-		eapply Nat.le_trans; eauto.
-		apply H14.
-Qed. *)
+Proof.
+	move => v_S v_S' v_memaddr v_meminst_1' v_meminst_2 v_memtype HOk HApp Hext.
+	inversion HOk; subst.
+	apply Forall2_lookup in Hext as [HLength Hext].
+	move/ltP in H1.
+	eapply Hext in H1 as HMe.
+	inversion H4; subst.
+	inversion H; subst.
+	inversion HMe; subst.
+	rewrite H3 in H5; inversion H5; subst; clear H5.
+
+	eapply extaddr_ok_mem.
+	{
+		rewrite HApp.
+		rewrite -size_length size_cat.
+		rewrite -!size_length in HLength.
+		rewrite -HLength.
+		eapply ltn_addr.
+		by move/ltP in H1.
+	}
+	{
+		rewrite HApp /lookup_total.
+		rewrite HLength in H1.
+		eapply app_nth1 with
+			(d := default_val)
+			(l' := v_meminst_2)
+		in H1.
+		rewrite H1.
+		rewrite /lookup_total in H6.
+		rewrite -H6.
+		eauto.
+	}
+	{
+		econstructor.
+		destruct v_n2.
+		econstructor.
+		- eapply leq_trans; eauto.
+		- eauto.
+	}
+Qed.
 
 Lemma func_extension_C: forall v_S v_S' v_funcaddrs v_funcinst_1' v_funcinst_2 tcf,
     Forall2 (fun v s => Externaddrs_ok v_S (EXTADDR_FUNC v) (EXT_FUNC s)) v_funcaddrs tcf ->
@@ -545,7 +600,6 @@ Lemma ext_extension_C: forall v_S v_S' v_exportinst,
 	Forall (Export_instance_ok v_S) v_exportinst -> 
 	Forall (Export_instance_ok v_S') v_exportinst.
 Proof.
-Admitted. (*
 	move => v_S v_S' v_exportinst.
 	move: v_S v_S'.
 	induction v_exportinst;
@@ -556,13 +610,50 @@ Admitted. (*
 		subst.
 		eapply mk_Export_instance_ok with (v_ext := v_ext).
 		inversion Hext; decomp. 
-		inversion H3; subst; destruct H20.
-		- inversion H6.
-		- inversion H7.
-		- inversion H8.
-		- inversion H9.
+		inversion H3; subst.
+		+ eapply func_agree_extension; eauto.
+		+ eapply table_agree_extension; eauto.
+		+ eapply mem_agree_extension; eauto.
+		+ eapply global_agree_extension; eauto.
 	- eapply IHv_exportinst; eauto.
-Qed. *)
+Qed.
+
+Lemma elem_length_extension: forall v_S v_S' v_elemaddr,
+    Store_extension v_S v_S' ->
+	Forall (λ a , a < Datatypes.length (ELEMS v_S)) v_elemaddr ->
+	Forall (λ a , a < Datatypes.length (ELEMS v_S')) v_elemaddr.
+Proof.
+	move => v_S v_S' v_elemaddr HSe HForall.
+	inversion HSe; subst.
+	induction HForall; auto.
+	- econstructor.
+	  + rewrite H9.
+	    rewrite -size_length.
+		rewrite size_cat.
+		eapply ltn_addr.
+		rewrite size_length.
+		rewrite -H19.
+		auto.
+	  + auto.
+Qed.
+
+Lemma elem_agree_extension: forall v_S v_S' a a' t,
+	Element_instance_ok v_S a t ->
+	Store_extension v_S v_S' -> 
+	Elem_extension a a' ->
+	Element_instance_ok v_S' a' t.
+Proof.
+	move => v_S v_S' a a' t HOk HST Hext.
+Admitted.
+
+
+Lemma elem_extension_C: forall v_S v_S' aa ts v_eleminst_1' v_eleminst_2,
+	Forall2 (λ a t, Element_instance_ok v_S (lookup_total (ELEMS v_S) a) t) aa ts ->
+	ELEMS v_S' = (v_eleminst_1' ++ v_eleminst_2) -> 
+	Forall2 (fun v s => Elem_extension v s) (ELEMS v_S) v_eleminst_1' ->
+	Forall2 (λ a t, Element_instance_ok v_S' (lookup_total (ELEMS v_S') a) t) aa ts.
+Proof.
+Admitted.
 
 Lemma module_inst_typing_extension: forall v_S v_S' v_i v_C,
     Store_extension v_S v_S' ->
@@ -573,14 +664,48 @@ Proof.
 	inversion HStoreExtension.
 	inversion HMIT; decomp.
 	subst.
-	apply mk_Module_instance_ok; repeat split => //=; auto.
-Admitted. (*
+	apply mk_Module_instance_ok; auto.
 	- eapply func_extension_C; eauto.
 	- eapply table_extension_C; eauto.
-	- eapply global_extension_C ; eauto.
 	- eapply mem_extension_C; eauto.
-	- eapply ext_extension_C; eauto.
+	- eapply global_extension_C; eauto.
+	- eapply elem_length_extension; eauto.
+	-
 Qed. *)
+
+Lemma funcinst_same: forall f1 f2,
+	Forall2 (λ v_funcinst_1 v_funcinst_1' : funcinst, Func_extension v_funcinst_1 v_funcinst_1') f1 f2 ->
+	f1 = f2.
+Proof.
+	move => f1 f2 Hfe.
+	induction Hfe; eauto.
+	by inversion H; subst.
+Qed.
+
+Lemma val_typing_extension: forall v_S v_S' v_t v_val,
+	Store_extension v_S v_S' ->
+	Val_ok v_S v_val v_t ->
+	Val_ok v_S' v_val v_t.
+Proof.
+	move => v_S v_S' v_t v_val Hs Hv1.
+	inversion Hs; subst.
+	clear - Hv1 H12 H5.
+	eapply funcinst_same in H12; subst.
+
+	induction Hv1; try by constructor.
+	econstructor.
+
+	inversion H; subst; eauto; try econstructor.
+	inversion H0; subst; econstructor.
+	- rewrite H5. rewrite -size_length size_cat.
+		by eapply ltn_addr.
+	- rewrite H5.
+		rewrite /lookup_total -{1}app_cat.
+		move/ltP in H4.
+		rewrite (app_nth1 _ _ _ H4).
+		rewrite /lookup_total in H6.
+		eauto.
+Qed.
 
 Lemma vals_typing_extension: forall v_S v_S' v_t v_val,
 	Store_extension v_S v_S' ->
@@ -589,35 +714,50 @@ Lemma vals_typing_extension: forall v_S v_S' v_t v_val,
 Proof.
 	rewrite /Vals_ok.
 	move => v_S v_S' v_t v_val Hs Hv1.
-	inversion Hs; subst.
-	clear - Hv1 H12 H5.
-
-	assert (v_funcinst_1' = FUNCS v_S) as Heq. {
-		clear Hv1 H5.
-		induction H12; eauto.
-		by inversion H; subst.
-	}
-	clear H12; subst.
-
-	induction Hv1; auto.
-	constructor; auto.
-
-	inversion H; subst; eauto; try econstructor.
-	inversion H0; subst; try econstructor.
-	instantiate (1 := v_ext).
-	inversion H1; subst.
-	econstructor.
-	- rewrite H5. rewrite -size_length size_cat.
-		by eapply ltn_addr.
-	- rewrite H5.
-		rewrite /lookup_total -{1}app_cat.
-		move/ltP in H6.
-		rewrite (app_nth1 _ _ _ H6).
-		rewrite /lookup_total in H7.
-		eauto.
+	eapply List.Forall2_impl.
+	2: eauto.
+	move => t v.
+	simpl.
+	move => H.
+	eapply val_typing_extension; eauto.
 Qed.
 
-(*
+Lemma func_typing_extension: forall s s' v t,
+	Store_extension s s' ->
+	Function_instance_ok s v t ->
+	Function_instance_ok s' v t.
+Proof.
+	move => s s' v t HS H.
+	inversion H; subst.
+	econstructor; eauto.
+	eapply val_typing_extension; eauto.
+Qed.
+
+Lemma global_typing_extension: forall s s' v t,
+	Store_extension s s' ->
+	Global_instance_ok s v t ->
+	Global_instance_ok s' v t.
+Proof.
+	move => s s' v t HS HG.
+	inversion HG; subst.
+	econstructor; eauto.
+	eapply val_typing_extension; eauto.
+Qed.
+
+Lemma globals_typing_extension: forall s s' vs ts,
+	Store_extension s s' ->
+	Forall2 (λ v t, Global_instance_ok s v t) vs ts ->
+	Forall2 (λ v t, Global_instance_ok s' v t) vs ts.
+Proof.
+	move => s s' vs ts HS HG.
+	eapply List.Forall2_impl.
+	2: eauto.
+	move => t v.
+	simpl.
+	move => H.
+	eapply global_typing_extension; eauto.
+Qed.
+
 Lemma global_instance_fine: forall s s' v_globaltype v_f v_x v_valtype v_val_,
     Forall2 (fun v vt => Global_instance_ok s v vt) (GLOBALS s) v_globaltype ->
 	Forall2 (fun g g' => Global_extension g g') (GLOBALS s) (GLOBALS s') ->
@@ -625,8 +765,8 @@ Lemma global_instance_fine: forall s s' v_globaltype v_f v_x v_valtype v_val_,
 	(TABLES s = TABLES s') ->
 	(MEMS s = MEMS s') ->
 	(GLOBALS s') = list_update_func (GLOBALS s)
-	(lookup_total (MODULE_GLOBALS (F_MODULE v_f)) v_x)
-	[eta set VALUE (fun=> VAL_CONST v_valtype v_val_)] -> 
+		(lookup_total (MODULE_GLOBALS (F_MODULE v_f)) v_x)
+		[eta set GLOB_VALUE (fun=> VAL_CONST v_valtype v_val_)] -> 
 	Forall2 (fun v vt => Global_instance_ok s' v vt) (GLOBALS s) v_globaltype.
 Admitted.
 (* Proof.
@@ -658,6 +798,7 @@ Admitted.
 				eapply Global_instance_ok__; eauto.
 Qed. *)
 
+(*
 Lemma store_global_extension_store_typed: forall s s' v_f v_C v_valtype v_val_ v_x v_mut v_valtype0 v_val_0,
     Store_ok s ->
     Store_extension s s' ->
@@ -677,7 +818,7 @@ Lemma store_global_extension_store_typed: forall s s' v_f v_C v_valtype v_val_ v
     (MEMS s = MEMS s') ->
 	((lookup_total (MODULE_GLOBALS (F_MODULE v_f)) v_x) < length (GLOBALS s))%coq_nat ->
     Store_ok s'.
-Admitted.
+Admitted. *)
 (* Proof.
 	move => s s' f C v_valtype v_val_ v_x v_mut v_valtype0 v_val_0 HSOK Hext HIT HITS' HUpdate HGlobInst HLGlobal HFeq HTeq HMeq HLength.
 	inversion HSOK; decomp.
@@ -737,7 +878,7 @@ Admitted.
 	- apply Forall2_forall2; split => //=. move => x y HIn.
 		apply Forall2_forall2 in H8; destruct H8. apply H11 in HIn. inversion HIn; decomp; subst. 
 		eapply Memory_instance_ok__; repeat split => //=; eauto.
-Qed. *) *)
+Qed. *)
 
 Lemma fold_prepend_label : forall C lab lab1,
 	prepend_label (upd_label C lab) lab1 =
@@ -942,12 +1083,13 @@ Proof.
 		join_subtyping_eq Hsub Hsub0.
 		eapply Val_ok_non_bot in HValok as Hnonbot.
 		eapply valtype_sub_non_bot in Hsubv; eauto.
-		subst.
+		subst. clear Hsub Hsubi Hnonbot.
 
 		remember  (s <| GLOBALS :=
 			list_update_func (GLOBALS s) (lookup_total (MODULE_GLOBALS (F_MODULE f)) (fun_proj_uN_0 32 v_x))
 			[eta set GLOB_VALUE (fun=> v_val)] |>) as s'.
-		split.
+
+		assert (Store_extension s s').
 		{
 			eapply mk_Store_extension with
 				(v_funcinst_2 := [])
@@ -960,22 +1102,46 @@ Proof.
 			; eauto;
 			try solve [
 				rewrite Heqs';
-				by rewrite cats0
+				by rewrite cats0 |
+				by rewrite Heqs'; rewrite list_update_length_func
 			].
-			by rewrite Heqs'; rewrite list_update_length_func.
-			destruct s eqn: Heqs. simpl.
-			rewrite Heqs'; simpl.
-			destruct C, C'; rewrite /inst_match in HMatch; destruct_all;
-			simpl in *.
-			inversion HStore; inversion H; clear H.
-			eapply Forall2_global with
-				(v_S := s)
-				(v_globaltype := v_globaltype)
-				(v_valtype := t)
-				; try by subst; eauto.
-			admit.
-			admit.
+
+			eapply invert_globals in HIT; eauto.
+
+			eapply Forall2_nth2 in HIT as [_ HIT].
+			eapply HIT with
+				(d := default_val)
+				(d' := default_val) in H1.
+			destruct_all.
+			rewrite /lookup_total in H0.
+			rewrite H0 in H3.
+			inversion H3; subst; clear H3.
+			rewrite /lookup_total in H4.
+
+			eapply Forall2_global; eauto.
 		}
+		split; auto.
+
+		inversion HStore.
+		eapply store_extension_global_ok in H.
+		{
+		}
+
+		destruct s.
+		rewrite /set in Heqs'.
+		simpl in Heqs'.
+		inversion HStore; inversion H; subst.
+		econstructor. eauto.
+		3: {
+			rewrite list_update_length_func.
+			instantiate (1 := v_globaltype).
+			eauto.
+		}
+		3: {
+			Search Global_instance_ok/
+		}
+		simpl in *; eauto.
+		econstructor; try solve [inversion HStore; by].
 		admit.
 	}
 	{ (* Table Set *)
