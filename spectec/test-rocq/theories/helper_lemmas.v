@@ -124,12 +124,12 @@ Proof.
 	rewrite <- List.length_zero_iff_nil => //=.
 Qed.  
 
-Lemma Forall2_nth {A : Type} {B : Type} (l : list A) (l' : list B) (R : A -> B -> Prop) :
-      Forall2 R l l' -> length l = length l' /\ (forall i d d', (i < length l) -> R (List.nth i l d) (List.nth i l' d')).
+Lemma Forall2_nth {A : Type} {B : Type} {_ : Inhabited A} {_ : Inhabited B} (l : list A) (l' : list B) (R : A -> B -> Prop) :
+      Forall2 R l l' -> length l = length l' /\ (forall i, (i < length l) -> R (List.nth i l default_val) (List.nth i l' default_val)).
 Proof.
 	move => H.
 	split. apply (Forall2_length) in H. apply H.
-	move => i d d' H'.
+	move => i H'.
 	move/ltP in H'.
 	generalize dependent i. induction H; move => i HLength. 
 		+ apply Nat.nlt_0_r in HLength. exfalso. apply HLength.
@@ -138,12 +138,12 @@ Proof.
 			+ simpl in HLength. apply Nat.succ_lt_mono in HLength. apply IHForall2. apply HLength.
 Qed.
 
-Lemma Forall2_nth2 {A : Type} {B : Type} (l : list A) (l' : list B) (R : A -> B -> Prop) :
-      Forall2 R l l' -> length l = length l' /\ (forall i d d', (i < length l') -> R (List.nth i l d) (List.nth i l' d')).
+Lemma Forall2_nth2 {A : Type} {B : Type} {_ : Inhabited A} {_ : Inhabited B} (l : list A) (l' : list B) (R : A -> B -> Prop) :
+      Forall2 R l l' -> length l = length l' /\ (forall i, (i < length l') -> R (List.nth i l default_val) (List.nth i l' default_val)).
 Proof.
 	move => H.
 	split. apply (Forall2_length) in H. apply H.
-	move => i d d' H'.
+	move => i H'.
 	move/ltP in H'.
 	generalize dependent i. induction H; move => i HLength. 
 		+ apply Nat.nlt_0_r in HLength. exfalso. apply HLength.
@@ -495,17 +495,16 @@ Proof.
 Qed. 
 
 Lemma lookup_app: forall {A : Type} {B : Inhabited A} (l l' : list A) (n : nat),
-	(n < List.length l)%coq_nat ->
+	(n < List.length l) ->
 	lookup_total l n = lookup_total (l ++ l') n.
 Proof.
 	move => A B l l' n.
 	move: l l'.
 	induction n; move => l l' H.
-	- destruct l => //=. simpl in H. apply Nat.nlt_0_r in H. exfalso. apply H.
+	- destruct l => //=.
 	- destruct l => //=. 
-		- simpl in H. apply Nat.nlt_0_r in H. exfalso. apply H.
-		- unfold lookup_total. simpl.
-		apply IHn. apply Nat.succ_lt_mono. apply H.
+	  unfold lookup_total. simpl.
+	  apply IHn. apply H.
 Qed.
 
 
