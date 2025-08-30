@@ -113,17 +113,20 @@ def $with_data((s; f), x, b*) = s[.DATAS[f.MODULE.DATAS[x]].BYTES = b*]; f
 
 ;; Growing
 
-def $growtable(tableinst, nat, ref) : tableinst hint(partial)
-def $growmemory(meminst, nat) : meminst         hint(partial)
+relation growtable: |- tableinst; nat; ref : tableinst
+relation growmemory: |- meminst; nat : meminst
 
-def $growtable(ti, n, r) = ti'
-  -- if ti = { TYPE (`[i .. j] rt), REFS r'* }
+rule growtable:
+  |- tableinst_1; n; r : tableinst_2
+  -- if tableinst_1 = { TYPE (`[i .. j] rt), REFS r'* }
   -- if i' = $(|r'*| + n)
-  -- if ti' = { TYPE (`[i' .. j] rt), REFS r'* r^n }
+  -- if tableinst_2 = { TYPE (`[i' .. j] rt), REFS r'* r^n }
   -- if $(i' <= j)
+  -- if n = |r^n|
 
-def $growmemory(mi, n) = mi'
-  -- if mi = { TYPE (`[i .. j] PAGE), BYTES b* }
+rule growmemory:
+  |- meminst_1; n : meminst_2
+  -- if meminst_1 = { TYPE (`[i .. j] PAGE), BYTES b* }
   -- if i' = $(|b*| / (64 * $Ki) + n)
-  -- if mi' = { TYPE (`[i' .. j] PAGE), BYTES b* 0^(n * $($(64 * $Ki))) }
+  -- if meminst_2 = { TYPE (`[i' .. j] PAGE), BYTES b* 0^(n * $($(64 * $Ki))) }
   -- if $(i' <= j)

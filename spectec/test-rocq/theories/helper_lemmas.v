@@ -435,6 +435,25 @@ Proof.
 		f_equal. apply IHi.
 Qed.
 
+Lemma list_slice_update_length: forall {A : Type} (l l': list A) (i n: nat),
+	n = length l' ->
+	length (list_slice_update l i n l') = length l.
+Proof.
+	move => A l l' i n HLength.
+	subst.
+	move : i l'.
+	induction l; move => i l'; auto.
+	destruct i; simpl.
+	{
+		destruct l'; simpl; auto.
+	}
+	destruct l'; simpl; auto.
+	f_equal.
+	assert (S (length l') = length (a0 :: l')). { auto. }
+	rewrite H.
+	eapply IHl.
+Qed.
+
 Lemma split_append_last : forall {A : Type} (z : list A) (y : list A) (i : A) (j : A),
 	@app _ z [i] = @app _ y [j] ->
 	z = y /\ i = j.
@@ -660,4 +679,62 @@ Proof.
 	rewrite cat1s.
 	rewrite addn1.
 	reflexivity.
+Qed.
+
+Lemma add_sub : forall a b,
+	a + b - b = a.
+Proof.
+	move => a b.
+	by eapply Nat.add_sub.
+Qed.
+
+Lemma add_sub' : forall a b,
+	a + b - a = b.
+Proof.
+	move => a b.
+	rewrite addnC.
+	by eapply Nat.add_sub.
+Qed.
+
+Lemma sizecat_le1: forall {A: Type} (l l': seq A),
+	size l <= size (l ++ l').
+Proof.
+	move => A l l'.
+	rewrite size_cat.
+	eapply leq_addr.
+Qed.
+
+Lemma sizecat_le2: forall {A: Type} (l l': seq A),
+	size l' <= size (l ++ l').
+Proof.
+	move => A l l'.
+	rewrite size_cat.
+	eapply leq_addl.
+Qed.
+
+Lemma lt_irrefl: forall x, x < x = false.
+Proof.
+  move => x.
+  induction x as [| n IH]; simpl; auto.
+Qed.
+
+Lemma drop_size_cat : forall {A: Type} (x y : seq A),
+  drop (size x) (x ++ y) = y.
+Proof.
+  move => A x y.
+  rewrite drop_cat.
+  rewrite ltnn.
+  rewrite subnn.
+  by rewrite drop0.
+Qed.
+
+Lemma take_size_cat : forall {A: Type} (x y : seq A),
+  take (size x) (x ++ y) = x.
+Proof.
+  move => A x y.
+  rewrite take_cat.
+  rewrite ltnn.
+  rewrite subnn.
+  rewrite take0.
+  apply cats0.
 Qed.

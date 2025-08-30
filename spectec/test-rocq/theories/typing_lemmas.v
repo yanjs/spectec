@@ -1813,6 +1813,8 @@ Proof.
 	- destruct v_rt; discriminate.
 Qed.
 
+
+
 Lemma Vals_ok_non_bot : forall v_S v_val v_ts,
 	Forall2	(λ (v_t0 : valtype) (v_val0 : wasm.val),
 		Val_ok v_S v_val0 v_t0) v_ts v_val ->
@@ -1838,6 +1840,14 @@ Proof.
 	}
 Qed.
 
+Lemma Ref_ok_non_bot : forall v_S v_val (v_t: reftype),
+	Ref_ok v_S v_val v_t ->
+	(v_t: valtype) <> VALTYPE_BOT.
+Proof.
+	move=> v_S v_val v_t HRefok.
+	inversion HRefok; subst; try discriminate.
+	destruct v_t; discriminate.
+Qed.
 
 (*
 Ltac apply_instrs_composition_typing_single H := 

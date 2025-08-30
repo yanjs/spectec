@@ -230,18 +230,17 @@ Proof.
 		eapply valtype_sub_non_bot in Hsubv; eauto.
 		subst. clear Hsub Hsubi Hnonbot.
 
-		remember  (s <| GLOBALS :=
-			list_update_func (GLOBALS s) (lookup_total (MODULE_GLOBALS (F_MODULE f)) (fun_proj_uN_0 32 v_x))
-			[eta set GLOB_VALUE (fun=> v_val)] |>) as s'.
 		remember ((fun_proj_uN_0 32 v_x)) as v_i.
-
+		remember ((lookup_total (MODULE_GLOBALS (F_MODULE f)) v_i)) as ga.
+		remember  (s <| GLOBALS :=
+			list_update_func (GLOBALS s) ga
+			[eta set GLOB_VALUE (fun=> v_val)] |>) as s'.
 
 		assert (
-			lookup_total (MODULE_GLOBALS (F_MODULE f)) v_i
-			< Datatypes.length (GLOBALS s) /\ exists t v,
-			lookup_total (GLOBALS s) (lookup_total (MODULE_GLOBALS (F_MODULE f)) v_i)
-			= {| GLOB_TYPE := mk_globaltype (Some MUT) t; GLOB_VALUE := v |})
-			as [HLen [v_t [v_old HLookup]]].
+			ga < Datatypes.length (GLOBALS s) /\
+			exists v, lookup_total (GLOBALS s) ga =
+				{| GLOB_TYPE := mk_globaltype (Some MUT) t; GLOB_VALUE := v |})
+			as [HLen [v_old HLookup]].
 		{
 			eapply minst_invert_globals in HIT; eauto.
 
@@ -254,7 +253,7 @@ Proof.
 			rewrite /lookup_total in H4.
 
 			split. auto.
-			by exists extr0, extr1.
+			by exists extr1.
 		}
 
 		assert (Store_extension s s').
@@ -283,7 +282,7 @@ Proof.
 			(v_funcinst := v_funcinst)
 			(v_globalinst :=
 				list_update_func (GLOBALS s)
-					(lookup_total (MODULE_GLOBALS (F_MODULE f)) (fun_proj_uN_0 32 v_x))
+					ga
 					[eta set GLOB_VALUE (fun=> v_val)])
 			(v_tableinst := v_tableinst)
 			(v_meminst := v_meminst)
@@ -295,6 +294,7 @@ Proof.
 			first [
 				eapply store_extension_funcinsts; eauto |
 				eapply store_extension_tableinsts; eauto |
+				eapply store_extension_globalinsts; eauto |
 				eapply store_extension_meminsts; eauto |
 				eapply store_extension_eleminsts; eauto |
 				eapply store_extension_datainsts; eauto |
@@ -302,57 +302,752 @@ Proof.
 			].
 		- rewrite {1}list_update_length_func {1}H2; eauto.
 		- {
-			remember (list_update_func (GLOBALS s) (lookup_total (MODULE_GLOBALS (F_MODULE f)) (fun_proj_uN_0 32 v_x))
-[eta set GLOB_VALUE (fun=> v_val)]) as v_globalinst1.
-			induction v_globaltype.
-			{
-				destruct v_globalinst1; auto.
-				inversion H6; subst.
-				simpl in Heqv_globalinst1.
-				discriminate.
-			}
-			{
-				destruct v_globalinst1; auto.
-				inversion H6; subst.
-				simpl in Heqv_globalinst1.
-			}
+			eapply construct_globalinsts; subst; eauto.
 		}
-		- admit.
-		- eapply tables_typing_extension; eauto.
-			
-			
-			
-			.
-		; econstructor; subst; simpl;
-		rewrite /set; simpl.
-
-		admit.
 	}
 	{ (* Table Set *)
-		admit.
+		destruct_all; subst.
+		invert_ais_typing.
+		resolve_all_pt.
+		Opaque instrtype_sub.
+		join_subtyping_ge Hsub Hsub0.
+		join_subtyping_eq Hsubi Hsub1.
+		eapply Ref_ok_non_bot in HRefok as Hnonbot.
+		eapply valtype_sub_non_bot in Hsubv0; eauto.
+		subst. clear Hsub Hsubi Hnonbot.
+
+		remember ((fun_proj_uN_0 32 v_i)) as i.
+		remember ((fun_proj_uN_0 32 v_x)) as j.
+		remember ((lookup_total (MODULE_TABLES (F_MODULE f)) j)) as tba.
+		remember  (s <| TABLES :=
+			list_update_func (TABLES s) tba
+			(λ v_1 : tableinst, v_1
+				<| TAB_REFS := list_update_func (TAB_REFS v_1) i (fun=> v_ref)
+			|>) |>) as s'.
+
+		assert (
+			tba < Datatypes.length (TABLES s) /\
+			exists tbt' tbr,
+				((lookup_total (TABLES s) tba) =
+					{| TAB_TYPE := tbt'; TAB_REFS := tbr |}))
+			as [HLen [tbt' [tbr HLookup]]].
+		{
+			eapply minst_invert_tables in HIT; eauto.
+
+			eapply Forall2_nth2 in HIT as [_ HIT].
+			eapply HIT in H1.
+			destruct_all.
+			rewrite /lookup_total in H0.
+			rewrite H0 in H3.
+			inversion H3; subst; clear H3.
+			rewrite /lookup_total in H4.
+
+			split. auto.
+			by exists (mk_tabletype v_lim_1 extr), extr2.
+		}
+
+		assert (Store_extension s s').
+		{
+			eapply mk_Store_extension with
+				(v_funcinst_2 := [])
+				(v_tableinst_2 := [])
+				(v_meminst_2 := [])
+				(v_globalinst_2 := [])
+				(v_eleminst_2 := [])
+				(v_datainst_2 := [])
+				(v_tableinst_1' := TABLES s')
+			; eauto;
+			try solve [
+				rewrite Heqs';
+				by rewrite cats0 |
+				by rewrite Heqs'; rewrite list_update_length_func
+			].
+			subst; rewrite {1}/set /=.
+			eapply table_set_table_extension; eauto.
+		}
+		split; auto.
+
+		inversion HStore.
+		eapply mk_Store_ok with
+			(v_funcinst := v_funcinst)
+			(v_globalinst := v_globalinst)
+			(v_tableinst := list_update_func (TABLES s) tba
+				(λ v_1 : tableinst, v_1 <| TAB_REFS :=
+					list_update_func (TAB_REFS v_1) i (fun=> v_ref)
+				|>))
+			(v_meminst := v_meminst)
+			(v_eleminst := v_eleminst)
+			(v_datainst := v_datainst)
+			; auto;
+			try solve [subst; auto];
+			try solve eauto;
+			first [
+				eapply store_extension_funcinsts; eauto |
+				eapply store_extension_tableinsts; eauto |
+				eapply store_extension_globalinsts; eauto |
+				eapply store_extension_meminsts; eauto |
+				eapply store_extension_eleminsts; eauto |
+				eapply store_extension_datainsts; eauto |
+				eauto
+			].
+		- rewrite {1}list_update_length_func {1}H3; eauto.
+		- {
+			eapply construct_tableinsts; subst; eauto.
+		}
 	}
 	{ (* Table Grow *)
+		destruct_all; subst.
+		invert_ais_typing.
+		resolve_all_pt.
+		Opaque instrtype_sub.
+		join_subtyping_ge Hsub Hsub1.
+		join_subtyping_eq Hsubi Hsub0.
+		eapply Ref_ok_non_bot in HRefok as Hnonbot.
+		eapply valtype_sub_non_bot in Hsubv; eauto.
+		subst. clear Hsub Hsubi Hnonbot.
+		rewrite /fun_table in H.
+		inversion H; subst.
+
 		admit.
+		(*
+
+		remember ((fun_proj_uN_0 32 v_x)) as i.
+		remember ((lookup_total (MODULE_TABLES (F_MODULE f)) i)) as tba.
+		remember ((mk_limits (mk_uN 32 (Datatypes.length v_r' + v_n)) v_j))
+			as v_limits_new.
+		remember (({| TAB_TYPE := mk_tabletype v_limits_new
+			v_rt; TAB_REFS := v_r' ++ [v_ref] |})) as v_ti.
+		remember  (s <| TABLES := list_update_func (TABLES s) tba
+					(fun=> v_ti) |>) as s'.
+		
+
+
+		assert (
+			tba < Datatypes.length (TABLES s) /\
+			exists tbt' tbr,
+				((lookup_total (TABLES s) tba) =
+					{| TAB_TYPE := tbt'; TAB_REFS := tbr |}))
+			as [HLen [tbt' [tbr HLookup]]].
+		{
+			eapply minst_invert_tables in HIT; eauto.
+
+			eapply Forall2_nth2 in HIT as [_ HIT].
+			eapply HIT in H1.
+			destruct_all.
+			rewrite /lookup_total in H0.
+			rewrite H0 in H4.
+			inversion H4; subst; clear H4.
+			rewrite /lookup_total in H4.
+
+			split. auto.
+			by exists (mk_tabletype v_lim_1 extr), extr2.
+		}
+		(* Cannot be proven as missing information about the new table *)
+		admit.
+		(*
+		assert (Store_extension s s').
+		{
+			eapply mk_Store_extension with
+				(v_funcinst_2 := [])
+				(v_tableinst_2 := [])
+				(v_meminst_2 := [])
+				(v_globalinst_2 := [])
+				(v_eleminst_2 := [])
+				(v_datainst_2 := [])
+				(v_tableinst_1' := TABLES s')
+			; eauto;
+			try solve [
+				rewrite Heqs';
+				by rewrite cats0 |
+				by rewrite Heqs'; rewrite list_update_length_func
+			].
+			subst; rewrite {1}/set /=.
+			eapply table_grow_table_extension; eauto.
+		}
+		split; auto.
+
+		inversion HStore.
+		eapply mk_Store_ok with
+			(v_funcinst := v_funcinst)
+			(v_globalinst := v_globalinst)
+			(v_tableinst := list_update_func (TABLES s) tba
+				(λ v_1 : tableinst, v_1 <| TAB_REFS :=
+					list_update_func (TAB_REFS v_1) i (fun=> v_ref)
+				|>))
+			(v_meminst := v_meminst)
+			(v_eleminst := v_eleminst)
+			(v_datainst := v_datainst)
+			; auto;
+			try solve [subst; auto];
+			try solve eauto;
+			first [
+				eapply store_extension_funcinsts; eauto |
+				eapply store_extension_tableinsts; eauto |
+				eapply store_extension_globalinsts; eauto |
+				eapply store_extension_meminsts; eauto |
+				eapply store_extension_eleminsts; eauto |
+				eapply store_extension_datainsts; eauto |
+				eauto
+			].
+		- rewrite {1}list_update_length_func {1}H3; eauto.
+		- {
+			eapply construct_tableinsts; subst; eauto.
+		}
+			*) *)
 	}
 	{ (* Elem Drop *)
-		admit.
+		destruct_all; subst.
+		invert_ais_typing.
+		resolve_all_pt.
+
+		remember ((fun_proj_uN_0 32 v_x)) as i.
+		remember ((lookup_total (MODULE_ELEMS (F_MODULE f)) i)) as ea.
+		remember  (s <| ELEMS :=
+			list_update_func (ELEMS s) ea [eta set ELEM_REFS (fun=> [])] |>) as s'.
+
+		assert (
+			(ea < (List.length (ELEMS s))) /\
+			exists v_rt v_ref,
+				((lookup_total (ELEMS s) ea) =
+					{| ELEM_TYPE := v_rt; ELEM_REFS := v_ref |}) /\
+				(List.Forall (fun (v_ref : ref) => (Ref_ok s v_ref v_rt)) (v_ref)))
+			as [HLen [v_rt [v_ref [HLookup HRefok]]]].
+		{
+			eapply minst_invert_elems in HIT; eauto.
+
+			eapply Forall2_nth2 in HIT as [_ HIT].
+			eapply HIT in H1.
+			destruct_all.
+			rewrite /lookup_total in Heqea.
+			rewrite -Heqea in H1.
+			split; auto.
+
+			rewrite -Heqea in H4.
+			by exists extr0, extr1.
+		}
+
+		assert (Store_extension s s').
+		{
+			eapply mk_Store_extension with
+				(v_funcinst_2 := [])
+				(v_tableinst_2 := [])
+				(v_meminst_2 := [])
+				(v_globalinst_2 := [])
+				(v_eleminst_2 := [])
+				(v_datainst_2 := [])
+				(v_eleminst_1' := ELEMS s')
+			; eauto;
+			try solve [
+				rewrite Heqs';
+				by rewrite cats0 |
+				by rewrite Heqs'; rewrite list_update_length_func
+			].
+			subst; rewrite {1}/set /=.
+			eapply elem_drop_elem_extension; eauto.
+		}
+		split; auto.
+
+		inversion HStore.
+		eapply mk_Store_ok with
+			(v_funcinst := v_funcinst)
+			(v_globalinst := v_globalinst)
+			(v_tableinst := v_tableinst)
+			(v_meminst := v_meminst)
+			(v_eleminst := list_update_func (ELEMS s) ea
+				[eta set ELEM_REFS (fun=> [])])
+			(v_datainst := v_datainst)
+			; auto;
+			try solve [subst; auto];
+			try solve eauto;
+			first [
+				eapply store_extension_funcinsts; eauto |
+				eapply store_extension_tableinsts; eauto |
+				eapply store_extension_globalinsts; eauto |
+				eapply store_extension_meminsts; eauto |
+				eapply store_extension_eleminsts; eauto |
+				eapply store_extension_datainsts; eauto |
+				eauto
+			].
+		- rewrite {1}list_update_length_func {1}H2; eauto.
+		- eapply construct_eleminsts; subst; eauto.
 	}
 	{ (* Store None *)
-		admit.
+		destruct_all; subst.
+		invert_ais_typing.
+		resolve_all_pt.
+
+		simpl.
+
+		assert (length (fun_nbytes_ v_nt v_c) = 
+			(Nat.divmod (the (fun_size v_nt)) 7 0 7).1 )
+			as Heqlen.
+		{
+			(* fun_nbytes_ not implemented *)
+			admit.
+		}
+
+		remember ((fun_proj_uN_0 32 v_i)) as i.
+		remember (fun_proj_uN_0 32 (OFFSET v_ao)) as ao.
+		remember ((lookup_total (MODULE_MEMS (F_MODULE f)) 0)) as ma.
+		remember  (s <| MEMS :=
+			list_update_func (MEMS s) ma
+				(λ v_1,
+				v_1 <| MEM_BYTES := list_slice_update (MEM_BYTES v_1) (i + ao) (Nat.divmod (the (fun_size v_nt)) 7 0 7).1
+				(fun_nbytes_ v_nt v_c) |>)	
+		|> ) as s'.
+
+		assert (
+			(ma < (List.length (MEMS s))) /\
+			exists v_mt v_mt' v_b,
+				((lookup_total (MEMS s) ma) =
+					{| MEM_TYPE := v_mt; MEM_BYTES := v_b |}) /\
+				((Memtype_sub v_mt v_mt'))
+				)
+			as [HLen [v_mt [v_mt' [v_b [HLookup HRefok]]]]].
+		{
+			eapply minst_invert_mems in HIT; eauto.
+
+			eapply Forall2_nth2 in HIT as [_ HIT].
+			eapply HIT in H1.
+			destruct_all.
+			rewrite /lookup_total in Heqma.
+			rewrite -Heqma in H1.
+			split; auto.
+
+			rewrite -Heqma in H5.
+			by exists extr0, extr, extr1.
+		}
+
+		assert (Store_extension s s').
+		{
+			eapply mk_Store_extension with
+				(v_funcinst_2 := [])
+				(v_tableinst_2 := [])
+				(v_meminst_2 := [])
+				(v_globalinst_2 := [])
+				(v_eleminst_2 := [])
+				(v_datainst_2 := [])
+				(v_meminst_1' := MEMS s')
+			; eauto;
+			try solve [
+				rewrite Heqs';
+				by rewrite cats0 |
+				by rewrite Heqs'; rewrite list_update_length_func
+			].
+			subst; rewrite {1}/set /=.
+			eapply store_none_mem_extension; eauto.
+		}
+		split; auto.
+
+		inversion HStore.
+		eapply mk_Store_ok with
+			(v_funcinst := v_funcinst)
+			(v_globalinst := v_globalinst)
+			(v_tableinst := v_tableinst)
+			(v_meminst := list_update_func (MEMS s) ma
+				(λ v_1 : meminst,
+				v_1 <| MEM_BYTES := list_slice_update (MEM_BYTES v_1) (i + ao) (Nat.divmod (the (fun_size v_nt)) 7 0 7).1
+				(fun_nbytes_ v_nt v_c) |>))
+			(v_eleminst := v_eleminst)
+			(v_datainst := v_datainst)
+			; auto;
+			try solve [subst; auto];
+			try solve eauto;
+			first [
+				eapply store_extension_funcinsts; eauto |
+				eapply store_extension_tableinsts; eauto |
+				eapply store_extension_globalinsts; eauto |
+				eapply store_extension_meminsts; eauto |
+				eapply store_extension_eleminsts; eauto |
+				eapply store_extension_datainsts; eauto |
+				eauto
+			].
+		- rewrite {1}list_update_length_func {1}H3; eauto.
+		- {
+			rewrite -Heqlen.
+			eapply construct_meminsts; subst; eauto.
+		}
 	}
 	{ (* Store Some I32 *)
-		admit.
+		destruct_all; subst.
+		invert_ais_typing.
+		resolve_all_pt.
+
+		simpl.
+
+		assert (length (fun_ibytes_ v_n (fun_wrap__ 32 v_n v_c)) = 
+			(Nat.divmod v_n 7 0 7).1 )
+			as Heqlen.
+		{
+			(* fun_ibytes_ fun_wrap__ not implemented *)
+			admit.
+		}
+
+		remember ((fun_proj_uN_0 32 v_i)) as i.
+		remember (fun_proj_uN_0 32 (OFFSET v_ao)) as ao.
+		remember ((lookup_total (MODULE_MEMS (F_MODULE f)) 0)) as ma.
+		remember  (s <| MEMS :=
+			list_update_func (MEMS s) ma
+				(λ v_1,
+				v_1 <| MEM_BYTES := list_slice_update (MEM_BYTES v_1) (i + ao) (Nat.divmod v_n 7 0 7).1
+				(fun_ibytes_ v_n (fun_wrap__ 32 v_n v_c)) |>)	
+		|> ) as s'.
+		rewrite -Heqlen in Heqs'.
+
+		assert (
+			(ma < (List.length (MEMS s))) /\
+			exists v_mt v_mt' v_b,
+				((lookup_total (MEMS s) ma) =
+					{| MEM_TYPE := v_mt; MEM_BYTES := v_b |}) /\
+				((Memtype_sub v_mt v_mt'))
+				)
+			as [HLen [v_mt [v_mt' [v_b [HLookup HRefok]]]]].
+		{
+			eapply minst_invert_mems in HIT; eauto.
+
+			eapply Forall2_nth2 in HIT as [_ HIT].
+			eapply HIT in H1.
+			destruct_all.
+			rewrite /lookup_total in Heqma.
+			rewrite -Heqma in H1.
+			split; auto.
+
+			rewrite -Heqma in H4.
+			by exists extr0, extr, extr1.
+		}
+
+		assert (Store_extension s s').
+		{
+			eapply mk_Store_extension with
+				(v_funcinst_2 := [])
+				(v_tableinst_2 := [])
+				(v_meminst_2 := [])
+				(v_globalinst_2 := [])
+				(v_eleminst_2 := [])
+				(v_datainst_2 := [])
+				(v_meminst_1' := MEMS s')
+			; eauto;
+			try solve [
+				rewrite Heqs';
+				by rewrite cats0 |
+				by rewrite Heqs'; rewrite list_update_length_func
+			].
+			subst; rewrite {1}/set /=.
+			eapply store_none_mem_extension; eauto.
+		}
+		split; auto.
+
+		inversion HStore.
+		eapply mk_Store_ok with
+			(v_funcinst := v_funcinst)
+			(v_globalinst := v_globalinst)
+			(v_tableinst := v_tableinst)
+			(v_meminst := list_update_func (MEMS s) ma
+				(λ v_1 : meminst,
+				v_1 <| MEM_BYTES := list_slice_update
+					(MEM_BYTES v_1)
+					(i + ao)
+					(Datatypes.length (fun_ibytes_ v_n (fun_wrap__ 32 v_n v_c)))
+					(fun_ibytes_ v_n (fun_wrap__ 32 v_n v_c)) |>))
+			(v_eleminst := v_eleminst)
+			(v_datainst := v_datainst)
+			; auto;
+			try solve [subst; auto];
+			try solve eauto;
+			first [
+				eapply store_extension_funcinsts; eauto |
+				eapply store_extension_tableinsts; eauto |
+				eapply store_extension_globalinsts; eauto |
+				eapply store_extension_meminsts; eauto |
+				eapply store_extension_eleminsts; eauto |
+				eapply store_extension_datainsts; eauto |
+				eauto
+			].
+		- rewrite {1}list_update_length_func {1}H2; eauto.
+		- {
+			eapply construct_meminsts; subst; eauto.
+		}
 	}
 	{ (* Store Some I64 *)
-		admit.
+		destruct_all; subst.
+		invert_ais_typing.
+		resolve_all_pt.
+
+		simpl.
+
+		assert (length (fun_ibytes_ v_n (fun_wrap__ 64 v_n v_c)) = 
+			(Nat.divmod v_n 7 0 7).1 )
+			as Heqlen.
+		{
+			(* fun_ibytes_ fun_wrap__ not implemented *)
+			admit.
+		}
+
+		remember ((fun_proj_uN_0 32 v_i)) as i.
+		remember (fun_proj_uN_0 32 (OFFSET v_ao)) as ao.
+		remember ((lookup_total (MODULE_MEMS (F_MODULE f)) 0)) as ma.
+		remember  (s <| MEMS :=
+			list_update_func (MEMS s) ma
+				(λ v_1,
+				v_1 <| MEM_BYTES := list_slice_update
+				(MEM_BYTES v_1) (i + ao) (Nat.divmod v_n 7 0 7).1
+				(fun_ibytes_ v_n (fun_wrap__ 64 v_n v_c)) |>)	
+		|> ) as s'.
+		rewrite -Heqlen in Heqs'.
+
+		assert (
+			(ma < (List.length (MEMS s))) /\
+			exists v_mt v_mt' v_b,
+				((lookup_total (MEMS s) ma) =
+					{| MEM_TYPE := v_mt; MEM_BYTES := v_b |}) /\
+				((Memtype_sub v_mt v_mt'))
+				)
+			as [HLen [v_mt [v_mt' [v_b [HLookup HRefok]]]]].
+		{
+			eapply minst_invert_mems in HIT; eauto.
+
+			eapply Forall2_nth2 in HIT as [_ HIT].
+			eapply HIT in H1.
+			destruct_all.
+			rewrite /lookup_total in Heqma.
+			rewrite -Heqma in H1.
+			split; auto.
+
+			rewrite -Heqma in H4.
+			by exists extr0, extr, extr1.
+		}
+
+		assert (Store_extension s s').
+		{
+			eapply mk_Store_extension with
+				(v_funcinst_2 := [])
+				(v_tableinst_2 := [])
+				(v_meminst_2 := [])
+				(v_globalinst_2 := [])
+				(v_eleminst_2 := [])
+				(v_datainst_2 := [])
+				(v_meminst_1' := MEMS s')
+			; eauto;
+			try solve [
+				rewrite Heqs';
+				by rewrite cats0 |
+				by rewrite Heqs'; rewrite list_update_length_func
+			].
+			subst; rewrite {1}/set /=.
+			eapply store_none_mem_extension; eauto.
+		}
+		split; auto.
+
+		inversion HStore.
+		eapply mk_Store_ok with
+			(v_funcinst := v_funcinst)
+			(v_globalinst := v_globalinst)
+			(v_tableinst := v_tableinst)
+			(v_meminst := list_update_func (MEMS s) ma
+				(λ v_1 : meminst,
+				v_1 <| MEM_BYTES := list_slice_update
+					(MEM_BYTES v_1)
+					(i + ao)
+					(Datatypes.length (fun_ibytes_ v_n (fun_wrap__ 64 v_n v_c)))
+					(fun_ibytes_ v_n (fun_wrap__ 64 v_n v_c)) |>))
+			(v_eleminst := v_eleminst)
+			(v_datainst := v_datainst)
+			; auto;
+			try solve [subst; auto];
+			try solve eauto;
+			first [
+				eapply store_extension_funcinsts; eauto |
+				eapply store_extension_tableinsts; eauto |
+				eapply store_extension_globalinsts; eauto |
+				eapply store_extension_meminsts; eauto |
+				eapply store_extension_eleminsts; eauto |
+				eapply store_extension_datainsts; eauto |
+				eauto
+			].
+		- rewrite {1}list_update_length_func {1}H2; eauto.
+		- {
+			eapply construct_meminsts; subst; eauto.
+		}
 	}
 	(* SIMD instructions *)
 	admit. admit. admit. admit. admit.
 	{ (* Memory Grow *)
+		destruct_all; subst.
+		invert_ais_typing.
+		resolve_all_pt.
+		simpl.
+
+		(* implementation of growmemory *)
 		admit.
+		(*
+		inversion H; subst.
+
+		remember ((mk_uN 32 (Datatypes.length v_b / (64 * fun_Ki) + v_n)))
+			as lim_i.
+		remember (fun_proj_uN_0 32 (OFFSET v_ao)) as ao.
+		remember ((lookup_total (MODULE_MEMS (F_MODULE f)) 0)) as ma.
+		remember  (s <| MEMS :=
+			list_update_func (MEMS s) ma
+				(λ v_1,
+				v_1 <| MEM_BYTES := list_slice_update
+				(MEM_BYTES v_1) (i + ao) (Nat.divmod v_n 7 0 7).1
+				(fun_ibytes_ v_n (fun_wrap__ 64 v_n v_c)) |>)	
+		|> ) as s'.
+		rewrite -Heqlen in Heqs'.
+
+		assert (
+			(ma < (List.length (MEMS s))) /\
+			exists v_mt v_mt' v_b,
+				((lookup_total (MEMS s) ma) =
+					{| MEM_TYPE := v_mt; MEM_BYTES := v_b |}) /\
+				((Memtype_sub v_mt v_mt'))
+				)
+			as [HLen [v_mt [v_mt' [v_b [HLookup HRefok]]]]].
+		{
+			eapply minst_invert_mems in HIT; eauto.
+
+			eapply Forall2_nth2 in HIT as [_ HIT].
+			eapply HIT in H1.
+			destruct_all.
+			rewrite /lookup_total in Heqma.
+			rewrite -Heqma in H1.
+			split; auto.
+
+			rewrite -Heqma in H4.
+			by exists extr0, extr, extr1.
+		}
+
+		assert (Store_extension s s').
+		{
+			eapply mk_Store_extension with
+				(v_funcinst_2 := [])
+				(v_tableinst_2 := [])
+				(v_meminst_2 := [])
+				(v_globalinst_2 := [])
+				(v_eleminst_2 := [])
+				(v_datainst_2 := [])
+				(v_meminst_1' := MEMS s')
+			; eauto;
+			try solve [
+				rewrite Heqs';
+				by rewrite cats0 |
+				by rewrite Heqs'; rewrite list_update_length_func
+			].
+			subst; rewrite {1}/set /=.
+			eapply store_none_mem_extension; eauto.
+		}
+		split; auto.
+
+		inversion HStore.
+		eapply mk_Store_ok with
+			(v_funcinst := v_funcinst)
+			(v_globalinst := v_globalinst)
+			(v_tableinst := v_tableinst)
+			(v_meminst := list_update_func (MEMS s) ma
+				(λ v_1 : meminst,
+				v_1 <| MEM_BYTES := list_slice_update
+					(MEM_BYTES v_1)
+					(i + ao)
+					(Datatypes.length (fun_ibytes_ v_n (fun_wrap__ 64 v_n v_c)))
+					(fun_ibytes_ v_n (fun_wrap__ 64 v_n v_c)) |>))
+			(v_eleminst := v_eleminst)
+			(v_datainst := v_datainst)
+			; auto;
+			try solve [subst; auto];
+			try solve eauto;
+			first [
+				eapply store_extension_funcinsts; eauto |
+				eapply store_extension_tableinsts; eauto |
+				eapply store_extension_globalinsts; eauto |
+				eapply store_extension_meminsts; eauto |
+				eapply store_extension_eleminsts; eauto |
+				eapply store_extension_datainsts; eauto |
+				eauto
+			].
+		- rewrite {1}list_update_length_func {1}H2; eauto.
+		- {
+			eapply construct_meminsts; subst; eauto.
+		}
+			*)
 	}
 	{ (* Data Drop *)
-		admit.
+		destruct_all; subst.
+		invert_ais_typing.
+		resolve_all_pt.
+
+		remember ((fun_proj_uN_0 32 v_x)) as i.
+		remember ((lookup_total (MODULE_DATAS (F_MODULE f)) i)) as da.
+		remember (s <| DATAS :=
+			list_update_func (DATAS s) da [eta set DATA_BYTES (fun=> [])] |>) as s'.
+
+		assert (
+			(List.length (MODULE_DATAS (F_MODULE f)) = (List.length (C_DATAS C'))) /\
+			(da < (List.length (DATAS s))) /\
+			exists v_b,
+				((lookup_total (DATAS s) da) =
+					{| DATA_BYTES := v_b |})
+				)
+			as [HCLen [HLen [v_b HLookup]]].
+		{
+			eapply minst_invert_datas in HIT; eauto.
+			destruct_all.
+			split. auto.
+
+			eapply Forall_nth with (d := default_val) in H3.
+			2: {
+				instantiate (1 := i).
+				rewrite H2.
+				by move/ltP in H1.
+			}
+			destruct_all.
+			split. by rewrite Heqda.
+			exists extr.
+			by rewrite Heqda.
+		}
+
+		assert (Store_extension s s').
+		{
+			eapply mk_Store_extension with
+				(v_funcinst_2 := [])
+				(v_tableinst_2 := [])
+				(v_meminst_2 := [])
+				(v_globalinst_2 := [])
+				(v_eleminst_2 := [])
+				(v_datainst_2 := [])
+				(v_datainst_1' := DATAS s')
+			; eauto;
+			try solve [
+				rewrite Heqs';
+				by rewrite cats0 |
+				by rewrite Heqs'; rewrite list_update_length_func
+			].
+			subst; rewrite {1}/set /=.
+			eapply data_drop_data_extension; eauto.
+		}
+		split; auto.
+
+		inversion HStore.
+		eapply mk_Store_ok with
+			(v_funcinst := v_funcinst)
+			(v_globalinst := v_globalinst)
+			(v_tableinst := v_tableinst)
+			(v_meminst := v_meminst)
+			(v_eleminst := v_eleminst)
+			(v_datainst := list_update_func (DATAS s) da
+				[eta set DATA_BYTES (fun=> [])])
+			; auto;
+			try solve [subst; auto];
+			try solve eauto;
+			first [
+				eapply store_extension_funcinsts; eauto |
+				eapply store_extension_tableinsts; eauto |
+				eapply store_extension_globalinsts; eauto |
+				eapply store_extension_meminsts; eauto |
+				eapply store_extension_eleminsts; eauto |
+				eapply store_extension_datainsts; eauto |
+				eauto
+			].
+		- eapply construct_datainsts; subst; eauto.
 	}
 Admitted.
 	

@@ -152,11 +152,25 @@ Ltac resolve_all_pt :=
 
 Opaque instrtype_sub.
 
+Create HintDb take_drop_size_db.
+
+Hint Rewrite take_size drop_size size_cat
+	@helper_lemmas.take_size_cat @helper_lemmas.drop_size_cat
+	cats0 subn0 add_sub add_sub': take_drop_size_db.
+
 Ltac simplify_take_drop_size H :=
-	repeat rewrite subn0 in H;
-	simpl in H;
-	repeat rewrite take_size in H;
-	repeat rewrite drop_size in H.
+	repeat (
+		autorewrite with take_drop_size_db in H;
+		repeat match goal with
+		| He : length ?l1 = length ?l2 |- _ =>
+			rewrite -!size_length in He
+		| He : size ?l1 = size ?l2 |- _ =>
+			rewrite He in H
+		| _ => auto
+		end;
+		autorewrite with take_drop_size_db in H;
+		simpl in H
+	).
 
 Ltac simplify_resulttype_sub H :=
   simplify_take_drop_size H;
@@ -177,6 +191,22 @@ Ltac join_subtyping_trans H1 H2 :=
   eapply (instrtype_sub_trans _ _ _ H1) in H2
 	as Hsubi.
 
+Ltac construct_size_le :=
+  repeat rewrite take_size drop_size /=;
+  repeat match goal with
+  | _ : _ |- context [ size (?l1 ++ ?l2) ] =>
+	rewrite !size_cat
+  | H : length ?l1 = length ?l2 |- _ =>
+	rewrite -!size_length in H
+  | H : size ?l1 = size ?l2 |- context [ size ?l1 ] =>
+	rewrite H
+  | _ : _ |- is_true (?a <= ?a + ?b) =>
+	by eapply leq_addr
+  | _ : _ |- is_true (?b <= ?a + ?b) =>
+	by eapply leq_addl
+  | _ => auto
+  end.
+
 Ltac join_subtyping_eq H1 H2 :=
   let Hsubi := fresh "Hsubi" in
   let Hsubs := fresh "Hsubs" in
@@ -191,20 +221,23 @@ Ltac join_subtyping_ge H1 H2 :=
 	let Hsubi := fresh "Hsubi" in
 	let Hsubs := fresh "Hsubs" in
   	eapply (instrtype_sub_compose_ge' _ _ _ _ _ _ _ H1) in H2
-	  as [Hsubi Hsubs]; [ | auto] ;
-	simpl in Hsubi, Hsubs;
+	  as [Hsubi Hsubs];
 	simplify_take_drop_size Hsubi;
-	simplify_resulttype_sub Hsubs.
+	simplify_resulttype_sub Hsubs;
+	[ |
+		construct_size_le
+	].
 
 Ltac join_subtyping_le H1 H2 :=
 	let Hsubi := fresh "Hsubi" in
 	let Hsubs := fresh "Hsubs" in
-  	eapply (instrtype_sub_compose_le _ _ _ _ _ _ _ _ H1) in H2
+  	eapply (instrtype_sub_compose_le' _ _ _ _ _ _ _ H1) in H2
 	  as [Hsubi Hsubs];
-	[simpl in Hsubi, Hsubs;
-	rewrite cats0 in Hsubi;
-	simplify_resulttype_sub Hsubs |
-	auto].
+	simplify_take_drop_size Hsubi;
+	simplify_resulttype_sub Hsubs;
+	[ |
+		construct_size_le
+	].
 
 Ltac resolve_subtyping :=
   repeat lazymatch goal with
@@ -331,7 +364,9 @@ Proof.
 	move => v_S v_C v_c v_bt v_instrs_1 v_instrs_2 v_ft HType.
 	invert_ais_typing.
 	resolve_all_pt.
+
 	join_subtyping_le Hsub0 Hsub.
+	try rewrite sizecat_size2 in Hsubi.
 	
 	split;
 	construct_ais_typing;
@@ -387,12 +422,8 @@ Proof.
 	resolve_all_pt.
 	rewrite lookup_label_0 /= in H4; subst.
 
+	eapply Forall2_length in HValsok0 as HLeneq.
 	join_subtyping_le Hsub1 Hsub2.
-	2: {
-		eapply Forall2_length in HValsok0.
-		rewrite H3 in HValsok0.
-		auto.
-	}
 	eapply construct_ais_subtyping.
 	2: eapply Hsub.
 

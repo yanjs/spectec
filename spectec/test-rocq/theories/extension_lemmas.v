@@ -87,6 +87,27 @@ Proof.
     auto.
 Qed.
 
+Lemma minst_invert_tables: forall v_S v_minst C C',
+	Module_instance_ok v_S v_minst C ->
+	inst_match C C' ->
+	List.Forall2 (fun tba tbt => 
+		exists tbt' tbr,
+		(tba < (List.length (TABLES v_S))) /\
+		(Tabletype_sub tbt' tbt) /\
+		((lookup_total (TABLES v_S) tba) =
+			{| TAB_TYPE := tbt'; TAB_REFS := tbr |})
+	) (MODULE_TABLES v_minst) (C_TABLES C').
+Proof.
+	move => v_S v_minst v_C v_C' HMi Him.
+	inversion HMi; subst; clear HMi.
+	clear - H3 Him.
+	destruct v_C'; rewrite /inst_match in Him; destruct_all; simpl in *; subst.
+
+	induction H3; eauto.
+	econstructor; eauto.
+	inversion H; subst; clear H.
+	by exists v_tt', v_ref.
+Qed.
 
 Lemma minst_invert_globals: forall v_S v_minst C C',
 	Module_instance_ok v_S v_minst C ->
@@ -104,12 +125,96 @@ Proof.
 	clear - H7 Him.
 	destruct v_C'; rewrite /inst_match in Him; destruct_all; simpl in *; subst.
 
-	induction H7.
-	- eauto.
-	- econstructor.
-	  + inversion H; subst; clear H.
-	    by exists v_mut, v_valtype, v_val.
-	  + auto.
+	induction H7; eauto.
+	econstructor; eauto.
+	inversion H; subst; clear H.
+	by exists v_mut, v_valtype, v_val.
+Qed.
+
+Lemma minst_invert_mems: forall v_S v_minst C C',
+	Module_instance_ok v_S v_minst C ->
+	inst_match C C' ->
+	List.Forall2 (fun ma mt => 
+		exists v_mt' v_mt v_b,
+		(ma < (List.length (MEMS v_S))) /\
+		((Memtype_sub v_mt v_mt')) /\
+		((lookup_total (MEMS v_S) ma) = {| MEM_TYPE := v_mt; MEM_BYTES := v_b |})
+	) (MODULE_MEMS v_minst) (C_MEMS C').
+Proof.
+	move => v_S v_minst v_C v_C' HMi Him.
+	inversion HMi; subst; clear HMi.
+	clear - H5 Him.
+	destruct v_C'; rewrite /inst_match in Him; destruct_all; simpl in *; subst.
+
+	induction H5; eauto.
+	econstructor; eauto.
+	inversion H; subst; clear H.
+	by exists y, v_mt', v_b.
+Qed.
+
+Lemma minst_invert_elems: forall v_S v_minst C C',
+	Module_instance_ok v_S v_minst C ->
+	inst_match C C' ->
+	List.Forall2 (fun ea et => 
+		exists v_rt v_ref,
+		(ea < (List.length (ELEMS v_S))) /\
+		(List.Forall (fun (v_ref : ref) => (Ref_ok v_S v_ref v_rt)) (v_ref)) /\
+		((lookup_total (ELEMS v_S) ea) = {| ELEM_TYPE := v_rt; ELEM_REFS := v_ref |})
+	) (MODULE_ELEMS v_minst) (C_ELEMS C').
+Proof.
+	move => v_S v_minst v_C v_C' HMi Him.
+	inversion HMi; subst; clear HMi.
+	clear - H9 H10 Him.
+	destruct v_C'; rewrite /inst_match in Him; destruct_all; simpl in *; subst.
+	simpl.
+
+	move : C_ELEMS H10.
+	induction v_elemaddr; move => C_ELEMS Heok. inversion Heok; subst; auto.
+	destruct C_ELEMS. by inversion Heok.
+	econstructor.
+	{
+		inversion Heok; subst.
+		inversion H2; subst.
+		inversion H9; subst.
+		eexists e, v_ref.
+		split; auto.
+	}
+	eapply IHv_elemaddr. by inversion H9.
+	by inversion Heok.
+Qed.
+
+Lemma minst_invert_datas: forall v_S v_minst C C',
+	Module_instance_ok v_S v_minst C ->
+	inst_match C C' ->
+	((List.length (MODULE_DATAS v_minst) = (List.length (C_DATAS C')))) /\
+	List.Forall (fun da => 
+		exists v_b,
+		(da < (List.length (DATAS v_S))) /\
+		((lookup_total (DATAS v_S) da) = {| DATA_BYTES := v_b |})
+	) (MODULE_DATAS v_minst).
+Proof.
+	move => v_S v_minst v_C v_C' HMi Him.
+	inversion HMi; subst; clear HMi.
+	split.
+	{
+		by destruct v_C'; inversion Him; destruct_all; simpl in *; subst.
+	}
+	clear - H11 H12 Him.
+	destruct v_C'; rewrite /inst_match in Him; destruct_all; simpl in *; subst.
+	simpl.
+
+	move : H12.
+	induction v_dataaddr; move => Hdok. inversion Hdok; subst; auto.
+	econstructor.
+	{
+		inversion Hdok; subst.
+		inversion H1; subst.
+		inversion H11; subst.
+		eexists v_b.
+		split; auto.
+	}
+	eapply IHv_dataaddr. by inversion H11.
+	by inversion Hdok.
 Qed.
 
 Ltac invert_funcs :=
@@ -136,6 +241,20 @@ Ltac invert_tables :=
 		let v3 := fresh "Htbe" in
 		let v4 := fresh "Htbeq" in
 		eapply se_invert_tables in H'
+			as [v1 [v2 [v3 v4]]]
+	| _ : _ |- _ => idtac
+	end.
+
+Ltac invert_mems :=
+	match goal with
+	| H: Store_extension ?s ?s' |- _ =>
+		let H' := fresh "H'" in
+		pose (H' := H);
+		let v1 := fresh "tbs'" in
+		let v2 := fresh "tbs2" in
+		let v3 := fresh "Htbe" in
+		let v4 := fresh "Htbeq" in
+		eapply se_invert_mems in H'
 			as [v1 [v2 [v3 v4]]]
 	| _ : _ |- _ => idtac
 	end.
@@ -282,14 +401,31 @@ Lemma global_type_reference: forall v_S v_i v_x v_C mut v t,
 	f_equal => //=.
 Qed. *) *)
 
+Lemma func_extension_refl0: forall f,
+	Func_extension f f.
+Proof.
+	move => f.
+	econstructor.
+Qed.
+
 Lemma func_extension_refl: forall f,
 	Forall2 (fun v s => Func_extension v s) f f.
 Proof.
 	move => f.
 	induction f => //.
 	apply Forall2_cons_iff. split.
-	- apply mk_Func_extension.
+	- econstructor.
 	- apply IHf.
+Qed.
+
+Lemma table_extension_refl0: forall t,
+	Table_extension t t.
+Proof.
+	move => t.
+	induction t => //.
+	destruct TAB_TYPE, v_limits, v__.
+	econstructor.
+	auto.
 Qed.
 
 Lemma table_extension_refl: forall t,
@@ -298,11 +434,17 @@ Proof.
 	move => t.
 	induction t => //.
 	apply Forall2_cons_iff. split.
-	- destruct a as [type refs]. destruct type.
-	  destruct v_limits.
-	  destruct v__.
-	  by constructor.
+	- eapply table_extension_refl0.
 	- apply IHt.
+Qed.
+
+Lemma mem_extension_refl0: forall m,
+	Mem_extension m m.
+Proof.
+	move => m.
+	destruct m, MEM_TYPE, v_limits, v__.
+	econstructor.
+	auto.
 Qed.
 
 Lemma mem_extension_refl: forall m,
@@ -311,10 +453,7 @@ Proof.
 	move => m.
 	induction m => //.
 	apply Forall2_cons_iff. split.
-	- destruct a as [type bytes]. destruct type.
-	  destruct v_limits.
-	  destruct v__.
-	  by constructor.
+	- by eapply mem_extension_refl0.
 	- apply IHm.
 Qed.
 
@@ -342,6 +481,15 @@ Proof.
 	  + by eapply IHg.
 Qed.
 
+Lemma elem_extension_refl0: forall g,
+	Elem_extension g g.
+Proof.
+	move => g.
+	destruct g.
+	econstructor.
+	by left.
+Qed.
+
 Lemma elem_extension_refl: forall g,
 	Forall2 (fun v s => Elem_extension v s) g g.
 Proof.
@@ -349,23 +497,27 @@ Proof.
 	induction g.
 	- econstructor.
 	- econstructor.
-	  + destruct a.
-	    econstructor.
-		by left.
+	  + by eapply elem_extension_refl0.
 	  + by eapply IHg.
 Qed.
 
+Lemma data_extension_refl0: forall d,
+	Data_extension d d.
+Proof.
+	move => g.
+	destruct g.
+	econstructor.
+	by left.
+Qed.
 
-Lemma data_extension_refl: forall g,
-	Forall2 (fun v s => Data_extension v s) g g.
+Lemma data_extension_refl: forall d,
+	Forall2 (fun v s => Data_extension v s) d d.
 Proof.
 	move => g.
 	induction g.
 	- econstructor.
 	- econstructor.
-	  + destruct a.
-	    econstructor.
-		by left.
+	  + by eapply data_extension_refl0.
 	  + by eapply IHg.
 Qed.
 
@@ -517,6 +669,149 @@ Proof.
 	simpl.
 	econstructor; try eapply global_extension_refl_0.
 	by eapply IHv_i.
+Qed.
+
+Lemma store_none_mem_extension: forall v_ms v_idx v_mt v_b v_l v_n v_nb,
+	(v_idx < length v_ms) ->
+	lookup_total v_ms v_idx = {| MEM_TYPE := v_mt; MEM_BYTES := v_b |} ->
+	Forall2 (λ v v', Mem_extension v v') v_ms
+		(list_update_func v_ms v_idx
+			(λ m, m <| MEM_BYTES :=
+			list_slice_update (MEM_BYTES m) v_l v_n v_nb |>)).
+Proof.
+	move => v_ms v_idx v_mt v_b v_l v_n v_nb HLength HLookup.
+	move : v_idx v_mt v_b v_l v_n v_nb HLength HLookup.
+	induction v_ms; auto; move => v_idx v_mt v_b v_l v_n v_nb HLength HLookup.
+	destruct v_idx; simpl.
+	{
+		econstructor.
+		{
+			destruct a; rewrite /set /=.
+			destruct MEM_TYPE, v_limits, v__.
+			econstructor.
+			eauto.
+		}
+		eapply mem_extension_refl.
+	}
+	econstructor.
+	eapply mem_extension_refl0.
+	eapply IHv_ms; eauto.
+Qed.
+
+Lemma table_set_table_extension: forall v_tbs v_idx tbt tbr v_i v_tbr,
+	(v_idx < length v_tbs) ->
+	lookup_total v_tbs v_idx = 
+		{| TAB_TYPE := tbt; TAB_REFS := tbr |} ->
+	Forall2 (fun v v' => Table_extension v v') v_tbs
+		(list_update_func v_tbs v_idx
+			(fun tb => tb <| TAB_REFS :=
+				list_update_func (TAB_REFS tb) v_i (fun=> v_tbr) |> )).
+Proof.
+	move => v_tbs v_i tbt tbr v_tbr HLength HLookup.
+	move: v_tbs HLength HLookup.
+	induction v_i.
+	{ (* i = 0 *)
+		move => v_tbs HLength HLookup.
+		destruct v_tbs; auto.
+		simpl.
+		econstructor.
+		{
+			rewrite /lookup_total in HLookup.
+			destruct t. simpl.
+			rewrite /set /=.
+			destruct TAB_TYPE, v_limits, v__.
+			econstructor.
+			auto.
+		}
+		eapply table_extension_refl.
+	}
+	move => v_tbs HLength HLookup.
+	destruct v_tbs; auto.
+	simpl.
+	econstructor; try eapply table_extension_refl0.
+	by eapply IHv_i.
+Qed.
+
+Lemma table_grow_table_extension: forall v_tbs v_idx tbt tbr tb_new,
+	(v_idx < length v_tbs) ->
+	lookup_total v_tbs v_idx = 
+		{| TAB_TYPE := tbt; TAB_REFS := tbr |} ->
+	Forall2 (fun v v' => Table_extension v v') v_tbs
+		(list_update_func v_tbs v_idx
+			(fun => tb_new )).
+Proof.
+	move => v_tbs v_idx tbt tbr tb_new HLength HLookup.
+	move: v_tbs HLength HLookup.
+Admitted. (*
+
+	induction v_idx.
+	{
+		move => v_tbs HLength HLookup.
+		destruct v_tbs; auto.
+		simpl.
+		econstructor.
+		{
+			econstructor.
+			rewrite /lookup_total in HLookup.
+			destruct t. simpl.
+			rewrite /set /=.
+			destruct TAB_TYPE, v_limits, v__.
+			econstructor.
+			auto.
+		}
+		eapply table_extension_refl.
+	}
+	move => v_tbs HLength HLookup.
+	destruct v_tbs; auto.
+	simpl.
+	econstructor; try eapply table_extension_refl0.
+	by eapply IHv_i.
+Qed. *)
+
+Lemma elem_drop_elem_extension: forall es idx,
+	(idx < length es) ->
+	(Forall2 (λ v v' : eleminst, Elem_extension v v') es
+		(list_update_func es idx
+			[eta set ELEM_REFS (fun=> [])])).
+Proof.
+	move => es idx HLength.
+	move : idx HLength.
+	induction es; auto.
+	move => idx HLength.
+	destruct idx.
+	{
+		destruct a.
+		econstructor.
+		- econstructor. by right.
+		- by eapply elem_extension_refl.
+	}
+	simpl.
+	econstructor.
+	- by eapply elem_extension_refl0.
+	- by eapply IHes.
+Qed.
+
+Lemma data_drop_data_extension: forall ds idx,
+	(idx < length ds) ->
+	(Forall2 (λ v v', Data_extension v v') ds
+		(list_update_func ds idx
+			[eta set DATA_BYTES (fun=> [])])).
+Proof.
+	move => ds idx HLength.
+	move : idx HLength.
+	induction ds; auto.
+	move => idx HLength.
+	destruct idx.
+	{
+		destruct a.
+		econstructor.
+		- econstructor. by right.
+		- by eapply data_extension_refl.
+	}
+	simpl.
+	econstructor.
+	- by eapply data_extension_refl0.
+	- by eapply IHds.
 Qed.
 
 Lemma update_global_unchanged: forall v_S v_S' func v_idx,
@@ -785,7 +1080,9 @@ Proof.
 	rewrite -app_cat in HApp.
 	subst.
 	apply Forall2_cons_iff. split.
-	- inversion HOk; subst. apply (addrs_globals_extension v_S) with (v_globalinst_1' := v_globalinst_1') (v_globalinst_2 := v_globalinst_2) => //.
+	- inversion HOk; subst.
+	  apply (addrs_globals_extension v_S) with
+	  	(v_globalinst_1' := v_globalinst_1') (v_globalinst_2 := v_globalinst_2) => //.
 	- eapply IHv_globaladdrs. inversion HOk. apply H4. apply Hlength. apply HApp. apply Hext.
 Qed.
 
@@ -805,7 +1102,9 @@ Proof.
 	rewrite -app_cat in HApp.
 	subst.
 	apply Forall2_cons_iff. split.
-	- inversion HOk; subst. apply (addrs_mems_extension v_S) with (v_meminst_1' := v_meminst_1') (v_meminst_2 := v_meminst_2) => //.
+	- inversion HOk; subst.
+	  apply (addrs_mems_extension v_S) with
+	  (v_meminst_1' := v_meminst_1') (v_meminst_2 := v_meminst_2) => //.
 	- eapply IHv_memaddrs. inversion HOk. apply H4. apply Hlength. apply HApp. apply Hext.
 Qed.
 
@@ -882,7 +1181,7 @@ Proof.
 	by inversion Het.
 Qed.
 
-Lemma store_extension_eleminsts: forall v_S v_S' aa ts,
+Lemma store_extension_eleminsts': forall v_S v_S' aa ts,
 	Store_extension v_S v_S' ->
 	Forall (λ a , a < Datatypes.length (ELEMS v_S)) aa ->
 	Forall2 (λ a t, Element_instance_ok v_S (lookup_total (ELEMS v_S) a) t) aa ts ->
@@ -936,26 +1235,24 @@ Proof.
 	by inversion HLen.
 Qed.
 
-Lemma store_extension_data_lens: forall v_S v_S' aa,
-    Store_extension v_S v_S' ->
-	Forall (λ a : nat, a < Datatypes.length (DATAS v_S)) aa ->
-	Forall (λ a : nat, a < Datatypes.length (DATAS v_S')) aa.
+Lemma store_extension_eleminsts: forall v_S v_S' aa ts,
+	Store_extension v_S v_S' ->
+	Forall2 (λ a t, Element_instance_ok v_S a t) aa ts ->
+	Forall2 (λ a t, Element_instance_ok v_S' a t) aa ts.
 Proof.
-	move => v_S v_S' v_elemaddr HSe HForall.
-	inversion HSe; subst.
-	induction HForall; auto.
-	- econstructor.
-	  + rewrite H10.
-	    rewrite -size_length.
-		rewrite size_cat.
-		eapply ltn_addr.
-		rewrite size_length.
-		rewrite -H21.
-		auto.
-	  + auto.
+	move => s s' aa ts HS He.
+	induction He; auto.
+	econstructor; auto.
+	invert_elems.
+	inversion H; subst.
+	econstructor.
+	induction H0; auto.
+	econstructor.
+	- eapply store_extension_ref; eauto.
+	- eapply IHForall. by inversion H.
 Qed.
 
-Lemma store_extension_datainsts: forall v_S v_S' aa,
+Lemma store_extension_datainsts': forall v_S v_S' aa,
 	Store_extension v_S v_S' ->
 	Forall (λ a , a < Datatypes.length (DATAS v_S)) aa ->
 	Forall (λ a, Data_instance_ok v_S (lookup_total (DATAS v_S) a)) aa ->
@@ -989,6 +1286,19 @@ Proof.
 	by inversion Hds.
 Qed.
 
+Lemma store_extension_datainsts: forall v_S v_S' aa,
+	Store_extension v_S v_S' ->
+	Forall (λ a, Data_instance_ok v_S a) aa ->
+	Forall (λ a, Data_instance_ok v_S' a) aa.
+Proof.
+	move => s s' aa HS He.
+	induction He; auto.
+	econstructor; auto.
+	invert_elems.
+	inversion H; subst.
+	econstructor.
+Qed.
+
 Lemma store_extension_moduleinst: forall v_S v_S' v_i v_C,
     Store_extension v_S v_S' ->
     Module_instance_ok v_S v_i v_C ->
@@ -1002,13 +1312,13 @@ Proof.
 		Forall (λ a , a < Datatypes.length (ELEMS v_S')) v_elemaddr /\
 		Forall2 (λ a t, Element_instance_ok v_S' (lookup_total (ELEMS v_S') a) t) v_elemaddr v_reftype) as [HElemLen HElem].
 	{
-	  eapply store_extension_eleminsts; eauto.
+	  eapply store_extension_eleminsts'; eauto.
 	}
 	assert (
 		Forall (λ a , a < Datatypes.length (DATAS v_S')) v_dataaddr /\
 		Forall (λ a, Data_instance_ok v_S' (lookup_total (DATAS v_S') a)) v_dataaddr) as [HDataLen HData].
 	{
-	  eapply store_extension_datainsts; eauto.
+	  eapply store_extension_datainsts'; eauto.
 	}
 	apply mk_Module_instance_ok; auto.
 	- eapply addrss_funcs_extension; eauto.
@@ -1094,6 +1404,45 @@ Proof.
 		eapply IHForall2; auto.
 		by inversion H1.
 	}
+Qed.
+
+Lemma store_extension_tableinsts: forall s s' vs ts,
+	Store_extension s s' ->
+	Forall2 (λ v t, Table_instance_ok s v t) vs ts ->
+	Forall2 (λ v t, Table_instance_ok s' v t) vs ts.
+Proof.
+	move => s s' vs ts HS HG.
+	eapply List.Forall2_impl.
+	2: eauto.
+	move => t v.
+	simpl.
+	move => H.
+	eapply store_extension_tableinst; eauto.
+Qed.
+
+Lemma store_extension_meminst: forall s s' v t,
+	Store_extension s s' ->
+	Memory_instance_ok s v t ->
+	Memory_instance_ok s' v t.
+Proof.
+	move => s s' v t HS HT.
+	invert_mems.
+	inversion HT; subst; clear HT.
+	econstructor; eauto.
+Qed.
+
+Lemma store_extension_meminsts: forall s s' vs ts,
+	Store_extension s s' ->
+	Forall2 (λ v t, Memory_instance_ok s v t) vs ts ->
+	Forall2 (λ v t, Memory_instance_ok s' v t) vs ts.
+Proof.
+	move => s s' vs ts HS HG.
+	eapply List.Forall2_impl.
+	2: eauto.
+	move => t v.
+	simpl.
+	move => H.
+	eapply store_extension_meminst; eauto.
 Qed.
 
 (*
@@ -1252,3 +1601,124 @@ Lemma store_global_extension_store_typed: forall s s' v_f v_C v_valtype v_val_ v
 		apply Forall2_forall2 in H8; destruct H8. apply H11 in HIn. inversion HIn; decomp; subst. 
 		eapply Memory_instance_ok__; repeat split => //=; eauto.
 Qed. *)
+
+Lemma construct_tableinsts: forall s ts tba tbt' tbr i v_ref,
+	Forall2 (λ v t, Table_instance_ok s v t) (TABLES s) ts ->
+	lookup_total (TABLES s) tba =  {| TAB_TYPE := tbt'; TAB_REFS := tbr |} ->
+	Forall2 (λ v t, Table_instance_ok s v t)
+		(list_update_func (TABLES s) tba
+			(λ v_1 : tableinst, v_1 <| TAB_REFS :=
+				list_update_func (TAB_REFS v_1) i (fun=> v_ref)
+			|>)) ts.
+Proof.
+	move => s ts tba tbt' tbr i v_ref Hold HLookup.
+	move : tba HLookup.
+	induction Hold; auto; move => tba HLookup.
+	destruct tba.
+	{
+		simpl.
+		econstructor; auto.
+		inversion H; subst.
+		rewrite /lookup_total /= in HLookup.
+		inversion HLookup; subst.
+		rewrite /set /=.
+		econstructor; eauto.
+	}
+	simpl.
+	econstructor; auto.
+Qed.
+
+Lemma construct_globalinsts: forall s ts ga v t v_old,
+	Forall2 (λ v t, Global_instance_ok s v t) (GLOBALS s) ts ->
+	lookup_total (GLOBALS s) ga = {| GLOB_TYPE := mk_globaltype (Some MUT) t; GLOB_VALUE := v_old |} ->
+	Val_ok s v t ->
+	Forall2 (λ v t, Global_instance_ok s v t)
+		(list_update_func (GLOBALS s) ga [eta set GLOB_VALUE (fun=> v)]) ts.
+Proof.
+	move => s ts ga v t v_old Hold HLookup HValok.
+	move : ga HLookup HValok.
+	induction Hold; auto; move => ga HLookup HValok.
+	destruct ga.
+	{
+		simpl.
+		econstructor; auto.
+		inversion H; subst.
+		rewrite /lookup_total /= in HLookup.
+		inversion HLookup; subst.
+		rewrite /set /=.
+		econstructor; eauto.
+	}
+	simpl.
+	econstructor; auto.
+Qed.
+
+Lemma construct_meminsts: forall s ts ma v_mt v_b v_i v_nb,
+	Forall2 (λ v t, Memory_instance_ok s v t) (MEMS s) ts ->
+	lookup_total (MEMS s) ma = {| MEM_TYPE := v_mt; MEM_BYTES := v_b |} ->
+	Forall2 (λ v t, Memory_instance_ok s v t)
+		(list_update_func (MEMS s) ma
+			(λ m, m <| MEM_BYTES :=
+			list_slice_update (MEM_BYTES m) v_i (length v_nb) v_nb |>)) ts.
+Proof.
+	move => s ts ma v_mt v_b v_i v_nb Hold HLookup.
+	move : ma HLookup.
+	induction Hold; auto; move => ma HLookup.
+	destruct ma.
+	{
+		simpl.
+		econstructor; auto.
+		inversion H; subst.
+		rewrite /lookup_total /= in HLookup.
+		inversion HLookup; subst.
+		rewrite /set /=.
+		econstructor; eauto.
+		rewrite list_slice_update_length; auto.
+	}
+	simpl.
+	econstructor; auto.
+Qed.
+
+Lemma construct_datainsts: forall s da v_b,
+	Forall [eta Data_instance_ok s]
+		(DATAS s) ->
+	lookup_total (DATAS s) da = {| DATA_BYTES := v_b |} ->
+	Forall [eta Data_instance_ok s]
+		(list_update_func (DATAS s) da [eta set DATA_BYTES (fun=> [])]).
+Proof.
+	move => s da v_b Hold HLookup.
+	move : da HLookup.
+	induction Hold; auto; move => da HLookup.
+	destruct da.
+	{
+		rewrite /lookup_total /= in HLookup; subst.
+		inversion H; subst.
+		simpl.
+		econstructor; auto.
+		rewrite /set /=.
+		by econstructor.
+	}
+	simpl.
+	econstructor; auto.
+Qed.
+
+Lemma construct_eleminsts: forall s ts ea t ref,
+	Forall2 (λ v t, Element_instance_ok s v t) (ELEMS s) ts ->
+	lookup_total (ELEMS s) ea = {| ELEM_TYPE := t; ELEM_REFS := ref |} ->
+	Forall2 (λ v t, Element_instance_ok s v t)
+	(list_update_func (ELEMS s) ea [eta set ELEM_REFS (fun=> [])]) ts.
+Proof.
+	move => s ts ea t ref Hold HLookup.
+	move : ea HLookup.
+	induction Hold; auto; move => ea HLookup.
+	destruct ea.
+	{
+		rewrite /lookup_total /= in HLookup; subst.
+		inversion H; subst.
+		simpl.
+		econstructor; auto.
+		rewrite /set /=.
+		by econstructor.
+	}
+	simpl.
+	econstructor; auto.
+Qed.

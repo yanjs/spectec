@@ -4513,11 +4513,24 @@ Definition fun_with_data (v_state : state) (v_dataidx : dataidx) (var_0 : (list 
 		| (mk_state v_s v_f), v_x, v_b => (mk_state (v_s <| DATAS := (list_update_func (DATAS v_s) (lookup_total (MODULE_DATAS (F_MODULE v_f)) (fun_proj_uN_0 32 v_x)) (fun (v_1 : datainst) => (v_1 <| DATA_BYTES := v_b |>))) |>) v_f)
 	end.
 
-(* Axiom Definition at: ../specification/wasm-2.0/5-runtime-aux.spectec:116.1-116.62 *)
-Axiom fun_growtable : forall (v_tableinst : tableinst) (v_nat : nat) (v_ref : ref), (option tableinst).
+(* Inductive Relations Definition at: ../specification/wasm-2.0/5-runtime-aux.spectec:116.1-116.55 *)
+Inductive growtable: tableinst -> nat -> ref -> tableinst -> Prop :=
+	| mk_growtable : forall (v_tableinst_1 : tableinst) (v_n : n) (v_r : ref) (v_tableinst_2 : tableinst) (v_i : u32) (v_j : u32) (v_rt : reftype) (v_r' : (list ref)) (v_i' : nat), 
+		(v_tableinst_1 = {| TAB_TYPE := (mk_tabletype (mk_limits v_i v_j) v_rt); TAB_REFS := v_r' |}) ->
+		(v_i' = ((List.length v_r') + v_n)) ->
+		(v_tableinst_2 = {| TAB_TYPE := (mk_tabletype (mk_limits (mk_uN _ v_i') v_j) v_rt); TAB_REFS := (v_r' ++ [v_r]) |}) ->
+		(v_i' <= (fun_proj_uN_0 32 v_j)) ->
+		(v_n = (List.length [v_r])) ->
+		growtable v_tableinst_1 v_n v_r v_tableinst_2.
 
-(* Axiom Definition at: ../specification/wasm-2.0/5-runtime-aux.spectec:117.1-117.62 *)
-Axiom fun_growmemory : forall (v_meminst : meminst) (v_nat : nat), (option meminst).
+(* Inductive Relations Definition at: ../specification/wasm-2.0/5-runtime-aux.spectec:117.1-117.47 *)
+Inductive growmemory: meminst -> nat -> meminst -> Prop :=
+	| mk_growmemory : forall (v_meminst_1 : meminst) (v_n : n) (v_meminst_2 : meminst) (v_i : u32) (v_j : u32) (v_b : (list byte)) (v_i' : nat), 
+		(v_meminst_1 = {| MEM_TYPE := (PAGE (mk_limits v_i v_j)); MEM_BYTES := v_b |}) ->
+		(v_i' = ((((List.length v_b) : nat) / ((64 * fun_Ki) : nat)) + (v_n : nat))) ->
+		(v_meminst_2 = {| MEM_TYPE := (PAGE (mk_limits (mk_uN _ (v_i' : nat)) v_j)); MEM_BYTES := (v_b ++ [(mk_byte 0)]) |}) ->
+		(v_i' <= ((fun_proj_uN_0 32 v_j) : nat)) ->
+		growmemory v_meminst_1 v_n v_meminst_2.
 
 (* Record Creation Definition at: ../specification/wasm-2.0/6-typing.spectec:5.1-9.62 *)
 Record context := MKcontext
@@ -6110,8 +6123,7 @@ Inductive Step: config -> config -> Prop :=
 		((fun_proj_uN_0 32 v_i) < (List.length (TAB_REFS (fun_table v_z v_x)))) ->
 		Step (mk_config v_z [(AI_CONST I32 v_i); (v_ref : admininstr); (AI_TABLE_SET v_x)]) (mk_config (fun_with_table v_z v_x (fun_proj_uN_0 32 v_i) v_ref) [])
 	| step_table_grow_succeed : forall (v_z : state) (v_ref : ref) (v_n : n) (v_x : idx) (v_ti : tableinst), 
-		((fun_growtable (fun_table v_z v_x) v_n v_ref) <> None) ->
-		((the (fun_growtable (fun_table v_z v_x) v_n v_ref)) = v_ti) ->
+		(growtable (fun_table v_z v_x) v_n v_ref v_ti) ->
 		Step (mk_config v_z [(v_ref : admininstr); (AI_CONST I32 (mk_uN _ v_n)); (AI_TABLE_GROW v_x)]) (mk_config (fun_with_tableinst v_z v_x v_ti) [(AI_CONST I32 (mk_uN _ (List.length (TAB_REFS (fun_table v_z v_x)))))])
 	| step_table_grow_fail : forall (v_z : state) (v_ref : ref) (v_n : n) (v_x : idx), Step (mk_config v_z [(v_ref : admininstr); (AI_CONST I32 (mk_uN _ v_n)); (AI_TABLE_GROW v_x)]) (mk_config v_z [(AI_CONST I32 (mk_uN _ (fun_inv_signed_ 32 (0 - (1 : nat)))))])
 	| step_elem_drop : forall (v_z : state) (v_x : idx), Step (mk_config v_z [(AI_ELEM_DROP v_x)]) (mk_config (fun_with_elem v_z v_x []) [])
@@ -6173,8 +6185,7 @@ Inductive Step: config -> config -> Prop :=
 		(v_b = (fun_ibytes_ v_N (mk_uN _ (fun_proj_uN_0 16 (lookup_total (fun_lanes_ (X (JNN_I16 : lanetype) (mk_dim v_M)) v_c) (fun_proj_uN_0 8 v_j)))))) ->
 		Step (mk_config v_z [(AI_CONST I32 v_i); (AI_VCONST V128 v_c); (AI_VSTORE_LANE V128 (mk_sz v_N) v_ao v_j)]) (mk_config (fun_with_mem v_z (mk_uN _ 0) ((fun_proj_uN_0 32 v_i) + (fun_proj_uN_0 32 (OFFSET v_ao))) (((v_N : nat) / (8 : nat)) : nat) v_b) [])
 	| step_memory_grow_succeed : forall (v_z : state) (v_n : n) (v_mi : meminst), 
-		((fun_growmemory (fun_mem v_z (mk_uN _ 0)) v_n) <> None) ->
-		((the (fun_growmemory (fun_mem v_z (mk_uN _ 0)) v_n)) = v_mi) ->
+		(growmemory (fun_mem v_z (mk_uN _ 0)) v_n v_mi) ->
 		Step (mk_config v_z [(AI_CONST I32 (mk_uN _ v_n)); AI_MEMORY_GROW]) (mk_config (fun_with_meminst v_z (mk_uN _ 0) v_mi) [(AI_CONST I32 (mk_uN _ ((((List.length (MEM_BYTES (fun_mem v_z (mk_uN _ 0)))) : nat) / ((64 * fun_Ki) : nat)) : nat)))])
 	| step_memory_grow_fail : forall (v_z : state) (v_n : n), Step (mk_config v_z [(AI_CONST I32 (mk_uN _ v_n)); AI_MEMORY_GROW]) (mk_config v_z [(AI_CONST I32 (mk_uN _ (fun_inv_signed_ 32 (0 - (1 : nat)))))])
 	| step_data_drop : forall (v_z : state) (v_x : idx), Step (mk_config v_z [(AI_DATA_DROP v_x)]) (mk_config (fun_with_data v_z v_x []) []).

@@ -302,13 +302,8 @@ Proof.
     + by eapply Forall2_drop.
 Qed.
 
-Lemma lt_irrefl: forall x, x < x = false.
-Proof.
-  move => x.
-  induction x as [| n IH]; simpl; auto.
-Qed.
-
-Lemma drop_size_cat : forall A (x y : seq A),
+(* They are here for compatibility reasons *)
+Lemma drop_size_cat : forall {A: Type} (x y : seq A),
   drop (size x) (x ++ y) = y.
 Proof.
   move => A x y.
@@ -318,7 +313,7 @@ Proof.
   by rewrite drop0.
 Qed.
 
-Lemma take_size_cat : forall A (x y : seq A),
+Lemma take_size_cat : forall {A: Type} (x y : seq A),
   take (size x) (x ++ y) = x.
 Proof.
   move => A x y.
@@ -336,9 +331,9 @@ Lemma resulttype_sub_split_sup: forall ts ts1 ts2,
 Proof.
   move => ts ts1 ts2 Hsub.
   assert (ts1 = take (size ts1) (ts1 ++ ts2)) as Htake.
-  { symmetry. apply take_size_cat.  }
+  { symmetry. by apply take_size_cat.  }
   assert (ts2 = drop (size ts1) (ts1 ++ ts2)) as Hdrop.
-  { symmetry. apply drop_size_cat. }
+  { symmetry. by apply drop_size_cat. }
   eapply resulttype_sub_split in Hsub.
   rewrite <- Htake in Hsub.
   rewrite <- Hdrop in Hsub.
@@ -425,14 +420,12 @@ Proof.
         inversion H12_3; subst.
         eapply (resulttype_sub_split _ _ (length ts_H12)) in H23_4 as [H23_41 H23_42].
         rewrite <- H1 in H23_41 at 2.
-        rewrite take_size_cat in H23_41.
-        auto.
+        by rewrite take_size_cat in H23_41.
       }
       {
         apply (resulttype_sub_trans _ ts_H12). { auto. }
         eapply (resulttype_sub_split _ _ (length ts_H12)) in H23_5 as [H23_51 H23_52].
-        rewrite take_size_cat in H23_51.
-        auto.
+        by rewrite take_size_cat in H23_51.
       }
     }
   split.
@@ -441,14 +434,14 @@ Proof.
       eapply (resulttype_sub_split _ _ (length ts_H12)) in H23_4 as [H23_41 H23_42].
       inversion H12_3; subst.
       rewrite <- H1 in H23_42 at 2.
-      rewrite drop_size_cat in H23_42.
+      rewrite drop_size_cat in H23_42;
       auto.
     }
     { auto. }
   - apply (resulttype_sub_trans _ ts12_sup_H12). { auto. }
     {
       eapply (resulttype_sub_split _ _ (length ts_H12)) in H23_5 as [H23_51 H23_52].
-      rewrite drop_size_cat in H23_52.
+      rewrite drop_size_cat in H23_52;
       auto.
     }
 Qed.

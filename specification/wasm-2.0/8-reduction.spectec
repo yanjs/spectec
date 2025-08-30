@@ -431,7 +431,7 @@ rule Step_read/table.size:
 
 rule Step/table.grow-succeed:
   z; ref (CONST I32 n) (TABLE.GROW x)  ~>  $with_tableinst(z, x, ti); (CONST I32 $(|$table(z, x).REFS|))
-  -- if $growtable($table(z, x), n, ref) = ti
+  -- growtable: |- $table(z, x); n; ref : ti
 
 rule Step/table.grow-fail:
   z; ref (CONST I32 n) (TABLE.GROW x)  ~>  z; (CONST I32 $inv_signed_(32, $(-1)))
@@ -611,7 +611,7 @@ rule Step_read/memory.size:
 
 rule Step/memory.grow-succeed:
   z; (CONST I32 n) (MEMORY.GROW)  ~>  $with_meminst(z, 0, mi); (CONST I32 $(|$mem(z, 0).BYTES| / (64 * $Ki)))
-  -- if $growmemory($mem(z, 0), n) = mi
+  -- growmemory: |- $mem(z, 0); n : mi
 
 rule Step/memory.grow-fail:
   z; (CONST I32 n) (MEMORY.GROW)  ~>  z; (CONST I32 $inv_signed_(32, $(-1)))
