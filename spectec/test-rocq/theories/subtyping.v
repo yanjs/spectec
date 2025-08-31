@@ -10,14 +10,6 @@ Notation "t1 <tv: t2" := (Valtype_sub t1 t2) (at level 30).
 Definition Resulttype_subtype ts1 ts2 := Resulttype_sub (mk_list _ ts1) (mk_list _ ts2).
 Notation "ts1 <ts: ts2" := (Resulttype_subtype ts1 ts2) (at level 60).
 
-Definition Ftype_sub tf1 tf2 : Prop :=
-  match tf1, tf2 with
-  | ts11 :-> ts12,
-    ts21 :-> ts22 =>
-        (ts21 <ts: ts11) /\
-        (ts12 <ts: ts22)
-  end.
-
 Definition instrtype_sub tf tf' : Prop :=
   match tf, tf' with
   | ts11 :-> ts12,
@@ -30,7 +22,6 @@ Definition instrtype_sub tf tf' : Prop :=
         (ts12 <ts: ts12_sup)
   end.
 
-Notation "tf1 <tf: tf2" := (Ftype_sub tf1 tf2) (at level 60).
 Notation "tf1 <ti: tf2" := (instrtype_sub tf1 tf2) (at level 60).
 
 Lemma size_length : forall {A : Type} (xs : seq A),
@@ -340,25 +331,6 @@ Proof.
   auto.
 Qed.
 
-Lemma ftype_sub_refl : forall tf, tf <tf: tf.
-Proof.
-  move => [[ts1] [ts2]].
-  unfold Ftype_sub.
-  split; apply resulttype_sub_refl.
-Qed.
-
-Lemma ftype_sub_trans: forall tf1 tf2 tf3,
-    tf1 <tf: tf2 ->
-    tf2 <tf: tf3 ->
-    tf1 <tf: tf3.
-Proof.
-  move => [[ts11] [ts12]] [[ts21] [ts22]] [[ts31] [ts32]] H12 H23.
-  unfold Ftype_sub in *; simpl in *.
-  destruct H12 as [H12_1 H12_2];
-  destruct H23 as [H23_1 H23_2].
-  split; eapply resulttype_sub_trans; eauto.
-Qed.
-
 Lemma instrtype_sub_refl: forall tf, tf <ti: tf.
 Proof.
   move => [[ts1] [ts2]].
@@ -460,14 +432,6 @@ Proof.
   constructor.
   - move => x. destruct x. apply resulttype_sub_refl.
   - move => x y z Hxy Hyz. destruct x, y, z. eapply resulttype_sub_trans; eauto.
-Qed.
-
-#[global]
-Instance ftype_sub_preorder: RelationClasses.PreOrder Ftype_sub.
-Proof.
-  constructor.
-  - move => x. by apply ftype_sub_refl.
-  - move => x y z Hxy Hyz. eapply ftype_sub_trans; eauto.
 Qed.
 
 #[global]
@@ -851,13 +815,7 @@ Proof.
     auto.
   }
 Qed.
-(*
-Lemma instrtype_sub_compose_le : forall ts1 ts2' ts2 ts3 ts4 txs tys tzs,
-  ((ts1 :-> ts2') <ti: (txs :-> tys)) ->
-  (((ts3 ++ ts2) :-> ts4) <ti: (tys :-> tzs)) ->
-  (size ts2 = size ts2') ->
-  (((ts3 ++ ts1) :-> ts4) <ti: (txs :-> tzs)) /\ (ts2' <ts: ts2).
-  *)
+
 Lemma instrtype_sub_extend : forall t1s t2s txs tys tzs, 
   (t1s :-> t2s) <ti: (txs :-> tys) ->
   exists t3s, ((t3s ++ t1s) :-> tzs) <ti: (txs :-> tzs).
