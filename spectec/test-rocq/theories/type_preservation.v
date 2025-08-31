@@ -101,61 +101,6 @@ Proof.
 	eapply t_preservation_vs_type' in HValOK; eauto.
 	eapply store_extension_vals in HValOK; eauto.
 Qed.
-(*
-	move => s f ais s' f' ais' C C' v_t1 
-		lab ret t1s t2s HReduce HStore HStore' HStoreExt HMInst HMInst' HValTypeEq HValOK HType.
-	simpl in HValTypeEq;
-	rewrite -HValTypeEq in HType; clear HValTypeEq.
-	remember (mk_config (mk_state s f) ais) as c1.
-	remember (mk_config (mk_state s' f') ais') as c2.
-	generalize dependent t2s. generalize dependent t1s.
-	generalize dependent lab. generalize dependent ais'. generalize dependent ais.
-	induction HReduce; try intros;
-	try (destruct v_z; subst);
-	try (destruct v_z'; subst);
-	try (apply config_same in Heqc1 as [Hbefore1 [Hbefore2 Hbefore3]];
-		apply config_same in Heqc2 as [Hafter1  [Hafter2  Hafter3]]);
-	subst; auto;
-	try apply Forall2_length in HValOK as ?; auto.
-	try (specialize (IHHReduce _ erefl _ erefl)).
-	{ (* Label Context *)
-		invert_ais_typing.
-		eapply IHHReduce.
-		eauto.
-	}
-	{ (* Frame Context *)
-		invert_ais_typing.
-		resolve_all_pt.
-		eapply IHHReduce;
-		eauto.
-		Opaque fun_coec_instr__admininstr.
-		unfold_principal_typing Hai.
-		destruct_all.
-		inversion H0; subst.
-		inversion H4; subst.
-		eapply IHHReduce; eauto.
-	}
-Admitted.
-(*
-	{ (* Local Set *)
-		rewrite -> Forall2_Val_ok_is_same_as_map in HValOK;
-		rewrite -> Forall2_Val_ok_is_same_as_map.
-		induction v_val.
-		apply_composition_typing_and_single HType.
-		apply AI_const_typing in  H4_comp0.
-		apply_composition_typing_single H4_comp.
-		apply Set_local_typing in H4_comp1; destruct H4_comp1 as [t [HLookup [H0' H1']]].
-		subst.
-		repeat rewrite -> app_assoc in H1_comp1; apply split_append_last in H1_comp1; destruct H1_comp1.
-		replace (C_LOCALS C) with ([::]: list wasm.valtype) in *; last by symmetry; eapply inst_t_context_local_empty; eauto.
-		rewrite -> cats0 in *.
-		simpl in H1'; simpl in H0. rewrite -> List.map_length in H1'. 
-		apply list_update_map with (f := typeof) (val := (VAL_CONST v_valtype v_val_)) in H1' as HUpdate.
-		rewrite HUpdate.
-		rewrite list_update_same_unchanged => //=; try rewrite List.map_length => //=.
-		simpl. by rewrite list_update_length.
-	}
-Qed. *) *)
 
 Lemma store_extension_reduce: forall s f ais s' f' ais' C C' tf,
     Step (mk_config (mk_state s f) ais) (mk_config (mk_state s' f') ais') ->
@@ -907,44 +852,64 @@ Proof.
 		resolve_all_pt.
 		simpl.
 
-		inversion H; subst; clear H.
-		rewrite /fun_mem /= in H2.
+		clear Hsub Hsub0.
 
-		remember ((mk_uN 32 (Datatypes.length v_b / (64 * fun_Ki) + v_n)))
-			as lim_i.
 		remember ((lookup_total (MODULE_MEMS (F_MODULE f)) 0)) as ma.
-		remember  (s <| MEMS :=
-			list_update_func (MEMS s) ma
-			(fun=> {| MEM_TYPE := PAGE (mk_limits lim_i v_j);
-				MEM_BYTES := v_b ++ repeat (mk_byte 0) (v_n * (64 * fun_Ki)) |})	
-			|> ) as s'.
+		remember (s <| MEMS := list_update_func (MEMS s) ma (fun=> v_mi) |>) as s'.
 
 		assert (
 			(ma < (List.length (MEMS s))) /\
-			exists v_mt',
-				((Memtype_sub (PAGE (mk_limits v_i v_j)) v_mt'))
+			exists v_mt' lim_old v_j v_b,
+				((Memtype_sub (PAGE (mk_limits lim_old v_j)) v_mt')) /\
+				(lookup_total (MEMS s) ma =
+					{| MEM_TYPE := PAGE (mk_limits lim_old v_j); MEM_BYTES := v_b |}) /\
+				(v_mi =
+					{| MEM_TYPE := PAGE (mk_limits (lim_old + v_n) v_j);
+					MEM_BYTES := v_b ++ repeat (mk_byte 0) (v_n * (64 * fun_Ki)) |}) /\
+				(lim_old = (length v_b) / (64 * fun_Ki)) /\
+				(lim_old + v_n <= v_j)
 				)
-			as [HLen [v_mt' HMemsub]].
+			as [HLen [v_mt' [lim_old [v_j [v_b [HMemsub [HLookup [HNew [HLimold HRange]]]]]]]]].
 		{
 			eapply minst_invert_mems in HIT; eauto.
-
 			eapply Forall2_nth2 in HIT as [_ HIT].
 			eapply HIT in H1.
 			destruct_all.
 			rewrite /lookup_total in Heqma.
-			rewrite -Heqma in H1.
+			rewrite -Heqma in H1 H4.
 			split; auto.
+			clear HIT.
 
-			rewrite -Heqma H2 in H4.
+			eapply s_invert_mems in HStore as [mts HMem].
+			eapply Forall2_nth in HMem as [_ HForall].
+			eapply HForall in H1.
+			destruct_all.
+			rewrite /lookup_total H1 in H4.
+			inversion H4; clear H4.
+			rewrite H10 in H1 H2; clear H10.
+			rewrite H5 in H9.
+			rewrite -H9 in H3; clear H9.
+			rewrite H5 in H1.
+			clear HForall.
+			
+			rewrite /lookup_total.
+
+			rewrite /fun_mem in H; inversion H; subst; clear H.
+			rewrite /lookup_total /= H1 in H4.
 			inversion H4; subst; clear H4.
 
-			by exists (ListDef.nth 0 (C_MEMS C') default_val).
+			exists (ListDef.nth 0 (C_MEMS C') default_val),
+				(mk_uN 32 (Datatypes.length v_b / (64 * fun_Ki))),
+				(mk_uN 32 extr4),
+				(v_b).
+			split. auto.
+			split. auto.
+			split. auto.
+			split; auto.
 		}
 
 		assert (Store_extension s s').
 		{
-			remember (Datatypes.length v_b / (64 * fun_Ki)) as i.
-			clear Heqi.
 			eapply mk_Store_extension with
 				(v_funcinst_2 := [])
 				(v_tableinst_2 := [])
@@ -959,7 +924,7 @@ Proof.
 				by rewrite cats0 |
 				by rewrite Heqs'; rewrite list_update_length_func
 			].
-			subst; rewrite {1}/set /=.
+			subst; rewrite {1}/set {2}/MEMS.
 			eapply memory_grow_mem_extension; eauto.
 		}
 		split; auto.
@@ -970,14 +935,13 @@ Proof.
 			(v_globalinst := v_globalinst)
 			(v_tableinst := v_tableinst)
 			(v_meminst := list_update_func (MEMS s) ma
-				(λ v_1 : meminst,
-				v_1 <| MEM_BYTES := list_slice_update
-					(MEM_BYTES v_1)
-					(i + ao)
-					(Datatypes.length (fun_ibytes_ v_n (fun_wrap__ 64 v_n v_c)))
-					(fun_ibytes_ v_n (fun_wrap__ 64 v_n v_c)) |>))
+				(λ _,
+				{| MEM_TYPE := PAGE (mk_limits (lim_old + v_n) v_j);
+				MEM_BYTES := v_b ++ repeat (mk_byte 0) (v_n * (64 * fun_Ki)) |}))
 			(v_eleminst := v_eleminst)
 			(v_datainst := v_datainst)
+			(v_memtype := list_update_func v_memtype ma
+				(λ _, PAGE (mk_limits (lim_old + v_n) v_j)))
 			; auto;
 			try solve [subst; auto];
 			try solve eauto;
@@ -990,9 +954,9 @@ Proof.
 				eapply store_extension_datainsts; eauto |
 				eauto
 			].
-		- rewrite {1}list_update_length_func {1}H2; eauto.
+		- rewrite !list_update_length_func {1}H3 /=; eauto.
 		- {
-			eapply construct_meminsts; subst; eauto.
+			eapply construct_meminsts_grow; subst; eauto.
 		}
 	}
 	{ (* Data Drop *)
@@ -1213,7 +1177,6 @@ Proof.
 		rewrite /fun_funcinst /= in H1.
 		rewrite /fun_type /fun_funcinst /= in H2.
 
-
 		invert_ais_typing.
 		resolve_all_pt.
 		join_subtyping_le Hsub0 Hsub.
@@ -1227,23 +1190,23 @@ Proof.
 		eapply minst_invert_functypes in HIT1_0; eauto.
 		rewrite -HIT1_0 H7 in H2.
 
-		rewrite /lookup_total in H H9.
-		rewrite H9 /= in H H0.
+		rewrite /lookup_total in H H10.
+		rewrite H10 /= in H H0.
 
-		inversion HST.
-		eapply Forall2_nth in H11 as [HLen2 HFunc].
+		eapply s_invert_funcs in HST as [fts HFunc].
+		eapply Forall2_nth in HFunc as [HLen2 HFunc].
 		pose proof H1 as H1_0.
-		rewrite H6 /= in H1. 
 		eapply HFunc in H1.
-		inversion H1.
+		destruct_all.
 
 		construct_ais_typing.
 		econstructor.
 		econstructor; eauto.
-		rewrite /lookup_total {1}H6 /= -H11.
-		rewrite /lookup_total H6 /= -H11 /= in H2.
+		rewrite /lookup_total.
+		rewrite Hextr0.
+		rewrite /lookup_total Hextr0 /= in H2.
 		rewrite H2.
-		auto.
+		eauto.
 	}
 	{ (* Call_addr *)
 		typing_inversion HType.
@@ -1450,22 +1413,23 @@ Proof.
 		eapply HTable in H1.
 		destruct_all.
 
-		rewrite H4 /= in H.
-		rewrite H4 /=.
+		rewrite H5 /= in H.
+		rewrite H5 /=.
 
 		eapply s_invert_tables in HST as [tbts HTableinst].
 		eapply Forall2_nth in HTableinst as [HLen2 HTableinst].
 		eapply HTableinst in H1.
 		destruct_all.
-		rewrite /lookup_total in H4.
-		rewrite H4 in H1.
+		rewrite /lookup_total in H5.
+		rewrite H5 in H1.
 		inversion H1; subst; clear H1.
 
-		eapply Forall_nth' in H7; eauto.
+		eapply Forall_nth' in H8; eauto.
 		rewrite /lookup_total in H0.
-		rewrite H0 H5 in H3.
-
-		inversion H3; subst.
+		rewrite H0 in H3.
+		inversion H3; subst; clear H3.
+		rewrite -H9 in H6.
+		inversion H6; subst; clear H6.
 
 		rewrite /lookup_total.
 		construct_ais_typing.

@@ -46,6 +46,37 @@ Proof.
 	split; by eapply H.
 Qed.
 
+Lemma s_invert_funcs: forall s,
+	Store_ok s ->
+	exists fts,
+	List.Forall2 (fun f t =>
+		exists v_minst v_func,
+		(f = {| FUNC_TYPE := t;
+			FUNC_MODULE := v_minst;
+			FUNC_CODE := v_func |})
+			(* May add more here *)
+	) (FUNCS s) fts.
+Proof.
+	move => s HSt.
+	inversion HSt.
+	rewrite H /=.
+	clear -H1.
+	exists v_functype.
+
+	move : v_funcinst H1.
+	induction v_functype; move => v_funcinst HFok.
+	{
+		inversion HFok; subst; auto.
+	}
+	destruct v_funcinst; inversion HFok; subst; auto.
+	econstructor.
+	{
+		inversion H2; subst.
+		by exists v_moduleinst, v_func.
+	}
+	by eapply IHv_functype.
+Qed.
+
 Lemma s_invert_globals: forall s,
 	Store_ok s ->
 	exists gts,
@@ -75,6 +106,48 @@ Proof.
 		by exists v_mut, v_vt, v_v.
 	}
 	by eapply IHv_globaltype.
+Qed.
+
+Lemma s_invert_mems: forall s,
+	Store_ok s ->
+	exists mts,
+	List.Forall2 (fun m t =>
+		exists v_b v_n v_m,
+		(m = {| MEM_TYPE := t; MEM_BYTES := v_b |}) /\
+		(t = (PAGE (mk_limits (mk_uN _ v_n) (mk_uN _ v_m)))) /\
+		(v_n = (List.length v_b) / (64 * fun_Ki)) /\
+		(v_n <= v_m) /\
+		(v_m <= 2 ^ 16)
+	) (MEMS s) mts.
+Proof.
+	move => s HSt.
+	inversion HSt.
+	rewrite H /MEMS.
+	clear -H7.
+	exists v_memtype.
+	
+	move : v_meminst H7.
+	induction v_memtype; move => v_meminst HMok.
+	{
+		inversion HMok; subst; auto.
+	}
+	destruct v_meminst; inversion HMok; subst; auto.
+	econstructor.
+	{
+		inversion H2; subst; clear H2.
+		inversion H1; subst; clear H1.
+		inversion H2; subst; clear H2.
+		exists v_b, v_n, v_m.
+		split; auto.
+		split; auto.
+		split; auto.
+		rewrite H0.
+		rewrite -mulnA.
+		rewrite mulnE.
+		rewrite Nat.div_mul; auto.
+		rewrite /fun_Ki -mulnE; discriminate.
+	}
+	by eapply IHv_memtype.
 Qed.
 
 Lemma s_invert_tables: forall s,
@@ -1904,19 +1977,51 @@ Proof.
 	econstructor; auto.
 Qed.
 
-Lemma construct_meminsts_grow: forall s ts ma v_mt v_b v_i v_nb,
+Lemma construct_meminsts_grow: forall s ts ma v_b lim_old v_n v_j,
 	Forall2 (λ v t, Memory_instance_ok s v t) (MEMS s) ts ->
-	lookup_total (MEMS s) ma = {| MEM_TYPE := v_mt; MEM_BYTES := v_b |} ->
-	Forall2 (λ v t, Memory_instance_ok s v t)
+	lookup_total (MEMS s) ma = {|
+		MEM_TYPE := PAGE (mk_limits (lim_old) v_j);
+		MEM_BYTES := v_b |} ->
+	lim_old = Datatypes.length v_b / (64 * fun_Ki) ->
+	lim_old + v_n <= v_j ->
+	Forall2 (λ (v : meminst) (t : memtype), Memory_instance_ok s v t)
 		(list_update_func (MEMS s) ma
-			(λ m, m <| MEM_BYTES :=
-			list_slice_update (MEM_BYTES m) v_i (length v_nb) v_nb |>)) ts.
+		(fun=> {| MEM_TYPE := PAGE (mk_limits (lim_old + v_n) v_j);
+			MEM_BYTES := v_b ++ repeat (mk_byte 0) (v_n * (64 * fun_Ki)) |}))
+		(list_update_func ts ma (fun=> PAGE (mk_limits (lim_old + v_n) v_j))).
 Proof.
-	move => s ts ma v_mt v_b v_i v_nb Hold HLookup.
-	move : ma HLookup.
-	induction Hold; auto; move => ma HLookup.
-
-Admitted.
+	move => s ts ma v_b lim_old v_n v_j Hold HLookup HLim HRange.
+	move : ma HLookup HRange.
+	induction Hold; auto; move => ma HLookup HRange.
+	destruct ma; simpl.
+	{
+		econstructor; auto.
+		rewrite /lookup_total /= in HLookup.
+		rewrite HLookup in H.
+		destruct v_j.
+		inversion H; clear H.
+		subst.
+		rewrite -mulnA in H4.
+		remember (64 * fun_Ki) as n.
+		assert (n <> 0). { subst. rewrite /fun_Ki. discriminate. }
+		econstructor; eauto.
+		{
+			rewrite length_app H4 repeat_length.
+			rewrite -!mulnA.
+			rewrite mulnDl.
+			rewrite mulnE.
+			rewrite Nat.div_mul; auto.
+		}
+		econstructor.
+		econstructor.
+		split; auto.
+		inversion H6; clear H6.
+		inversion H1; clear H1.
+		destruct H7 as [_ H7].
+		auto.
+	}
+	econstructor; auto.
+Qed.
 
 Lemma construct_datainsts: forall s da v_b,
 	Forall [eta Data_instance_ok s]
