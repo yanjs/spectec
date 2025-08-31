@@ -4518,9 +4518,9 @@ Inductive growtable: tableinst -> nat -> ref -> tableinst -> Prop :=
 	| mk_growtable : forall (v_tableinst_1 : tableinst) (v_n : n) (v_r : ref) (v_tableinst_2 : tableinst) (v_i : u32) (v_j : u32) (v_rt : reftype) (v_r' : (list ref)) (v_i' : nat), 
 		(v_tableinst_1 = {| TAB_TYPE := (mk_tabletype (mk_limits v_i v_j) v_rt); TAB_REFS := v_r' |}) ->
 		(v_i' = ((List.length v_r') + v_n)) ->
-		(v_tableinst_2 = {| TAB_TYPE := (mk_tabletype (mk_limits (mk_uN _ v_i') v_j) v_rt); TAB_REFS := (v_r' ++ [v_r]) |}) ->
+		(v_tableinst_2 = {| TAB_TYPE := (mk_tabletype (mk_limits (mk_uN _ v_i') v_j) v_rt); TAB_REFS := (v_r' ++ (List.repeat v_r v_n)) |}) ->
 		(v_i' <= (fun_proj_uN_0 32 v_j)) ->
-		(v_n = (List.length [v_r])) ->
+		(v_n = (List.length (List.repeat v_r v_n))) ->
 		growtable v_tableinst_1 v_n v_r v_tableinst_2.
 
 (* Inductive Relations Definition at: ../specification/wasm-2.0/5-runtime-aux.spectec:117.1-117.47 *)
@@ -4528,7 +4528,7 @@ Inductive growmemory: meminst -> nat -> meminst -> Prop :=
 	| mk_growmemory : forall (v_meminst_1 : meminst) (v_n : n) (v_meminst_2 : meminst) (v_i : u32) (v_j : u32) (v_b : (list byte)) (v_i' : nat), 
 		(v_meminst_1 = {| MEM_TYPE := (PAGE (mk_limits v_i v_j)); MEM_BYTES := v_b |}) ->
 		(v_i' = ((((List.length v_b) : nat) / ((64 * fun_Ki) : nat)) + (v_n : nat))) ->
-		(v_meminst_2 = {| MEM_TYPE := (PAGE (mk_limits (mk_uN _ (v_i' : nat)) v_j)); MEM_BYTES := (v_b ++ [(mk_byte 0)]) |}) ->
+		(v_meminst_2 = {| MEM_TYPE := (PAGE (mk_limits (mk_uN _ (v_i' : nat)) v_j)); MEM_BYTES := (v_b ++ (List.repeat (mk_byte 0) (v_n * (64 * fun_Ki)))) |}) ->
 		(v_i' <= ((fun_proj_uN_0 32 v_j) : nat)) ->
 		growmemory v_meminst_1 v_n v_meminst_2.
 
@@ -5108,7 +5108,7 @@ Inductive Module_ok: module -> Prop :=
 		((List.length v_export) = (List.length v_xt)) ->
 		List.Forall2 (fun (v_export : export) (v_xt : externtype) => (Export_ok v_C v_export v_xt)) (v_export) (v_xt) ->
 		((List.length v_mt) <= 1) ->
-		(v_C = {| C_TYPES := v_ft'; C_FUNCS := (v_ift ++ v_ft); C_GLOBALS := (v_igt ++ v_gt); C_TABLES := (v_itt ++ v_tt); C_MEMS := (v_imt ++ v_mt); C_ELEMS := v_rt; C_DATAS := [OK]; C_LOCALS := []; C_LABELS := []; C_RETURN := None |}) ->
+		(v_C = {| C_TYPES := v_ft'; C_FUNCS := (v_ift ++ v_ft); C_GLOBALS := (v_igt ++ v_gt); C_TABLES := (v_itt ++ v_tt); C_MEMS := (v_imt ++ v_mt); C_ELEMS := v_rt; C_DATAS := (List.repeat OK v_n); C_LOCALS := []; C_LABELS := []; C_RETURN := None |}) ->
 		(v_C' = {| C_TYPES := v_ft'; C_FUNCS := (v_ift ++ v_ft); C_GLOBALS := v_igt; C_TABLES := (v_itt ++ v_tt); C_MEMS := (v_imt ++ v_mt); C_ELEMS := []; C_DATAS := []; C_LOCALS := []; C_LABELS := []; C_RETURN := None |}) ->
 		(v_ift = (fun_funcsxt v_ixt)) ->
 		(v_igt = (fun_globalsxt v_ixt)) ->
@@ -5404,30 +5404,30 @@ Inductive Step_pure: (list admininstr) -> (list admininstr) -> Prop :=
 		Step_pure [(AI_VCONST V128 v_c_1); (AI_CONST I32 (mk_uN _ v_n)); (AI_VSHIFTOP (IX JNN_I16 (mk_dim v_N)) v_vshiftop)] [(AI_VCONST V128 v_c)]
 	| step_vbitmask_I32 : forall (v_c : (vec_ V128)) (v_N : res_N) (v_ci : (iN 32)) (v_ci_1 : (list (uN 32))), 
 		(v_ci_1 = (fun_lanes_ (X (JNN_I32 : lanetype) (mk_dim v_N)) v_c)) ->
-		((fun_ibits_ 32 v_ci) = ((List.map (fun (v_ci_1 : (iN (fun_lsize (I32 : lanetype)))) => (mk_bit (fun_proj_uN_0 32 (fun_ilt_ (fun_lsize (JNN_I32 : lanetype)) res_S v_ci_1 (mk_uN _ 0))))) v_ci_1) ++ [(mk_bit 0)])) ->
+		((fun_ibits_ 32 v_ci) = ((List.map (fun (v_ci_1 : (iN (fun_lsize (I32 : lanetype)))) => (mk_bit (fun_proj_uN_0 32 (fun_ilt_ (fun_lsize (JNN_I32 : lanetype)) res_S v_ci_1 (mk_uN _ 0))))) v_ci_1) ++ (List.repeat (mk_bit 0) (((32 : nat) - (v_N : nat)) : nat)))) ->
 		Step_pure [(AI_VCONST V128 v_c); (AI_VBITMASK (IX JNN_I32 (mk_dim v_N)))] [(AI_CONST I32 (fun_irev_ 32 v_ci))]
 	| step_vbitmask_I64 : forall (v_c : (vec_ V128)) (v_N : res_N) (v_ci : (iN 32)) (v_ci_1 : (list (uN 64))), 
 		(v_ci_1 = (fun_lanes_ (X (JNN_I64 : lanetype) (mk_dim v_N)) v_c)) ->
-		((fun_ibits_ 32 v_ci) = ((List.map (fun (v_ci_1 : (iN (fun_lsize (I64 : lanetype)))) => (mk_bit (fun_proj_uN_0 32 (fun_ilt_ (fun_lsize (JNN_I64 : lanetype)) res_S v_ci_1 (mk_uN _ 0))))) v_ci_1) ++ [(mk_bit 0)])) ->
+		((fun_ibits_ 32 v_ci) = ((List.map (fun (v_ci_1 : (iN (fun_lsize (I64 : lanetype)))) => (mk_bit (fun_proj_uN_0 32 (fun_ilt_ (fun_lsize (JNN_I64 : lanetype)) res_S v_ci_1 (mk_uN _ 0))))) v_ci_1) ++ (List.repeat (mk_bit 0) (((32 : nat) - (v_N : nat)) : nat)))) ->
 		Step_pure [(AI_VCONST V128 v_c); (AI_VBITMASK (IX JNN_I64 (mk_dim v_N)))] [(AI_CONST I32 (fun_irev_ 32 v_ci))]
 	| step_vbitmask_I8 : forall (v_c : (vec_ V128)) (v_N : res_N) (v_ci : (iN 32)) (v_ci_1 : (list (uN 8))), 
 		(v_ci_1 = (fun_lanes_ (X (JNN_I8 : lanetype) (mk_dim v_N)) v_c)) ->
-		((fun_ibits_ 32 v_ci) = ((List.map (fun (v_ci_1 : (iN (fun_lsize (I8 : lanetype)))) => (mk_bit (fun_proj_uN_0 32 (fun_ilt_ (fun_lsize (JNN_I8 : lanetype)) res_S v_ci_1 (mk_uN _ 0))))) v_ci_1) ++ [(mk_bit 0)])) ->
+		((fun_ibits_ 32 v_ci) = ((List.map (fun (v_ci_1 : (iN (fun_lsize (I8 : lanetype)))) => (mk_bit (fun_proj_uN_0 32 (fun_ilt_ (fun_lsize (JNN_I8 : lanetype)) res_S v_ci_1 (mk_uN _ 0))))) v_ci_1) ++ (List.repeat (mk_bit 0) (((32 : nat) - (v_N : nat)) : nat)))) ->
 		Step_pure [(AI_VCONST V128 v_c); (AI_VBITMASK (IX JNN_I8 (mk_dim v_N)))] [(AI_CONST I32 (fun_irev_ 32 v_ci))]
 	| step_vbitmask_I16 : forall (v_c : (vec_ V128)) (v_N : res_N) (v_ci : (iN 32)) (v_ci_1 : (list (uN 16))), 
 		(v_ci_1 = (fun_lanes_ (X (JNN_I16 : lanetype) (mk_dim v_N)) v_c)) ->
-		((fun_ibits_ 32 v_ci) = ((List.map (fun (v_ci_1 : (iN (fun_lsize (I16 : lanetype)))) => (mk_bit (fun_proj_uN_0 32 (fun_ilt_ (fun_lsize (JNN_I16 : lanetype)) res_S v_ci_1 (mk_uN _ 0))))) v_ci_1) ++ [(mk_bit 0)])) ->
+		((fun_ibits_ 32 v_ci) = ((List.map (fun (v_ci_1 : (iN (fun_lsize (I16 : lanetype)))) => (mk_bit (fun_proj_uN_0 32 (fun_ilt_ (fun_lsize (JNN_I16 : lanetype)) res_S v_ci_1 (mk_uN _ 0))))) v_ci_1) ++ (List.repeat (mk_bit 0) (((32 : nat) - (v_N : nat)) : nat)))) ->
 		Step_pure [(AI_VCONST V128 v_c); (AI_VBITMASK (IX JNN_I16 (mk_dim v_N)))] [(AI_CONST I32 (fun_irev_ 32 v_ci))]
 	| step_vswizzle_I8 : forall (v_c_1 : (vec_ V128)) (v_c_2 : (vec_ V128)) (v_M : M) (v_c : (vec_ V128)) (v_c' : (list (iN (fun_lsize (I8 : lanetype))))) (v_ci : (list (uN 8))) (v_k : (list nat)), 
 		(v_ci = (fun_lanes_ (X (I8 : lanetype) (mk_dim v_M)) v_c_2)) ->
-		(v_c' = ((fun_lanes_ (X (I8 : lanetype) (mk_dim v_M)) v_c_1) ++ [(mk_uN _ 0)])) ->
+		(v_c' = ((fun_lanes_ (X (I8 : lanetype) (mk_dim v_M)) v_c_1) ++ (List.repeat (mk_uN _ 0) (((256 : nat) - (v_M : nat)) : nat)))) ->
 		List.Forall (fun (v_k : nat) => ((fun_proj_uN_0 8 (lookup_total v_ci v_k)) < (List.length v_c'))) (v_k) ->
 		List.Forall (fun (v_k : nat) => (v_k < (List.length v_ci))) (v_k) ->
 		(v_c = (fun_inv_lanes_ (X (I8 : lanetype) (mk_dim v_M)) (List.map (fun (v_k : nat) => (lookup_total v_c' (fun_proj_uN_0 8 (lookup_total v_ci v_k)))) v_k))) ->
 		Step_pure [(AI_VCONST V128 v_c_1); (AI_VCONST V128 v_c_2); (AI_VSWIZZLE (IX (I8 : Jnn) (mk_dim v_M)))] [(AI_VCONST V128 v_c)]
 	| step_vswizzle_I16 : forall (v_c_1 : (vec_ V128)) (v_c_2 : (vec_ V128)) (v_M : M) (v_c : (vec_ V128)) (v_c' : (list (iN (fun_lsize (I16 : lanetype))))) (v_ci : (list (uN 16))) (v_k : (list nat)), 
 		(v_ci = (fun_lanes_ (X (I16 : lanetype) (mk_dim v_M)) v_c_2)) ->
-		(v_c' = ((fun_lanes_ (X (I16 : lanetype) (mk_dim v_M)) v_c_1) ++ [(mk_uN _ 0)])) ->
+		(v_c' = ((fun_lanes_ (X (I16 : lanetype) (mk_dim v_M)) v_c_1) ++ (List.repeat (mk_uN _ 0) (((256 : nat) - (v_M : nat)) : nat)))) ->
 		List.Forall (fun (v_k : nat) => ((fun_proj_uN_0 16 (lookup_total v_ci v_k)) < (List.length v_c'))) (v_k) ->
 		List.Forall (fun (v_k : nat) => (v_k < (List.length v_ci))) (v_k) ->
 		(v_c = (fun_inv_lanes_ (X (I16 : lanetype) (mk_dim v_M)) (List.map (fun (v_k : nat) => (lookup_total v_c' (fun_proj_uN_0 16 (lookup_total v_ci v_k)))) v_k))) ->
@@ -5445,7 +5445,7 @@ Inductive Step_pure: (list admininstr) -> (list admininstr) -> Prop :=
 		(v_c = (fun_inv_lanes_ (X (I16 : lanetype) (mk_dim v_N)) (List.map (fun (v_k : nat) => (lookup_total v_c' (fun_proj_uN_0 8 (lookup_total v_i v_k)))) v_k))) ->
 		Step_pure [(AI_VCONST V128 v_c_1); (AI_VCONST V128 v_c_2); (AI_VSHUFFLE (IX (I16 : Jnn) (mk_dim v_N)) v_i)] [(AI_VCONST V128 v_c)]
 	| step_vsplat : forall (v_Lnn : Lnn) (v_c_1 : (num_ (fun_unpack v_Lnn))) (v_N : res_N) (v_c : (vec_ V128)), 
-		(v_c = (fun_inv_lanes_ (X v_Lnn (mk_dim v_N)) [(fun_packnum_ v_Lnn v_c_1)])) ->
+		(v_c = (fun_inv_lanes_ (X v_Lnn (mk_dim v_N)) (List.repeat (fun_packnum_ v_Lnn v_c_1) v_N))) ->
 		Step_pure [(AI_CONST (fun_unpack v_Lnn) v_c_1); (AI_VSPLAT (X v_Lnn (mk_dim v_N)))] [(AI_VCONST V128 v_c)]
 	| step_vextract_lane_num_I32 : forall (v_c_1 : (vec_ V128)) (v_N : res_N) (v_i : laneidx) (v_c_2 : (uN 32)), 
 		((fun_proj_uN_0 8 v_i) < (List.length (fun_lanes_ (X (I32 : lanetype) (mk_dim v_N)) v_c_1))) ->
@@ -5609,112 +5609,112 @@ Inductive Step_pure: (list admininstr) -> (list admininstr) -> Prop :=
 	| step_vcvtop_zero_I32_I32 : forall (v_c_1 : (vec_ V128)) (v_M_2 : M) (v_M_1 : M) (v_vcvtop : vcvtop) (v_c : (vec_ V128)) (v_ci : (list (uN 32))) (v_cj : (list (list (uN 32)))), 
 		((fun_zeroop v_vcvtop) = (Some ZERO)) ->
 		(v_ci = (fun_lanes_ (X (I32 : lanetype) (mk_dim v_M_1)) v_c_1)) ->
-		(v_cj = (fun_setproduct_ (uN 32) ((List.map (fun (v_ci : (uN 32)) => (fun_vcvtop__ (X (I32 : lanetype) (mk_dim v_M_1)) (X (I32 : lanetype) (mk_dim v_M_2)) v_vcvtop v_ci)) v_ci) ++ [[(fun_zero I32)]]))) ->
+		(v_cj = (fun_setproduct_ (uN 32) ((List.map (fun (v_ci : (uN 32)) => (fun_vcvtop__ (X (I32 : lanetype) (mk_dim v_M_1)) (X (I32 : lanetype) (mk_dim v_M_2)) v_vcvtop v_ci)) v_ci) ++ (List.repeat [(fun_zero I32)] v_M_1)))) ->
 		((List.length (List.map (fun (v_cj : (list (lane_ (fun_lanetype (X (I32 : lanetype) (mk_dim v_M_2)))))) => (fun_inv_lanes_ (X (I32 : lanetype) (mk_dim v_M_2)) v_cj)) v_cj)) > 0) ->
 		(List.In v_c (List.map (fun (v_cj : (list (uN 32))) => (fun_inv_lanes_ (X (I32 : lanetype) (mk_dim v_M_2)) v_cj)) v_cj)) ->
 		Step_pure [(AI_VCONST V128 v_c_1); (AI_VCVTOP (X (I32 : lanetype) (mk_dim v_M_2)) (X (I32 : lanetype) (mk_dim v_M_1)) v_vcvtop)] [(AI_VCONST V128 v_c)]
 	| step_vcvtop_zero_I64_I32 : forall (v_c_1 : (vec_ V128)) (v_M_2 : M) (v_M_1 : M) (v_vcvtop : vcvtop) (v_c : (vec_ V128)) (v_ci : (list (uN 64))) (v_cj : (list (list (uN 32)))), 
 		((fun_zeroop v_vcvtop) = (Some ZERO)) ->
 		(v_ci = (fun_lanes_ (X (I64 : lanetype) (mk_dim v_M_1)) v_c_1)) ->
-		(v_cj = (fun_setproduct_ (uN 32) ((List.map (fun (v_ci : (uN 64)) => (fun_vcvtop__ (X (I64 : lanetype) (mk_dim v_M_1)) (X (I32 : lanetype) (mk_dim v_M_2)) v_vcvtop v_ci)) v_ci) ++ [[(fun_zero I32)]]))) ->
+		(v_cj = (fun_setproduct_ (uN 32) ((List.map (fun (v_ci : (uN 64)) => (fun_vcvtop__ (X (I64 : lanetype) (mk_dim v_M_1)) (X (I32 : lanetype) (mk_dim v_M_2)) v_vcvtop v_ci)) v_ci) ++ (List.repeat [(fun_zero I32)] v_M_1)))) ->
 		((List.length (List.map (fun (v_cj : (list (lane_ (fun_lanetype (X (I32 : lanetype) (mk_dim v_M_2)))))) => (fun_inv_lanes_ (X (I32 : lanetype) (mk_dim v_M_2)) v_cj)) v_cj)) > 0) ->
 		(List.In v_c (List.map (fun (v_cj : (list (uN 32))) => (fun_inv_lanes_ (X (I32 : lanetype) (mk_dim v_M_2)) v_cj)) v_cj)) ->
 		Step_pure [(AI_VCONST V128 v_c_1); (AI_VCVTOP (X (I32 : lanetype) (mk_dim v_M_2)) (X (I64 : lanetype) (mk_dim v_M_1)) v_vcvtop)] [(AI_VCONST V128 v_c)]
 	| step_vcvtop_zero_F32_I32 : forall (v_c_1 : (vec_ V128)) (v_M_2 : M) (v_M_1 : M) (v_vcvtop : vcvtop) (v_c : (vec_ V128)) (v_ci : (list (fN 32))) (v_cj : (list (list (uN 32)))), 
 		((fun_zeroop v_vcvtop) = (Some ZERO)) ->
 		(v_ci = (fun_lanes_ (X (F32 : lanetype) (mk_dim v_M_1)) v_c_1)) ->
-		(v_cj = (fun_setproduct_ (uN 32) ((List.map (fun (v_ci : (fN 32)) => (fun_vcvtop__ (X (F32 : lanetype) (mk_dim v_M_1)) (X (I32 : lanetype) (mk_dim v_M_2)) v_vcvtop v_ci)) v_ci) ++ [[(fun_zero I32)]]))) ->
+		(v_cj = (fun_setproduct_ (uN 32) ((List.map (fun (v_ci : (fN 32)) => (fun_vcvtop__ (X (F32 : lanetype) (mk_dim v_M_1)) (X (I32 : lanetype) (mk_dim v_M_2)) v_vcvtop v_ci)) v_ci) ++ (List.repeat [(fun_zero I32)] v_M_1)))) ->
 		((List.length (List.map (fun (v_cj : (list (lane_ (fun_lanetype (X (I32 : lanetype) (mk_dim v_M_2)))))) => (fun_inv_lanes_ (X (I32 : lanetype) (mk_dim v_M_2)) v_cj)) v_cj)) > 0) ->
 		(List.In v_c (List.map (fun (v_cj : (list (uN 32))) => (fun_inv_lanes_ (X (I32 : lanetype) (mk_dim v_M_2)) v_cj)) v_cj)) ->
 		Step_pure [(AI_VCONST V128 v_c_1); (AI_VCVTOP (X (I32 : lanetype) (mk_dim v_M_2)) (X (F32 : lanetype) (mk_dim v_M_1)) v_vcvtop)] [(AI_VCONST V128 v_c)]
 	| step_vcvtop_zero_F64_I32 : forall (v_c_1 : (vec_ V128)) (v_M_2 : M) (v_M_1 : M) (v_vcvtop : vcvtop) (v_c : (vec_ V128)) (v_ci : (list (fN 64))) (v_cj : (list (list (uN 32)))), 
 		((fun_zeroop v_vcvtop) = (Some ZERO)) ->
 		(v_ci = (fun_lanes_ (X (F64 : lanetype) (mk_dim v_M_1)) v_c_1)) ->
-		(v_cj = (fun_setproduct_ (uN 32) ((List.map (fun (v_ci : (fN 64)) => (fun_vcvtop__ (X (F64 : lanetype) (mk_dim v_M_1)) (X (I32 : lanetype) (mk_dim v_M_2)) v_vcvtop v_ci)) v_ci) ++ [[(fun_zero I32)]]))) ->
+		(v_cj = (fun_setproduct_ (uN 32) ((List.map (fun (v_ci : (fN 64)) => (fun_vcvtop__ (X (F64 : lanetype) (mk_dim v_M_1)) (X (I32 : lanetype) (mk_dim v_M_2)) v_vcvtop v_ci)) v_ci) ++ (List.repeat [(fun_zero I32)] v_M_1)))) ->
 		((List.length (List.map (fun (v_cj : (list (lane_ (fun_lanetype (X (I32 : lanetype) (mk_dim v_M_2)))))) => (fun_inv_lanes_ (X (I32 : lanetype) (mk_dim v_M_2)) v_cj)) v_cj)) > 0) ->
 		(List.In v_c (List.map (fun (v_cj : (list (uN 32))) => (fun_inv_lanes_ (X (I32 : lanetype) (mk_dim v_M_2)) v_cj)) v_cj)) ->
 		Step_pure [(AI_VCONST V128 v_c_1); (AI_VCVTOP (X (I32 : lanetype) (mk_dim v_M_2)) (X (F64 : lanetype) (mk_dim v_M_1)) v_vcvtop)] [(AI_VCONST V128 v_c)]
 	| step_vcvtop_zero_I32_I64 : forall (v_c_1 : (vec_ V128)) (v_M_2 : M) (v_M_1 : M) (v_vcvtop : vcvtop) (v_c : (vec_ V128)) (v_ci : (list (uN 32))) (v_cj : (list (list (uN 64)))), 
 		((fun_zeroop v_vcvtop) = (Some ZERO)) ->
 		(v_ci = (fun_lanes_ (X (I32 : lanetype) (mk_dim v_M_1)) v_c_1)) ->
-		(v_cj = (fun_setproduct_ (uN 64) ((List.map (fun (v_ci : (uN 32)) => (fun_vcvtop__ (X (I32 : lanetype) (mk_dim v_M_1)) (X (I64 : lanetype) (mk_dim v_M_2)) v_vcvtop v_ci)) v_ci) ++ [[(fun_zero I64)]]))) ->
+		(v_cj = (fun_setproduct_ (uN 64) ((List.map (fun (v_ci : (uN 32)) => (fun_vcvtop__ (X (I32 : lanetype) (mk_dim v_M_1)) (X (I64 : lanetype) (mk_dim v_M_2)) v_vcvtop v_ci)) v_ci) ++ (List.repeat [(fun_zero I64)] v_M_1)))) ->
 		((List.length (List.map (fun (v_cj : (list (lane_ (fun_lanetype (X (I64 : lanetype) (mk_dim v_M_2)))))) => (fun_inv_lanes_ (X (I64 : lanetype) (mk_dim v_M_2)) v_cj)) v_cj)) > 0) ->
 		(List.In v_c (List.map (fun (v_cj : (list (uN 64))) => (fun_inv_lanes_ (X (I64 : lanetype) (mk_dim v_M_2)) v_cj)) v_cj)) ->
 		Step_pure [(AI_VCONST V128 v_c_1); (AI_VCVTOP (X (I64 : lanetype) (mk_dim v_M_2)) (X (I32 : lanetype) (mk_dim v_M_1)) v_vcvtop)] [(AI_VCONST V128 v_c)]
 	| step_vcvtop_zero_I64_I64 : forall (v_c_1 : (vec_ V128)) (v_M_2 : M) (v_M_1 : M) (v_vcvtop : vcvtop) (v_c : (vec_ V128)) (v_ci : (list (uN 64))) (v_cj : (list (list (uN 64)))), 
 		((fun_zeroop v_vcvtop) = (Some ZERO)) ->
 		(v_ci = (fun_lanes_ (X (I64 : lanetype) (mk_dim v_M_1)) v_c_1)) ->
-		(v_cj = (fun_setproduct_ (uN 64) ((List.map (fun (v_ci : (uN 64)) => (fun_vcvtop__ (X (I64 : lanetype) (mk_dim v_M_1)) (X (I64 : lanetype) (mk_dim v_M_2)) v_vcvtop v_ci)) v_ci) ++ [[(fun_zero I64)]]))) ->
+		(v_cj = (fun_setproduct_ (uN 64) ((List.map (fun (v_ci : (uN 64)) => (fun_vcvtop__ (X (I64 : lanetype) (mk_dim v_M_1)) (X (I64 : lanetype) (mk_dim v_M_2)) v_vcvtop v_ci)) v_ci) ++ (List.repeat [(fun_zero I64)] v_M_1)))) ->
 		((List.length (List.map (fun (v_cj : (list (lane_ (fun_lanetype (X (I64 : lanetype) (mk_dim v_M_2)))))) => (fun_inv_lanes_ (X (I64 : lanetype) (mk_dim v_M_2)) v_cj)) v_cj)) > 0) ->
 		(List.In v_c (List.map (fun (v_cj : (list (uN 64))) => (fun_inv_lanes_ (X (I64 : lanetype) (mk_dim v_M_2)) v_cj)) v_cj)) ->
 		Step_pure [(AI_VCONST V128 v_c_1); (AI_VCVTOP (X (I64 : lanetype) (mk_dim v_M_2)) (X (I64 : lanetype) (mk_dim v_M_1)) v_vcvtop)] [(AI_VCONST V128 v_c)]
 	| step_vcvtop_zero_F32_I64 : forall (v_c_1 : (vec_ V128)) (v_M_2 : M) (v_M_1 : M) (v_vcvtop : vcvtop) (v_c : (vec_ V128)) (v_ci : (list (fN 32))) (v_cj : (list (list (uN 64)))), 
 		((fun_zeroop v_vcvtop) = (Some ZERO)) ->
 		(v_ci = (fun_lanes_ (X (F32 : lanetype) (mk_dim v_M_1)) v_c_1)) ->
-		(v_cj = (fun_setproduct_ (uN 64) ((List.map (fun (v_ci : (fN 32)) => (fun_vcvtop__ (X (F32 : lanetype) (mk_dim v_M_1)) (X (I64 : lanetype) (mk_dim v_M_2)) v_vcvtop v_ci)) v_ci) ++ [[(fun_zero I64)]]))) ->
+		(v_cj = (fun_setproduct_ (uN 64) ((List.map (fun (v_ci : (fN 32)) => (fun_vcvtop__ (X (F32 : lanetype) (mk_dim v_M_1)) (X (I64 : lanetype) (mk_dim v_M_2)) v_vcvtop v_ci)) v_ci) ++ (List.repeat [(fun_zero I64)] v_M_1)))) ->
 		((List.length (List.map (fun (v_cj : (list (lane_ (fun_lanetype (X (I64 : lanetype) (mk_dim v_M_2)))))) => (fun_inv_lanes_ (X (I64 : lanetype) (mk_dim v_M_2)) v_cj)) v_cj)) > 0) ->
 		(List.In v_c (List.map (fun (v_cj : (list (uN 64))) => (fun_inv_lanes_ (X (I64 : lanetype) (mk_dim v_M_2)) v_cj)) v_cj)) ->
 		Step_pure [(AI_VCONST V128 v_c_1); (AI_VCVTOP (X (I64 : lanetype) (mk_dim v_M_2)) (X (F32 : lanetype) (mk_dim v_M_1)) v_vcvtop)] [(AI_VCONST V128 v_c)]
 	| step_vcvtop_zero_F64_I64 : forall (v_c_1 : (vec_ V128)) (v_M_2 : M) (v_M_1 : M) (v_vcvtop : vcvtop) (v_c : (vec_ V128)) (v_ci : (list (fN 64))) (v_cj : (list (list (uN 64)))), 
 		((fun_zeroop v_vcvtop) = (Some ZERO)) ->
 		(v_ci = (fun_lanes_ (X (F64 : lanetype) (mk_dim v_M_1)) v_c_1)) ->
-		(v_cj = (fun_setproduct_ (uN 64) ((List.map (fun (v_ci : (fN 64)) => (fun_vcvtop__ (X (F64 : lanetype) (mk_dim v_M_1)) (X (I64 : lanetype) (mk_dim v_M_2)) v_vcvtop v_ci)) v_ci) ++ [[(fun_zero I64)]]))) ->
+		(v_cj = (fun_setproduct_ (uN 64) ((List.map (fun (v_ci : (fN 64)) => (fun_vcvtop__ (X (F64 : lanetype) (mk_dim v_M_1)) (X (I64 : lanetype) (mk_dim v_M_2)) v_vcvtop v_ci)) v_ci) ++ (List.repeat [(fun_zero I64)] v_M_1)))) ->
 		((List.length (List.map (fun (v_cj : (list (lane_ (fun_lanetype (X (I64 : lanetype) (mk_dim v_M_2)))))) => (fun_inv_lanes_ (X (I64 : lanetype) (mk_dim v_M_2)) v_cj)) v_cj)) > 0) ->
 		(List.In v_c (List.map (fun (v_cj : (list (uN 64))) => (fun_inv_lanes_ (X (I64 : lanetype) (mk_dim v_M_2)) v_cj)) v_cj)) ->
 		Step_pure [(AI_VCONST V128 v_c_1); (AI_VCVTOP (X (I64 : lanetype) (mk_dim v_M_2)) (X (F64 : lanetype) (mk_dim v_M_1)) v_vcvtop)] [(AI_VCONST V128 v_c)]
 	| step_vcvtop_zero_I32_F32 : forall (v_c_1 : (vec_ V128)) (v_M_2 : M) (v_M_1 : M) (v_vcvtop : vcvtop) (v_c : (vec_ V128)) (v_ci : (list (uN 32))) (v_cj : (list (list (fN 32)))), 
 		((fun_zeroop v_vcvtop) = (Some ZERO)) ->
 		(v_ci = (fun_lanes_ (X (I32 : lanetype) (mk_dim v_M_1)) v_c_1)) ->
-		(v_cj = (fun_setproduct_ (fN 32) ((List.map (fun (v_ci : (uN 32)) => (fun_vcvtop__ (X (I32 : lanetype) (mk_dim v_M_1)) (X (F32 : lanetype) (mk_dim v_M_2)) v_vcvtop v_ci)) v_ci) ++ [[(fun_zero F32)]]))) ->
+		(v_cj = (fun_setproduct_ (fN 32) ((List.map (fun (v_ci : (uN 32)) => (fun_vcvtop__ (X (I32 : lanetype) (mk_dim v_M_1)) (X (F32 : lanetype) (mk_dim v_M_2)) v_vcvtop v_ci)) v_ci) ++ (List.repeat [(fun_zero F32)] v_M_1)))) ->
 		((List.length (List.map (fun (v_cj : (list (lane_ (fun_lanetype (X (F32 : lanetype) (mk_dim v_M_2)))))) => (fun_inv_lanes_ (X (F32 : lanetype) (mk_dim v_M_2)) v_cj)) v_cj)) > 0) ->
 		(List.In v_c (List.map (fun (v_cj : (list (fN 32))) => (fun_inv_lanes_ (X (F32 : lanetype) (mk_dim v_M_2)) v_cj)) v_cj)) ->
 		Step_pure [(AI_VCONST V128 v_c_1); (AI_VCVTOP (X (F32 : lanetype) (mk_dim v_M_2)) (X (I32 : lanetype) (mk_dim v_M_1)) v_vcvtop)] [(AI_VCONST V128 v_c)]
 	| step_vcvtop_zero_I64_F32 : forall (v_c_1 : (vec_ V128)) (v_M_2 : M) (v_M_1 : M) (v_vcvtop : vcvtop) (v_c : (vec_ V128)) (v_ci : (list (uN 64))) (v_cj : (list (list (fN 32)))), 
 		((fun_zeroop v_vcvtop) = (Some ZERO)) ->
 		(v_ci = (fun_lanes_ (X (I64 : lanetype) (mk_dim v_M_1)) v_c_1)) ->
-		(v_cj = (fun_setproduct_ (fN 32) ((List.map (fun (v_ci : (uN 64)) => (fun_vcvtop__ (X (I64 : lanetype) (mk_dim v_M_1)) (X (F32 : lanetype) (mk_dim v_M_2)) v_vcvtop v_ci)) v_ci) ++ [[(fun_zero F32)]]))) ->
+		(v_cj = (fun_setproduct_ (fN 32) ((List.map (fun (v_ci : (uN 64)) => (fun_vcvtop__ (X (I64 : lanetype) (mk_dim v_M_1)) (X (F32 : lanetype) (mk_dim v_M_2)) v_vcvtop v_ci)) v_ci) ++ (List.repeat [(fun_zero F32)] v_M_1)))) ->
 		((List.length (List.map (fun (v_cj : (list (lane_ (fun_lanetype (X (F32 : lanetype) (mk_dim v_M_2)))))) => (fun_inv_lanes_ (X (F32 : lanetype) (mk_dim v_M_2)) v_cj)) v_cj)) > 0) ->
 		(List.In v_c (List.map (fun (v_cj : (list (fN 32))) => (fun_inv_lanes_ (X (F32 : lanetype) (mk_dim v_M_2)) v_cj)) v_cj)) ->
 		Step_pure [(AI_VCONST V128 v_c_1); (AI_VCVTOP (X (F32 : lanetype) (mk_dim v_M_2)) (X (I64 : lanetype) (mk_dim v_M_1)) v_vcvtop)] [(AI_VCONST V128 v_c)]
 	| step_vcvtop_zero_F32_F32 : forall (v_c_1 : (vec_ V128)) (v_M_2 : M) (v_M_1 : M) (v_vcvtop : vcvtop) (v_c : (vec_ V128)) (v_ci : (list (fN 32))) (v_cj : (list (list (fN 32)))), 
 		((fun_zeroop v_vcvtop) = (Some ZERO)) ->
 		(v_ci = (fun_lanes_ (X (F32 : lanetype) (mk_dim v_M_1)) v_c_1)) ->
-		(v_cj = (fun_setproduct_ (fN 32) ((List.map (fun (v_ci : (fN 32)) => (fun_vcvtop__ (X (F32 : lanetype) (mk_dim v_M_1)) (X (F32 : lanetype) (mk_dim v_M_2)) v_vcvtop v_ci)) v_ci) ++ [[(fun_zero F32)]]))) ->
+		(v_cj = (fun_setproduct_ (fN 32) ((List.map (fun (v_ci : (fN 32)) => (fun_vcvtop__ (X (F32 : lanetype) (mk_dim v_M_1)) (X (F32 : lanetype) (mk_dim v_M_2)) v_vcvtop v_ci)) v_ci) ++ (List.repeat [(fun_zero F32)] v_M_1)))) ->
 		((List.length (List.map (fun (v_cj : (list (lane_ (fun_lanetype (X (F32 : lanetype) (mk_dim v_M_2)))))) => (fun_inv_lanes_ (X (F32 : lanetype) (mk_dim v_M_2)) v_cj)) v_cj)) > 0) ->
 		(List.In v_c (List.map (fun (v_cj : (list (fN 32))) => (fun_inv_lanes_ (X (F32 : lanetype) (mk_dim v_M_2)) v_cj)) v_cj)) ->
 		Step_pure [(AI_VCONST V128 v_c_1); (AI_VCVTOP (X (F32 : lanetype) (mk_dim v_M_2)) (X (F32 : lanetype) (mk_dim v_M_1)) v_vcvtop)] [(AI_VCONST V128 v_c)]
 	| step_vcvtop_zero_F64_F32 : forall (v_c_1 : (vec_ V128)) (v_M_2 : M) (v_M_1 : M) (v_vcvtop : vcvtop) (v_c : (vec_ V128)) (v_ci : (list (fN 64))) (v_cj : (list (list (fN 32)))), 
 		((fun_zeroop v_vcvtop) = (Some ZERO)) ->
 		(v_ci = (fun_lanes_ (X (F64 : lanetype) (mk_dim v_M_1)) v_c_1)) ->
-		(v_cj = (fun_setproduct_ (fN 32) ((List.map (fun (v_ci : (fN 64)) => (fun_vcvtop__ (X (F64 : lanetype) (mk_dim v_M_1)) (X (F32 : lanetype) (mk_dim v_M_2)) v_vcvtop v_ci)) v_ci) ++ [[(fun_zero F32)]]))) ->
+		(v_cj = (fun_setproduct_ (fN 32) ((List.map (fun (v_ci : (fN 64)) => (fun_vcvtop__ (X (F64 : lanetype) (mk_dim v_M_1)) (X (F32 : lanetype) (mk_dim v_M_2)) v_vcvtop v_ci)) v_ci) ++ (List.repeat [(fun_zero F32)] v_M_1)))) ->
 		((List.length (List.map (fun (v_cj : (list (lane_ (fun_lanetype (X (F32 : lanetype) (mk_dim v_M_2)))))) => (fun_inv_lanes_ (X (F32 : lanetype) (mk_dim v_M_2)) v_cj)) v_cj)) > 0) ->
 		(List.In v_c (List.map (fun (v_cj : (list (fN 32))) => (fun_inv_lanes_ (X (F32 : lanetype) (mk_dim v_M_2)) v_cj)) v_cj)) ->
 		Step_pure [(AI_VCONST V128 v_c_1); (AI_VCVTOP (X (F32 : lanetype) (mk_dim v_M_2)) (X (F64 : lanetype) (mk_dim v_M_1)) v_vcvtop)] [(AI_VCONST V128 v_c)]
 	| step_vcvtop_zero_I32_F64 : forall (v_c_1 : (vec_ V128)) (v_M_2 : M) (v_M_1 : M) (v_vcvtop : vcvtop) (v_c : (vec_ V128)) (v_ci : (list (uN 32))) (v_cj : (list (list (fN 64)))), 
 		((fun_zeroop v_vcvtop) = (Some ZERO)) ->
 		(v_ci = (fun_lanes_ (X (I32 : lanetype) (mk_dim v_M_1)) v_c_1)) ->
-		(v_cj = (fun_setproduct_ (fN 64) ((List.map (fun (v_ci : (uN 32)) => (fun_vcvtop__ (X (I32 : lanetype) (mk_dim v_M_1)) (X (F64 : lanetype) (mk_dim v_M_2)) v_vcvtop v_ci)) v_ci) ++ [[(fun_zero F64)]]))) ->
+		(v_cj = (fun_setproduct_ (fN 64) ((List.map (fun (v_ci : (uN 32)) => (fun_vcvtop__ (X (I32 : lanetype) (mk_dim v_M_1)) (X (F64 : lanetype) (mk_dim v_M_2)) v_vcvtop v_ci)) v_ci) ++ (List.repeat [(fun_zero F64)] v_M_1)))) ->
 		((List.length (List.map (fun (v_cj : (list (lane_ (fun_lanetype (X (F64 : lanetype) (mk_dim v_M_2)))))) => (fun_inv_lanes_ (X (F64 : lanetype) (mk_dim v_M_2)) v_cj)) v_cj)) > 0) ->
 		(List.In v_c (List.map (fun (v_cj : (list (fN 64))) => (fun_inv_lanes_ (X (F64 : lanetype) (mk_dim v_M_2)) v_cj)) v_cj)) ->
 		Step_pure [(AI_VCONST V128 v_c_1); (AI_VCVTOP (X (F64 : lanetype) (mk_dim v_M_2)) (X (I32 : lanetype) (mk_dim v_M_1)) v_vcvtop)] [(AI_VCONST V128 v_c)]
 	| step_vcvtop_zero_I64_F64 : forall (v_c_1 : (vec_ V128)) (v_M_2 : M) (v_M_1 : M) (v_vcvtop : vcvtop) (v_c : (vec_ V128)) (v_ci : (list (uN 64))) (v_cj : (list (list (fN 64)))), 
 		((fun_zeroop v_vcvtop) = (Some ZERO)) ->
 		(v_ci = (fun_lanes_ (X (I64 : lanetype) (mk_dim v_M_1)) v_c_1)) ->
-		(v_cj = (fun_setproduct_ (fN 64) ((List.map (fun (v_ci : (uN 64)) => (fun_vcvtop__ (X (I64 : lanetype) (mk_dim v_M_1)) (X (F64 : lanetype) (mk_dim v_M_2)) v_vcvtop v_ci)) v_ci) ++ [[(fun_zero F64)]]))) ->
+		(v_cj = (fun_setproduct_ (fN 64) ((List.map (fun (v_ci : (uN 64)) => (fun_vcvtop__ (X (I64 : lanetype) (mk_dim v_M_1)) (X (F64 : lanetype) (mk_dim v_M_2)) v_vcvtop v_ci)) v_ci) ++ (List.repeat [(fun_zero F64)] v_M_1)))) ->
 		((List.length (List.map (fun (v_cj : (list (lane_ (fun_lanetype (X (F64 : lanetype) (mk_dim v_M_2)))))) => (fun_inv_lanes_ (X (F64 : lanetype) (mk_dim v_M_2)) v_cj)) v_cj)) > 0) ->
 		(List.In v_c (List.map (fun (v_cj : (list (fN 64))) => (fun_inv_lanes_ (X (F64 : lanetype) (mk_dim v_M_2)) v_cj)) v_cj)) ->
 		Step_pure [(AI_VCONST V128 v_c_1); (AI_VCVTOP (X (F64 : lanetype) (mk_dim v_M_2)) (X (I64 : lanetype) (mk_dim v_M_1)) v_vcvtop)] [(AI_VCONST V128 v_c)]
 	| step_vcvtop_zero_F32_F64 : forall (v_c_1 : (vec_ V128)) (v_M_2 : M) (v_M_1 : M) (v_vcvtop : vcvtop) (v_c : (vec_ V128)) (v_ci : (list (fN 32))) (v_cj : (list (list (fN 64)))), 
 		((fun_zeroop v_vcvtop) = (Some ZERO)) ->
 		(v_ci = (fun_lanes_ (X (F32 : lanetype) (mk_dim v_M_1)) v_c_1)) ->
-		(v_cj = (fun_setproduct_ (fN 64) ((List.map (fun (v_ci : (fN 32)) => (fun_vcvtop__ (X (F32 : lanetype) (mk_dim v_M_1)) (X (F64 : lanetype) (mk_dim v_M_2)) v_vcvtop v_ci)) v_ci) ++ [[(fun_zero F64)]]))) ->
+		(v_cj = (fun_setproduct_ (fN 64) ((List.map (fun (v_ci : (fN 32)) => (fun_vcvtop__ (X (F32 : lanetype) (mk_dim v_M_1)) (X (F64 : lanetype) (mk_dim v_M_2)) v_vcvtop v_ci)) v_ci) ++ (List.repeat [(fun_zero F64)] v_M_1)))) ->
 		((List.length (List.map (fun (v_cj : (list (lane_ (fun_lanetype (X (F64 : lanetype) (mk_dim v_M_2)))))) => (fun_inv_lanes_ (X (F64 : lanetype) (mk_dim v_M_2)) v_cj)) v_cj)) > 0) ->
 		(List.In v_c (List.map (fun (v_cj : (list (fN 64))) => (fun_inv_lanes_ (X (F64 : lanetype) (mk_dim v_M_2)) v_cj)) v_cj)) ->
 		Step_pure [(AI_VCONST V128 v_c_1); (AI_VCVTOP (X (F64 : lanetype) (mk_dim v_M_2)) (X (F32 : lanetype) (mk_dim v_M_1)) v_vcvtop)] [(AI_VCONST V128 v_c)]
 	| step_vcvtop_zero_F64_F64 : forall (v_c_1 : (vec_ V128)) (v_M_2 : M) (v_M_1 : M) (v_vcvtop : vcvtop) (v_c : (vec_ V128)) (v_ci : (list (fN 64))) (v_cj : (list (list (fN 64)))), 
 		((fun_zeroop v_vcvtop) = (Some ZERO)) ->
 		(v_ci = (fun_lanes_ (X (F64 : lanetype) (mk_dim v_M_1)) v_c_1)) ->
-		(v_cj = (fun_setproduct_ (fN 64) ((List.map (fun (v_ci : (fN 64)) => (fun_vcvtop__ (X (F64 : lanetype) (mk_dim v_M_1)) (X (F64 : lanetype) (mk_dim v_M_2)) v_vcvtop v_ci)) v_ci) ++ [[(fun_zero F64)]]))) ->
+		(v_cj = (fun_setproduct_ (fN 64) ((List.map (fun (v_ci : (fN 64)) => (fun_vcvtop__ (X (F64 : lanetype) (mk_dim v_M_1)) (X (F64 : lanetype) (mk_dim v_M_2)) v_vcvtop v_ci)) v_ci) ++ (List.repeat [(fun_zero F64)] v_M_1)))) ->
 		((List.length (List.map (fun (v_cj : (list (lane_ (fun_lanetype (X (F64 : lanetype) (mk_dim v_M_2)))))) => (fun_inv_lanes_ (X (F64 : lanetype) (mk_dim v_M_2)) v_cj)) v_cj)) > 0) ->
 		(List.In v_c (List.map (fun (v_cj : (list (fN 64))) => (fun_inv_lanes_ (X (F64 : lanetype) (mk_dim v_M_2)) v_cj)) v_cj)) ->
 		Step_pure [(AI_VCONST V128 v_c_1); (AI_VCVTOP (X (F64 : lanetype) (mk_dim v_M_2)) (X (F64 : lanetype) (mk_dim v_M_1)) v_vcvtop)] [(AI_VCONST V128 v_c)]
@@ -6003,25 +6003,25 @@ Inductive Step_read: config -> (list admininstr) -> Prop :=
 		((fun_ibytes_ v_N v_j) = (list_slice (MEM_BYTES (fun_mem v_z (mk_uN _ 0))) ((fun_proj_uN_0 32 v_i) + (fun_proj_uN_0 32 (OFFSET v_ao))) (((v_N : nat) / (8 : nat)) : nat))) ->
 		(v_N = (fun_jsize JNN_I32)) ->
 		((v_M : nat) = ((128 : nat) / (v_N : nat))) ->
-		(v_c = (fun_inv_lanes_ (X (JNN_I32 : lanetype) (mk_dim v_M)) [(mk_uN _ (fun_proj_uN_0 v_N v_j))])) ->
+		(v_c = (fun_inv_lanes_ (X (JNN_I32 : lanetype) (mk_dim v_M)) (List.repeat (mk_uN _ (fun_proj_uN_0 v_N v_j)) v_M))) ->
 		Step_read (mk_config v_z [(AI_CONST I32 v_i); (AI_VLOAD V128 (Some (VLOAD_SPLAT v_N)) v_ao)]) [(AI_VCONST V128 v_c)]
 	| step_vload_splat_val_I64 : forall (v_z : state) (v_i : (uN 32)) (v_N : res_N) (v_ao : memarg) (v_c : (vec_ V128)) (v_j : (iN v_N)) (v_M : M), 
 		((fun_ibytes_ v_N v_j) = (list_slice (MEM_BYTES (fun_mem v_z (mk_uN _ 0))) ((fun_proj_uN_0 32 v_i) + (fun_proj_uN_0 32 (OFFSET v_ao))) (((v_N : nat) / (8 : nat)) : nat))) ->
 		(v_N = (fun_jsize JNN_I64)) ->
 		((v_M : nat) = ((128 : nat) / (v_N : nat))) ->
-		(v_c = (fun_inv_lanes_ (X (JNN_I64 : lanetype) (mk_dim v_M)) [(mk_uN _ (fun_proj_uN_0 v_N v_j))])) ->
+		(v_c = (fun_inv_lanes_ (X (JNN_I64 : lanetype) (mk_dim v_M)) (List.repeat (mk_uN _ (fun_proj_uN_0 v_N v_j)) v_M))) ->
 		Step_read (mk_config v_z [(AI_CONST I32 v_i); (AI_VLOAD V128 (Some (VLOAD_SPLAT v_N)) v_ao)]) [(AI_VCONST V128 v_c)]
 	| step_vload_splat_val_I8 : forall (v_z : state) (v_i : (uN 32)) (v_N : res_N) (v_ao : memarg) (v_c : (vec_ V128)) (v_j : (iN v_N)) (v_M : M), 
 		((fun_ibytes_ v_N v_j) = (list_slice (MEM_BYTES (fun_mem v_z (mk_uN _ 0))) ((fun_proj_uN_0 32 v_i) + (fun_proj_uN_0 32 (OFFSET v_ao))) (((v_N : nat) / (8 : nat)) : nat))) ->
 		(v_N = (fun_jsize JNN_I8)) ->
 		((v_M : nat) = ((128 : nat) / (v_N : nat))) ->
-		(v_c = (fun_inv_lanes_ (X (JNN_I8 : lanetype) (mk_dim v_M)) [(mk_uN _ (fun_proj_uN_0 v_N v_j))])) ->
+		(v_c = (fun_inv_lanes_ (X (JNN_I8 : lanetype) (mk_dim v_M)) (List.repeat (mk_uN _ (fun_proj_uN_0 v_N v_j)) v_M))) ->
 		Step_read (mk_config v_z [(AI_CONST I32 v_i); (AI_VLOAD V128 (Some (VLOAD_SPLAT v_N)) v_ao)]) [(AI_VCONST V128 v_c)]
 	| step_vload_splat_val_I16 : forall (v_z : state) (v_i : (uN 32)) (v_N : res_N) (v_ao : memarg) (v_c : (vec_ V128)) (v_j : (iN v_N)) (v_M : M), 
 		((fun_ibytes_ v_N v_j) = (list_slice (MEM_BYTES (fun_mem v_z (mk_uN _ 0))) ((fun_proj_uN_0 32 v_i) + (fun_proj_uN_0 32 (OFFSET v_ao))) (((v_N : nat) / (8 : nat)) : nat))) ->
 		(v_N = (fun_jsize JNN_I16)) ->
 		((v_M : nat) = ((128 : nat) / (v_N : nat))) ->
-		(v_c = (fun_inv_lanes_ (X (JNN_I16 : lanetype) (mk_dim v_M)) [(mk_uN _ (fun_proj_uN_0 v_N v_j))])) ->
+		(v_c = (fun_inv_lanes_ (X (JNN_I16 : lanetype) (mk_dim v_M)) (List.repeat (mk_uN _ (fun_proj_uN_0 v_N v_j)) v_M))) ->
 		Step_read (mk_config v_z [(AI_CONST I32 v_i); (AI_VLOAD V128 (Some (VLOAD_SPLAT v_N)) v_ao)]) [(AI_VCONST V128 v_c)]
 	| step_vload_zero_oob : forall (v_z : state) (v_i : (uN 32)) (v_N : res_N) (v_ao : memarg), 
 		((((fun_proj_uN_0 32 v_i) + (fun_proj_uN_0 32 (OFFSET v_ao))) + (((v_N : nat) / (8 : nat)) : nat)) > (List.length (MEM_BYTES (fun_mem v_z (mk_uN _ 0))))) ->

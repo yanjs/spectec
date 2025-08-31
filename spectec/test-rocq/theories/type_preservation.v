@@ -346,10 +346,10 @@ Proof.
 			rewrite /lookup_total in H0.
 			rewrite H0 in H3.
 			inversion H3; subst; clear H3.
-			rewrite /lookup_total in H4.
+			rewrite /lookup_total in H5.
 
 			split. auto.
-			by exists v_lim_1, extr1.
+			by exists extr1, extr3.
 		}
 
 		assert (Store_extension s s').
@@ -410,30 +410,33 @@ Proof.
 		join_subtyping_eq Hsubi Hsub0.
 		eapply Ref_ok_non_bot in HRefok as Hnonbot.
 		eapply valtype_sub_non_bot in Hsubv; eauto.
-		subst. clear Hsub Hsubi Hnonbot.
+		assert (extr = t).
+		{
+			destruct extr, t; auto; discriminate.
+		}
+		subst. clear Hsub Hsubi Hnonbot Hsubv.
 		rewrite /fun_table in H.
 		inversion H; subst.
-
-		admit.
-		(*
 
 		remember ((fun_proj_uN_0 32 v_x)) as i.
 		remember ((lookup_total (MODULE_TABLES (F_MODULE f)) i)) as tba.
 		remember ((mk_limits (mk_uN 32 (Datatypes.length v_r' + v_n)) v_j))
 			as v_limits_new.
-		remember (({| TAB_TYPE := mk_tabletype v_limits_new
-			v_rt; TAB_REFS := v_r' ++ [v_ref] |})) as v_ti.
+		remember (({| TAB_TYPE := mk_tabletype v_limits_new v_rt;
+			TAB_REFS := v_r' ++ repeat v_ref v_n |})) as v_ti.
 		remember  (s <| TABLES := list_update_func (TABLES s) tba
 					(fun=> v_ti) |>) as s'.
-		
-
 
 		assert (
 			tba < Datatypes.length (TABLES s) /\
-			exists tbt' tbr,
-				((lookup_total (TABLES s) tba) =
-					{| TAB_TYPE := tbt'; TAB_REFS := tbr |}))
-			as [HLen [tbt' [tbr HLookup]]].
+			((Datatypes.length v_r' + v_n) <= v_j) /\
+			(t = v_rt) /\
+			((lookup_total (TABLES s) tba) =
+				{| TAB_TYPE := mk_tabletype
+					(mk_limits (mk_uN 32 (Datatypes.length v_r')) v_j)
+					t;
+					TAB_REFS := v_r' |}))
+			as [HLen [HRange [tbr HLookup]]].
 		{
 			eapply minst_invert_tables in HIT; eauto.
 
@@ -442,15 +445,34 @@ Proof.
 			destruct_all.
 			rewrite /lookup_total in H0.
 			rewrite H0 in H4.
-			inversion H4; subst; clear H4.
-			rewrite /lookup_total in H4.
+			inversion H4; clear H4.
+			rewrite -H10 in H8; rewrite -H10; clear H10.
+			rewrite -H9 in H3; clear H9.
 
-			split. auto.
-			by exists (mk_tabletype v_lim_1 extr), extr2.
+			rewrite /lookup_total in Heqtba.
+			rewrite -Heqtba in H1.
+			rewrite -Heqtba /lookup_total in H8.
+
+			eapply s_invert_tables in HStore as [tbts HTable].
+			pose proof H1 as H1_0.
+			eapply Forall2_nth in HTable as [HLen HTable].
+			eapply HTable in H1.
+			destruct_all.
+
+			rewrite H7 in H1.
+			rewrite /lookup_total H1 in H2.
+			inversion H2; clear H2.
+			rewrite /lookup_total H1.
+			rewrite H1 in H8.
+			inversion H8; clear H8.
+
+			split. subst; auto.
+			inversion H; subst.
+			inversion H17; subst; clear H17.
+			rewrite -H9 in H18.
+			auto.
 		}
-		(* Cannot be proven as missing information about the new table *)
-		admit.
-		(*
+
 		assert (Store_extension s s').
 		{
 			eapply mk_Store_extension with
@@ -476,13 +498,15 @@ Proof.
 		eapply mk_Store_ok with
 			(v_funcinst := v_funcinst)
 			(v_globalinst := v_globalinst)
-			(v_tableinst := list_update_func (TABLES s) tba
-				(λ v_1 : tableinst, v_1 <| TAB_REFS :=
-					list_update_func (TAB_REFS v_1) i (fun=> v_ref)
-				|>))
+			(v_tableinst := list_update_func (TABLES s) tba (fun=> v_ti))
 			(v_meminst := v_meminst)
 			(v_eleminst := v_eleminst)
 			(v_datainst := v_datainst)
+			(v_tabletype := list_update_func (v_tabletype) tba (fun=>
+				mk_tabletype
+				(mk_limits (mk_uN 32 (Datatypes.length v_r' + v_n)) v_j)
+				v_rt
+			))
 			; auto;
 			try solve [subst; auto];
 			try solve eauto;
@@ -495,11 +519,11 @@ Proof.
 				eapply store_extension_datainsts; eauto |
 				eauto
 			].
-		- rewrite {1}list_update_length_func {1}H3; eauto.
+		- rewrite !list_update_length_func /= {1}H4 /=; eauto.
 		- {
-			eapply construct_tableinsts; subst; eauto.
+			rewrite Heqv_ti Heqv_limits_new /=.
+			eapply construct_tableinsts_grow; subst; eauto.
 		}
-			*) *)
 	}
 	{ (* Elem Drop *)
 		destruct_all; subst.
@@ -883,32 +907,24 @@ Proof.
 		resolve_all_pt.
 		simpl.
 
-		(* implementation of growmemory *)
-		admit.
-		(*
-		inversion H; subst.
+		inversion H; subst; clear H.
+		rewrite /fun_mem /= in H2.
 
 		remember ((mk_uN 32 (Datatypes.length v_b / (64 * fun_Ki) + v_n)))
 			as lim_i.
-		remember (fun_proj_uN_0 32 (OFFSET v_ao)) as ao.
 		remember ((lookup_total (MODULE_MEMS (F_MODULE f)) 0)) as ma.
 		remember  (s <| MEMS :=
 			list_update_func (MEMS s) ma
-				(λ v_1,
-				v_1 <| MEM_BYTES := list_slice_update
-				(MEM_BYTES v_1) (i + ao) (Nat.divmod v_n 7 0 7).1
-				(fun_ibytes_ v_n (fun_wrap__ 64 v_n v_c)) |>)	
-		|> ) as s'.
-		rewrite -Heqlen in Heqs'.
+			(fun=> {| MEM_TYPE := PAGE (mk_limits lim_i v_j);
+				MEM_BYTES := v_b ++ repeat (mk_byte 0) (v_n * (64 * fun_Ki)) |})	
+			|> ) as s'.
 
 		assert (
 			(ma < (List.length (MEMS s))) /\
-			exists v_mt v_mt' v_b,
-				((lookup_total (MEMS s) ma) =
-					{| MEM_TYPE := v_mt; MEM_BYTES := v_b |}) /\
-				((Memtype_sub v_mt v_mt'))
+			exists v_mt',
+				((Memtype_sub (PAGE (mk_limits v_i v_j)) v_mt'))
 				)
-			as [HLen [v_mt [v_mt' [v_b [HLookup HRefok]]]]].
+			as [HLen [v_mt' HMemsub]].
 		{
 			eapply minst_invert_mems in HIT; eauto.
 
@@ -919,12 +935,16 @@ Proof.
 			rewrite -Heqma in H1.
 			split; auto.
 
-			rewrite -Heqma in H4.
-			by exists extr0, extr, extr1.
+			rewrite -Heqma H2 in H4.
+			inversion H4; subst; clear H4.
+
+			by exists (ListDef.nth 0 (C_MEMS C') default_val).
 		}
 
 		assert (Store_extension s s').
 		{
+			remember (Datatypes.length v_b / (64 * fun_Ki)) as i.
+			clear Heqi.
 			eapply mk_Store_extension with
 				(v_funcinst_2 := [])
 				(v_tableinst_2 := [])
@@ -940,7 +960,7 @@ Proof.
 				by rewrite Heqs'; rewrite list_update_length_func
 			].
 			subst; rewrite {1}/set /=.
-			eapply store_none_mem_extension; eauto.
+			eapply memory_grow_mem_extension; eauto.
 		}
 		split; auto.
 
@@ -974,7 +994,6 @@ Proof.
 		- {
 			eapply construct_meminsts; subst; eauto.
 		}
-			*)
 	}
 	{ (* Data Drop *)
 		destruct_all; subst.

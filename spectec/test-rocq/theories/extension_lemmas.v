@@ -223,11 +223,12 @@ Lemma minst_invert_tables: forall v_S v_minst C C',
 	Module_instance_ok v_S v_minst C ->
 	inst_match C C' ->
 	List.Forall2 (fun tba tbt => 
-		exists tbt' tbr,
+		exists rt lim lim' tbr,
 		(tba < (List.length (TABLES v_S))) /\
-		(Tabletype_sub tbt' tbt) /\
+		(tbt = (mk_tabletype lim' rt)) /\
+		(Limits_sub lim lim') /\
 		((lookup_total (TABLES v_S) tba) =
-			{| TAB_TYPE := tbt'; TAB_REFS := tbr |})
+			{| TAB_TYPE := (mk_tabletype lim rt); TAB_REFS := tbr |})
 	) (MODULE_TABLES v_minst) (C_TABLES C').
 Proof.
 	move => v_S v_minst v_C v_C' HMi Him.
@@ -238,7 +239,8 @@ Proof.
 	induction H3; eauto.
 	econstructor; eauto.
 	inversion H; subst; clear H.
-	by exists v_tt', v_ref.
+	inversion H6; subst; clear H6.
+	by exists v_rt, v_lim_1, v_lim_2, v_ref.
 Qed.
 
 Lemma minst_invert_globals: forall v_S v_minst C C',
@@ -828,6 +830,44 @@ Proof.
 	econstructor.
 	eapply mem_extension_refl0.
 	eapply IHv_ms; eauto.
+Qed.
+
+Lemma memory_grow_mem_extension: forall v_ms v_idx v_b v_i v_n v_j,
+	(v_idx < length v_ms) ->
+	lookup_total v_ms v_idx = {| MEM_TYPE := PAGE (mk_limits
+				(mk_uN 32 v_i)
+				v_j); MEM_BYTES := v_b |} ->
+	v_i + v_n <= fun_proj_uN_0 32 v_j ->
+	Forall2 (λ v v', Mem_extension v v') v_ms
+		(list_update_func v_ms v_idx
+			(fun=> {|
+			MEM_TYPE := PAGE (mk_limits
+				(mk_uN 32 (v_i + v_n)) v_j);
+			MEM_BYTES := v_b ++ repeat (mk_byte 0) (v_n * (64 * fun_Ki))
+		|})).
+Proof.
+	move => v_ms v_idx v_b v_i v_n v_j HLength HLookup HRange.
+	move : v_idx v_b v_n v_j HLength HLookup HRange.
+	induction v_ms; move => v_idx v_b v_n v_j HLength HLookup HRange; auto.
+	destruct v_idx.
+	{
+		econstructor.
+		{
+			rewrite /lookup_total /ListDef.nth in HLookup.
+			rewrite HLookup.
+			destruct v_j.
+			econstructor.
+			simpl.
+			by eapply leq_addr.
+		}
+		eapply mem_extension_refl.
+	}
+	simpl.
+	econstructor.
+	{
+		eapply mem_extension_refl0.
+	}
+	eapply IHv_ms; auto.
 Qed.
 
 Lemma table_set_table_extension: forall v_tbs v_idx tbt tbr v_i v_tbr,
@@ -1764,6 +1804,56 @@ Proof.
 	econstructor; auto.
 Qed.
 
+Lemma construct_tableinsts_grow: forall s ts v_ref t tba v_r v_j v_n,
+	Forall2 (λ v t, Table_instance_ok s v t) (TABLES s) ts ->
+	Ref_ok s v_ref t ->
+	(Datatypes.length v_r + v_n) <= (fun_u32__nat v_j) ->
+	lookup_total (TABLES s) tba ={|
+		TAB_TYPE := mk_tabletype (mk_limits
+			(mk_uN 32 (Datatypes.length v_r)) v_j) t;
+		TAB_REFS := v_r |} ->
+	Forall2 (λ v t, Table_instance_ok s v t)
+		(list_update_func (TABLES s) tba
+			(fun=> {|
+				TAB_TYPE := mk_tabletype (mk_limits
+					(mk_uN 32 (Datatypes.length v_r + v_n)) v_j) t;
+				TAB_REFS := v_r ++ repeat v_ref v_n
+			|}))
+		(list_update_func ts tba (fun=> mk_tabletype (mk_limits
+			(mk_uN 32 (Datatypes.length v_r + v_n)) v_j) t)).
+Proof.
+	move => s ts v_ref t tba v_r v_j v_n Hold HRef HRange HLookup.
+	move : tba HLookup HRef.
+	induction Hold; auto; move => tba HLookup HRef.
+	destruct tba.
+	{
+		simpl.
+		econstructor; auto.
+		inversion H; subst.
+		rewrite /lookup_total /= in HLookup.
+		inversion HLookup; subst; clear HLookup.
+		econstructor; eauto.
+		{
+			by rewrite length_app repeat_length.
+		}
+		{
+			rewrite Forall_app.
+			split; auto.
+			clear - HRef H3.
+			induction v_n; auto.
+			econstructor; auto. 
+		}
+		inversion H3; subst; clear H3.
+		econstructor.
+		inversion H4; subst; clear H4.
+		destruct_all.
+		econstructor; auto.
+	}
+	simpl.
+	econstructor; auto.
+Qed.
+
+
 Lemma construct_globalinsts: forall s ts ga v t v_old,
 	Forall2 (λ v t, Global_instance_ok s v t) (GLOBALS s) ts ->
 	lookup_total (GLOBALS s) ga = {| GLOB_TYPE := mk_globaltype (Some MUT) t; GLOB_VALUE := v_old |} ->
@@ -1813,6 +1903,20 @@ Proof.
 	simpl.
 	econstructor; auto.
 Qed.
+
+Lemma construct_meminsts_grow: forall s ts ma v_mt v_b v_i v_nb,
+	Forall2 (λ v t, Memory_instance_ok s v t) (MEMS s) ts ->
+	lookup_total (MEMS s) ma = {| MEM_TYPE := v_mt; MEM_BYTES := v_b |} ->
+	Forall2 (λ v t, Memory_instance_ok s v t)
+		(list_update_func (MEMS s) ma
+			(λ m, m <| MEM_BYTES :=
+			list_slice_update (MEM_BYTES m) v_i (length v_nb) v_nb |>)) ts.
+Proof.
+	move => s ts ma v_mt v_b v_i v_nb Hold HLookup.
+	move : ma HLookup.
+	induction Hold; auto; move => ma HLookup.
+
+Admitted.
 
 Lemma construct_datainsts: forall s da v_b,
 	Forall [eta Data_instance_ok s]
