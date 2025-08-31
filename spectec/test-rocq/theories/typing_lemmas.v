@@ -1449,6 +1449,24 @@ Proof.
 	econstructor.
 Qed.
 
+Lemma construct_ai_ref : forall v_S v_C (v_ref: wasm.ref) v_t,
+	Ref_ok v_S v_ref v_t ->
+	Admin_instr_ok v_S v_C (v_ref: admininstr) ([] :-> [v_t: valtype]).
+Proof.
+	move => v_S v_C v_ref v_t HRef.
+	destruct HRef.
+	{
+		eapply AI_ok_instr with (v_instr := instr_REF_NULL v_rt).
+		econstructor.
+	}
+	{
+		eapply AI_ok_ref; eauto.
+	}
+	{
+		eapply AI_ok_ref_extern.
+	}
+Qed.
+
 Lemma construct_ai_val : forall v_S v_C (v_val: wasm.val) v_t,
 	Val_ok v_S v_val v_t ->
 	Admin_instr_ok v_S v_C (v_val: admininstr) ([] :-> [v_t]).

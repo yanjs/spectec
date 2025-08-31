@@ -124,6 +124,15 @@ Proof.
 	rewrite <- List.length_zero_iff_nil => //=.
 Qed.  
 
+Lemma Forall_nth' {A : Type} {_ : Inhabited A} (l : list A) (R : A -> Prop) :
+      Forall R l -> (forall i, (i < length l) -> R (List.nth i l default_val)).
+Proof.
+	move => H i Hi.
+	eapply Forall_nth in H.
+	- eauto.
+	- move/ltP in Hi; eauto.
+Qed.
+
 Lemma Forall2_nth {A : Type} {B : Type} {_ : Inhabited A} {_ : Inhabited B} (l : list A) (l' : list B) (R : A -> B -> Prop) :
       Forall2 R l l' -> length l = length l' /\ (forall i, (i < length l) -> R (List.nth i l default_val) (List.nth i l' default_val)).
 Proof.

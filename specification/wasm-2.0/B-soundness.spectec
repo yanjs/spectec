@@ -81,7 +81,8 @@ relation Table_instance_ok: store |- tableinst : tabletype
 rule Table_instance_ok:
   S |- {TYPE tt, REFS ref*} : tt
   -- if tt = `[n .. m] rt
-  -- ((Externaddrs_ok: S |- FUNC fa : FUNC functype)?)*
+  -- if n = |ref*|
+  -- (Ref_ok : S |- ref : rt)*
   -- Tabletype_ok : |- tt : OK
 
 ;; Global Instance

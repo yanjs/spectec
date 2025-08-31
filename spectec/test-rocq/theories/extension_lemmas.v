@@ -9,6 +9,108 @@ From WasmSpectec Require Import wasm helper_lemmas helper_tactics typing_lemmas 
 From mathcomp Require Import ssreflect ssrfun ssrnat ssrbool seq eqtype.
 Import ListNotations.
 
+Lemma Val_ok_store: forall f1 g1 t1 m1 e1 d1 g2 t2 m2 e2 d2 v t,
+	Val_ok {| FUNCS := f1;
+		GLOBALS := g1;
+		TABLES := t1;
+		MEMS := m1;
+		ELEMS := e1;
+		DATAS := d1 |} v t <->
+	Val_ok {| FUNCS := f1;
+		GLOBALS := g2;
+		TABLES := t2;
+		MEMS := m2;
+		ELEMS := e2;
+		DATAS := d2 |} v t.
+Proof.
+	assert (forall f1 g1 t1 m1 e1 d1 g2 t2 m2 e2 d2 v t,
+		Val_ok {| FUNCS := f1;
+			GLOBALS := g1;
+			TABLES := t1;
+			MEMS := m1;
+			ELEMS := e1;
+			DATAS := d1 |} v t ->
+		Val_ok {| FUNCS := f1;
+			GLOBALS := g2;
+			TABLES := t2;
+			MEMS := m2;
+			ELEMS := e2;
+			DATAS := d2 |} v t).
+	{
+		move => f1 g1 t1 m1 e1 d1 g2 t2 m2 e2 d2 v t HVal.
+		inversion HVal; subst; econstructor.
+		inversion H; subst; econstructor.
+		inversion H0; subst; econstructor; eauto.
+	}
+	move => f1 g1 t1 m1 e1 d1 g2 t2 m2 e2 d2 v t.
+	split; by eapply H.
+Qed.
+
+Lemma s_invert_globals: forall s,
+	Store_ok s ->
+	exists gts,
+	List.Forall2 (fun g t =>
+		exists v_mut v_vt v_v,
+		(g = {| GLOB_TYPE := t;
+			GLOB_VALUE := v_v |}) /\
+		(t = (mk_globaltype v_mut (v_vt : valtype))) /\
+		(Val_ok s v_v (v_vt : valtype))
+	) (GLOBALS s) gts.
+Proof.
+	move => s HSt.
+	inversion HSt.
+	rewrite {2}H /=.
+	clear -H3.
+	exists v_globaltype.
+	
+	move : v_globalinst H3.
+	induction v_globaltype; move => v_globalinst HGok.
+	{
+		inversion HGok; subst; auto.
+	}
+	destruct v_globalinst; inversion HGok; subst; auto.
+	econstructor.
+	{
+		inversion H2; subst.
+		by exists v_mut, v_vt, v_v.
+	}
+	by eapply IHv_globaltype.
+Qed.
+
+Lemma s_invert_tables: forall s,
+	Store_ok s ->
+	exists tbts,
+	List.Forall2 (fun tb tbt =>
+		exists v_ref v_m v_rt,
+		(tb = {| TAB_TYPE := tbt;
+			TAB_REFS := v_ref |}) /\
+		(tbt = (mk_tabletype
+			(mk_limits (mk_uN _ (List.length v_ref)) (mk_uN _ v_m)) v_rt)) /\
+		(Tabletype_ok tbt) /\
+		List.Forall (fun (v_ref : ref) => (Ref_ok s v_ref v_rt)) (v_ref)
+	) (TABLES s) tbts.
+Proof.
+	move => s HSt.
+	inversion HSt.
+
+	rewrite {2}H /=.
+	clear -H5.
+
+	exists v_tabletype.
+	move : v_tableinst H5.
+	induction v_tabletype; move => v_tableinst HTok.
+	{
+		inversion HTok; subst; auto.
+	}
+	destruct v_tableinst; inversion HTok; subst; auto.
+	econstructor.
+	{
+		inversion H2; subst.
+		by exists v_ref, v_m, v_rt.
+	}
+	by eapply IHv_tabletype.
+Qed.
+
 Lemma se_invert_funcs: forall s s',
     Store_extension s s' ->
     exists fs' fs2,
@@ -87,6 +189,36 @@ Proof.
     auto.
 Qed.
 
+Lemma minst_invert_functypes: forall v_S v_minst C C',
+	Module_instance_ok v_S v_minst C ->
+	inst_match C C' ->
+	(C_TYPES C') = (MODULE_TYPES v_minst).
+Proof.
+	move => v_S v_minst v_C v_C' HMi Him.
+	inversion HMi; inversion Him; subst; auto.
+Qed.
+
+Lemma minst_invert_funcs: forall v_S v_minst C C',
+	Module_instance_ok v_S v_minst C ->
+	inst_match C C' ->
+	List.Forall2 (fun fa ft => 
+		exists v_minst1 v_func,
+		(fa < (List.length (FUNCS v_S))) /\
+		((lookup_total (FUNCS v_S) fa) =
+			{| FUNC_TYPE := ft; FUNC_MODULE := v_minst1; FUNC_CODE := v_func |})
+	) (MODULE_FUNCS v_minst) (C_FUNCS C').
+Proof.
+	move => v_S v_minst v_C v_C' HMi Him.
+	inversion HMi; subst; clear HMi.
+	clear - H1 Him.
+	destruct v_C'; rewrite /inst_match in Him; destruct_all; simpl in *; subst.
+
+	induction H1; eauto.
+	econstructor; eauto.
+	inversion H; subst; clear H.
+	by exists v_minst, v_func.
+Qed.
+
 Lemma minst_invert_tables: forall v_S v_minst C C',
 	Module_instance_ok v_S v_minst C ->
 	inst_match C C' ->
@@ -135,9 +267,9 @@ Lemma minst_invert_mems: forall v_S v_minst C C',
 	Module_instance_ok v_S v_minst C ->
 	inst_match C C' ->
 	List.Forall2 (fun ma mt => 
-		exists v_mt' v_mt v_b,
+		exists v_mt v_b,
 		(ma < (List.length (MEMS v_S))) /\
-		((Memtype_sub v_mt v_mt')) /\
+		((Memtype_sub v_mt mt)) /\
 		((lookup_total (MEMS v_S) ma) = {| MEM_TYPE := v_mt; MEM_BYTES := v_b |})
 	) (MODULE_MEMS v_minst) (C_MEMS C').
 Proof.
@@ -149,17 +281,17 @@ Proof.
 	induction H5; eauto.
 	econstructor; eauto.
 	inversion H; subst; clear H.
-	by exists y, v_mt', v_b.
+	by exists v_mt', v_b.
 Qed.
 
 Lemma minst_invert_elems: forall v_S v_minst C C',
 	Module_instance_ok v_S v_minst C ->
 	inst_match C C' ->
 	List.Forall2 (fun ea et => 
-		exists v_rt v_ref,
+		exists v_ref,
 		(ea < (List.length (ELEMS v_S))) /\
-		(List.Forall (fun (v_ref : ref) => (Ref_ok v_S v_ref v_rt)) (v_ref)) /\
-		((lookup_total (ELEMS v_S) ea) = {| ELEM_TYPE := v_rt; ELEM_REFS := v_ref |})
+		(List.Forall (fun (v_ref : ref) => (Ref_ok v_S v_ref et)) (v_ref)) /\
+		((lookup_total (ELEMS v_S) ea) = {| ELEM_TYPE := et; ELEM_REFS := v_ref |})
 	) (MODULE_ELEMS v_minst) (C_ELEMS C').
 Proof.
 	move => v_S v_minst v_C v_C' HMi Him.
@@ -176,7 +308,7 @@ Proof.
 		inversion Heok; subst.
 		inversion H2; subst.
 		inversion H9; subst.
-		eexists e, v_ref.
+		eexists v_ref.
 		split; auto.
 	}
 	eapply IHv_elemaddr. by inversion H9.
@@ -1390,20 +1522,10 @@ Proof.
 	inversion HT; subst; clear HT.
 	econstructor; eauto.
 	induction H2; auto.
-	econstructor.
-	- eapply addrss_funcs_extension; eauto.
-	{
-		eapply funcinst_same in Hfe.
-		rewrite -Hfe in Hfeq.
-		eauto.
-	}
-	{
-		eapply func_extension_refl.
-	}
-	{
-		eapply IHForall2; auto.
-		by inversion H1.
-	}
+	
+	induction H1; auto.
+	econstructor; auto.
+	eapply store_extension_ref; eauto.
 Qed.
 
 Lemma store_extension_tableinsts: forall s s' vs ts,
@@ -1602,16 +1724,17 @@ Lemma store_global_extension_store_typed: forall s s' v_f v_C v_valtype v_val_ v
 		eapply Memory_instance_ok__; repeat split => //=; eauto.
 Qed. *)
 
-Lemma construct_tableinsts: forall s ts tba tbt' tbr i v_ref,
+Lemma construct_tableinsts: forall s ts t tba lim tbr i v_ref,
 	Forall2 (λ v t, Table_instance_ok s v t) (TABLES s) ts ->
-	lookup_total (TABLES s) tba =  {| TAB_TYPE := tbt'; TAB_REFS := tbr |} ->
+	Ref_ok s v_ref t ->
+	lookup_total (TABLES s) tba =  {| TAB_TYPE := mk_tabletype lim t; TAB_REFS := tbr |} ->
 	Forall2 (λ v t, Table_instance_ok s v t)
 		(list_update_func (TABLES s) tba
 			(λ v_1 : tableinst, v_1 <| TAB_REFS :=
 				list_update_func (TAB_REFS v_1) i (fun=> v_ref)
 			|>)) ts.
 Proof.
-	move => s ts tba tbt' tbr i v_ref Hold HLookup.
+	move => s ts t tba lim tbr i v_ref Hold HRef HLookup.
 	move : tba HLookup.
 	induction Hold; auto; move => tba HLookup.
 	destruct tba.
@@ -1620,9 +1743,22 @@ Proof.
 		econstructor; auto.
 		inversion H; subst.
 		rewrite /lookup_total /= in HLookup.
-		inversion HLookup; subst.
-		rewrite /set /=.
+		inversion HLookup; subst; clear HLookup.
+		rewrite /= /set /=.
 		econstructor; eauto.
+		{
+			by rewrite list_update_length_func.
+		}
+		clear IHHold H3 H.
+		move : i.
+		induction H2; auto.
+		move => i.
+		destruct i.
+		{
+			econstructor; auto.
+		}
+		rewrite /=.
+		econstructor; auto.
 	}
 	simpl.
 	econstructor; auto.
