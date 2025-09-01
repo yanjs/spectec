@@ -179,6 +179,80 @@ Definition typeof (v_val : val): valtype :=
 		| VAL_REF_FUNC_ADDR _ => VALTYPE_FUNCREF
 		| VAL_REF_HOST_ADDR _ => VALTYPE_EXTERNREF
 		end.
+
+Definition instr_of (ai: admininstr) : (option instr) :=
+match ai with
+  | (AI_NOP) => Some((instr_NOP))
+  | (AI_UNREACHABLE) => Some((instr_UNREACHABLE))
+  | (AI_DROP) => Some((instr_DROP))
+  | ((AI_SELECT v_0)) => Some((instr_SELECT v_0))
+  | ((AI_BLOCK v_0 v_1)) => Some((instr_BLOCK v_0 v_1))
+  | ((AI_LOOP v_0 v_1)) => Some((instr_LOOP v_0 v_1))
+  | ((AI_IFELSE v_0 v_1 v_2)) => Some((instr_IFELSE v_0 v_1 v_2))
+  | ((AI_BR v_0)) => Some((instr_BR v_0))
+  | ((AI_BR_IF v_0)) => Some((instr_BR_IF v_0))
+  | ((AI_BR_TABLE v_0 v_1)) => Some((instr_BR_TABLE v_0 v_1))
+  | ((AI_CALL v_0)) => Some((instr_CALL v_0))
+  | ((AI_CALL_INDIRECT v_0 v_1)) => Some((instr_CALL_INDIRECT v_0 v_1))
+  | (AI_RETURN) => Some((instr_RETURN))
+  | ((AI_CONST v_0 v_1)) => Some((instr_CONST v_0 v_1))
+  | ((AI_UNOP v_0 v_1)) => Some((instr_UNOP v_0 v_1))
+  | ((AI_BINOP v_0 v_1)) => Some((instr_BINOP v_0 v_1))
+  | ((AI_TESTOP v_0 v_1)) => Some((instr_TESTOP v_0 v_1))
+  | ((AI_RELOP v_0 v_1)) => Some((instr_RELOP v_0 v_1))
+  | ((AI_CVTOP v_0 v_1 v_2)) => Some((instr_CVTOP v_0 v_1 v_2))
+  | ((AI_EXTEND v_0 v_1)) => Some((instr_EXTEND v_0 v_1))
+  | ((AI_VCONST v_0 v_1)) => Some((instr_VCONST v_0 v_1))
+  | ((AI_VVUNOP v_0 v_1)) => Some((instr_VVUNOP v_0 v_1))
+  | ((AI_VVBINOP v_0 v_1)) => Some((instr_VVBINOP v_0 v_1))
+  | ((AI_VVTERNOP v_0 v_1)) => Some((instr_VVTERNOP v_0 v_1))
+  | ((AI_VVTESTOP v_0 v_1)) => Some((instr_VVTESTOP v_0 v_1))
+  | ((AI_VUNOP v_0 v_1)) => Some((instr_VUNOP v_0 v_1))
+  | ((AI_VBINOP v_0 v_1)) => Some((instr_VBINOP v_0 v_1))
+  | ((AI_VTESTOP v_0 v_1)) => Some((instr_VTESTOP v_0 v_1))
+  | ((AI_VRELOP v_0 v_1)) => Some((instr_VRELOP v_0 v_1))
+  | ((AI_VSHIFTOP v_0 v_1)) => Some((instr_VSHIFTOP v_0 v_1))
+  | ((AI_VBITMASK v_0)) => Some((instr_VBITMASK v_0))
+  | ((AI_VSWIZZLE v_0)) => Some((instr_VSWIZZLE v_0))
+  | ((AI_VSHUFFLE v_0 v_1)) => Some((instr_VSHUFFLE v_0 v_1))
+  | ((AI_VSPLAT v_0)) => Some((instr_VSPLAT v_0))
+  | ((AI_VEXTRACT_LANE v_0 v_1 v_2)) => Some((instr_VEXTRACT_LANE v_0 v_1 v_2))
+  | ((AI_VREPLACE_LANE v_0 v_1)) => Some((instr_VREPLACE_LANE v_0 v_1))
+  | ((AI_VEXTUNOP v_0 v_1 v_2)) => Some((instr_VEXTUNOP v_0 v_1 v_2))
+  | ((AI_VEXTBINOP v_0 v_1 v_2)) => Some((instr_VEXTBINOP v_0 v_1 v_2))
+  | ((AI_VNARROW v_0 v_1 v_2)) => Some((instr_VNARROW v_0 v_1 v_2))
+  | ((AI_VCVTOP v_0 v_1 v_2)) => Some((instr_VCVTOP v_0 v_1 v_2))
+  | ((AI_REF_NULL v_0)) => Some((instr_REF_NULL v_0))
+  | ((AI_REF_FUNC v_0)) => Some((instr_REF_FUNC v_0))
+  | (AI_REF_IS_NULL) => Some((instr_REF_IS_NULL))
+  | ((AI_LOCAL_GET v_0)) => Some((instr_LOCAL_GET v_0))
+  | ((AI_LOCAL_SET v_0)) => Some((instr_LOCAL_SET v_0))
+  | ((AI_LOCAL_TEE v_0)) => Some((instr_LOCAL_TEE v_0))
+  | ((AI_GLOBAL_GET v_0)) => Some((instr_GLOBAL_GET v_0))
+  | ((AI_GLOBAL_SET v_0)) => Some((instr_GLOBAL_SET v_0))
+  | ((AI_TABLE_GET v_0)) => Some((instr_TABLE_GET v_0))
+  | ((AI_TABLE_SET v_0)) => Some((instr_TABLE_SET v_0))
+  | ((AI_TABLE_SIZE v_0)) => Some((instr_TABLE_SIZE v_0))
+  | ((AI_TABLE_GROW v_0)) => Some((instr_TABLE_GROW v_0))
+  | ((AI_TABLE_FILL v_0)) => Some((instr_TABLE_FILL v_0))
+  | ((AI_TABLE_COPY v_0 v_1)) => Some((instr_TABLE_COPY v_0 v_1))
+  | ((AI_TABLE_INIT v_0 v_1)) => Some((instr_TABLE_INIT v_0 v_1))
+  | ((AI_ELEM_DROP v_0)) => Some((instr_ELEM_DROP v_0))
+  | ((AI_LOAD v_0 v_1 v_2)) => Some((instr_LOAD v_0 v_1 v_2))
+  | ((AI_STORE v_0 v_1 v_2)) => Some((instr_STORE v_0 v_1 v_2))
+  | ((AI_VLOAD v_0 v_1 v_2)) => Some((instr_VLOAD v_0 v_1 v_2))
+  | ((AI_VLOAD_LANE v_0 v_1 v_2 v_3)) => Some((instr_VLOAD_LANE v_0 v_1 v_2 v_3))
+  | ((AI_VSTORE v_0 v_1)) => Some((instr_VSTORE v_0 v_1))
+  | ((AI_VSTORE_LANE v_0 v_1 v_2 v_3)) => Some((instr_VSTORE_LANE v_0 v_1 v_2 v_3))
+  | (AI_MEMORY_SIZE) => Some((instr_MEMORY_SIZE))
+  | (AI_MEMORY_GROW) => Some((instr_MEMORY_GROW))
+  | (AI_MEMORY_FILL) => Some((instr_MEMORY_FILL))
+  | (AI_MEMORY_COPY) => Some((instr_MEMORY_COPY))
+  | ((AI_MEMORY_INIT v_0)) => Some((instr_MEMORY_INIT v_0))
+  | ((AI_DATA_DROP v_0)) => Some((instr_DATA_DROP v_0))
+  | _ => None
+  end.
+
 	
 (*
 Lemma typeof_default_inverse: forall (v_t : list valtype),
@@ -204,39 +278,6 @@ Proof.
 		inversion H0 => //=.
 	- by apply IHv_t1.
 Qed.
-
-(*
-Lemma instrs_empty_same_type: forall C t1 t2,
-	Instrs_ok C [] (mk_functype t1 t2) ->
-	t1 = t2.
-Proof.
-	move => C t t2 H. gen_ind_subst H => //.
-	- (* Seq *) symmetry in Enil. apply app_cons_not_nil in Enil. exfalso. apply Enil.
-	- (* Sub *)
-	    eapply IHInstrs_ok; eauto.
-		reflexivity.
-	- (* Frame *) f_equal. by eapply IHInstrs_ok.
-Qed.
-
-Lemma admin_empty_same_type: forall v_S C t1 t2,
-	Admin_instrs_ok v_S C [] (functype_from_lists t1 t2) ->
-	t1 = t2.
-Proof.
-	move => v_S C t t2 H. gen_ind_subst H => //.
-		- (* Seq *) symmetry in Enil. apply app_cons_not_nil in Enil. exfalso. apply Enil. 
-		- (* Frame *) f_equal. by eapply IHAdmin_instrs_ok.
-		- (* Instrs *) apply (instrs_empty_same_type C). apply map_eq_nil in Enil. subst. apply H.
-Qed.
-
-Lemma val_is_same_as_admin_const: forall v_S v_C (v : val) ts,
-	Admin_instr_ok v_S v_C (v : admininstr) ts ->
-	exists v_valtype v_val_, Admin_instr_ok v_S v_C (AI_CONST v_valtype v_val_) ts.
-Proof. 
-	move => v_S v_C val ts HType.
-	induction val.
-	exists v_valtype, v_val_. done.
-Qed. *)
-
 
 Notation "tf1 :-> tf2" :=
 (mk_functype (mk_list _ tf1) (mk_list _ tf2)) (at level 40).
@@ -541,8 +582,8 @@ match v_ai with
 		((fun_proj_uN_0 32 v_x) < (List.length (C_FUNCS v_C))) /\
 		((lookup_total (C_FUNCS v_C) (fun_proj_uN_0 32 v_x)) = v_fty)
 	| AI_REF_IS_NULL =>
-	  exists v_rt,
-	  v_ft = ([v_rt] :-> [VALTYPE_I32])
+	  exists v_rt: reftype,
+	  v_ft = ([v_rt: valtype] :-> [VALTYPE_I32])
 	| (AI_LOCAL_GET v_x) =>
 	  exists v_t, v_ft = ([] :-> [v_t]) /\
 	    ((fun_proj_uN_0 32 v_x) < (List.length (C_LOCALS v_C))) /\
@@ -615,12 +656,16 @@ match v_ai with
 	  	(0 < (List.length (C_MEMS v_C))) /\
 		((lookup_total (C_MEMS v_C) 0) = v_mt) /\
 		(((2 ^ (fun_proj_uN_0 32 (ALIGN v_memarg))) : nat) <= ((v_M : nat) / (8 : nat)))
+	| (AI_LOAD F32 (Some _) _) => False
+	| (AI_LOAD F64 (Some _) _) => False
 	| (AI_STORE v_nt None v_memarg) =>
 	  exists v_mt, v_ft = ([VALTYPE_I32; (v_nt : valtype)] :-> []) /\
 	  	(0 < (List.length (C_MEMS v_C))) /\
 		((lookup_total (C_MEMS v_C) 0) = v_mt) /\
 		((fun_size (v_nt : valtype)) <> None) /\
 		(((2 ^ (fun_proj_uN_0 32 (ALIGN v_memarg))) : nat) <= (((the (fun_size (v_nt : valtype))) : nat) / (8 : nat)))
+	(* | (AI_STORE F32 (Some _) _) => False
+	| (AI_STORE F64 (Some _) _) => False *)
 	| (AI_STORE v_Inn (Some (mk_sz v_M)) v_memarg) =>
 	  exists v_mt, v_ft = ([VALTYPE_I32; (v_Inn : valtype)] :-> []) /\
 	  	(0 < (List.length (C_MEMS v_C))) /\
@@ -677,6 +722,7 @@ match v_ai with
 	    (Thread_ok v_S (Some (mk_list _ t)) v_F v_ais (mk_list _ t)) /\
 		(v_n = (List.length t))
 	| AI_TRAP => True
+	| (AI_EXTEND v_0 v_1) => False
 	| _ => True
 end.
 
@@ -703,8 +749,14 @@ Proof.
 	{ (* LOAD None *)
 		destruct v_nt; repeat eexists; eauto.
 	}
+	(*
+	{ (* STORE None *)
+		destruct v_Inn; eauto.
+	}*)
 	{ (* STORE Some *)
-		destruct v_Inn; auto.
+		destruct v_Inn; 
+		rewrite /fun_coec_Inn__numtype; auto;
+		eexists; eauto.
 	}
 Qed.
 
@@ -722,7 +774,14 @@ Proof.
 		all: unfold ai_principal_typing;
 		unfold fun_coec_instr__admininstr.
 		57: { (* LOAD *)
-			admit. (* Inversion not working for some reason
+			admit.
+			(*
+			eexists [:: VALTYPE_I32], [:: VALTYPE_I32].
+			destruct v_numtype, o.
+			inversion H.
+			destruct o.
+			inversion H.
+			admit. *)(* Inversion not working for some reason
 			destruct o.
 			admit. 
 			{
@@ -804,8 +863,15 @@ Proof.
 				split; [|split; [|split; [|split]]];
 				try apply resulttype_sub_refl;
 				simpl; try exact;
-				try destruct v_Inn; auto
+				try destruct v_Inn; rewrite /fun_coec_Inn__numtype; eexists; eauto
 	  	]).
+		(*
+		(* STORE Some *)
+		split.
+		2: eapply instrtype_sub_refl.
+		destruct v_Inn;
+		rewrite /fun_coec_Inn__numtype;
+		eexists; eauto; eapply instrtype_sub_refl. *)
 	}
 	{ (* trap *)
 	  exists t1s, t2s.
@@ -1485,7 +1551,30 @@ Proof.
 	  + by eapply AI_ok_ref_extern.
 Qed.
 
+Lemma construct_ai_weakening : forall v_S v_C ai tf1 tf2,
+	(tf1 <ti: tf2) ->
+	Admin_instr_ok v_S v_C ai tf1 ->
+	Admin_instr_ok v_S v_C ai tf2.
+Proof.
+	move => v_S v_C ai tf1 tf2 Hsub HType.
+	unfold_instrtype_sub Hsub; subst.
+	eapply AI_ok_weakening; eauto.
+Qed.
 
+Lemma construct_ai_maybe : forall v_S v_C ai tf,
+	((instr_of ai) <> None) ->
+	(Instr_ok v_C (the (instr_of ai)) tf) ->
+	Admin_instr_ok v_S v_C ai tf.
+Proof.
+	move => v_S v_C ai tf HSome HInstr.
+	remember (the (instr_of ai)) as instr.
+	destruct ai;
+	simpl in Heqinstr; subst;
+	rewrite /instr_of in HSome;
+	try contradiction;
+	eapply AI_ok_instr in HInstr;
+	by eauto.
+Qed.
 
 Lemma construct_ais_vals' : forall v_S v_C v_C' (v_vals: seq wasm.val) v_ft,
 	Admin_instrs_ok v_S v_C (map fun_coec_val__admininstr v_vals) v_ft ->
@@ -1519,12 +1608,6 @@ Proof.
 		by eauto.
 	}
 Qed.
-
-Lemma construct_ais_vals'' : forall v_S v_S' v_C v_C' (v_vals: seq wasm.val) v_ft,
-	Store_extension v_S v_S' ->
-	Admin_instrs_ok v_S v_C (map fun_coec_val__admininstr v_vals) v_ft ->
-	Admin_instrs_ok v_S' v_C' (map fun_coec_val__admininstr v_vals) v_ft.
-Admitted.
 
 Lemma construct_ais_trap : forall v_S v_C v_ft,
 Admin_instrs_ok v_S v_C [(AI_TRAP )] v_ft.
@@ -1866,141 +1949,3 @@ Proof.
 	inversion HRefok; subst; try discriminate.
 	destruct v_t; discriminate.
 Qed.
-
-(*
-Ltac apply_instrs_composition_typing_single H := 
-	let ts1 := fresh "ts1_comp" in
-    let ts2 := fresh "ts2_comp" in
-    let ts3 := fresh "ts3_comp" in
-    let ts4 := fresh "ts4_comp" in
-    let H1 := fresh "H1_comp" in
-    let H2 := fresh "H2_comp" in
-    let H3 := fresh "H3_comp" in
-    let H4 := fresh "H4_comp" in
-	rewrite -> app_left_single_nil in H;
-    apply composition_typing_single in H; destruct H as [ts1 [ts2 [ts3 [ts4 [H1 [H2 [H3 H4]]]]]]];
-	try apply instrs_empty_same_type in H3.
-
-Ltac apply_composition_typing_single H := 
-	let ts1 := fresh "ts1_comp" in
-    let ts2 := fresh "ts2_comp" in
-    let ts3 := fresh "ts3_comp" in
-    let ts4 := fresh "ts4_comp" in
-    let H1 := fresh "H1_comp" in
-    let H2 := fresh "H2_comp" in
-    let H3 := fresh "H3_comp" in
-    let H4 := fresh "H4_comp" in
-	rewrite -> app_left_single_nil in H;
-    apply admin_composition_typing_single in H; destruct H as [ts1 [ts2 [ts3 [ts4 [H1 [H2 [H3 H4]]]]]]];
-	try apply admin_empty_same_type in H3.
-*)
-
-(*
-
-Ltac apply_composition_typing_and_single H :=
-	let ts1 := fresh "ts1_comp" in
-    let ts2 := fresh "ts2_comp" in
-    let ts3 := fresh "ts3_comp" in
-    let ts4 := fresh "ts4_comp" in
-    let H1 := fresh "H1_comp" in
-    let H2 := fresh "H2_comp" in
-    let H3 := fresh "H3_comp" in
-    let H4 := fresh "H4_comp" in
-	try rewrite -cat1s in H; subst;
-    apply admin_composition_typing in H; destruct H as [ts1 [ts2 [ts3 [ts4 [H1 [H2 [H3 H4]]]]]]];
-	apply_composition_typing_single H3.
-
-Ltac apply_composition_typing H :=
-	let ts1 := fresh "ts1_comp" in
-	let ts2 := fresh "ts2_comp" in
-	let ts3 := fresh "ts3_comp" in
-	let ts4 := fresh "ts4_comp" in
-	let H1 := fresh "H1_comp" in
-	let H2 := fresh "H2_comp" in
-	let H3 := fresh "H3_comp" in
-	let H4 := fresh "H4_comp" in
-	try rewrite -cat1s in H; subst;
-	apply admin_composition_typing in H; destruct H as [ts1 [ts2 [ts3 [ts4 [H1 [H2 [H3 H4]]]]]]].
-
-Lemma admin_instrs_ok_eq: forall v_S v_C v_ai tf,
-	Admin_instr_ok v_S v_C v_ai tf <-> 
-	Admin_instrs_ok v_S v_C [v_ai] tf.
-Proof.
-	split; move => H; destruct tf as [ts1 ts2].
-	- (* -> *)
-		assert (Admin_instrs_ok v_S v_C [] (functype_from_lists [] [])). { apply AIs_ok_empty. }
-		apply admin_weakening_empty_both with (ts := ts1) in H0.
-		apply (AIs_ok_seq v_S v_C [] v_ai ts1 ts2 ts1); eauto.
-	- (* <- *) 
-		apply_composition_typing_single H; subst.
-		apply AI_ok_weakening. apply H4_comp.
-Qed.
-
-Lemma admin_composition': forall v_S v_C v_ais1 v_ais2 t1s t2s t3s,
-	Admin_instrs_ok v_S v_C v_ais1 (functype_from_lists t1s t2s) ->
-	Admin_instrs_ok v_S v_C v_ais2 (functype_from_lists t2s t3s) ->
-	Admin_instrs_ok v_S v_C (v_ais1 ++ v_ais2) (functype_from_lists t1s t3s).
-Admitted.
-(* Proof.
-	move => v_S v_C v_ais1 v_ais2.
-	move: v_ais1.
-	induction v_ais2 using List.rev_ind; move => v_ais1 t1s t2s t3s HType1 HType2.
-		- apply admin_empty_same_type in HType2; by rewrite cats0; subst.
-		- apply_composition_typing_single HType2.
-	subst.
-	rewrite catA. eapply AIs_ok_seq; split.
-	eapply IHv_ais2; eauto.
-	apply AIs_ok_frame with (v_t := ts1_comp) in H3_comp.
-	apply H3_comp.
-	apply AI_ok_weakening; eauto.
-Qed. *)
-
-Lemma map_eq_local: forall (l l' : list valtype) ,
-	List.map [eta LOCAL] l = List.map [eta LOCAL] l' -> l = l'.
-Proof.
-	move => l l' H.
-	generalize dependent l'.
-	induction l; move => l' H.
-	- destruct l' => //=.
-	- destruct l' => //=. repeat rewrite List.map_cons in H.
-		injection H as ?.
-		f_equal. 
-		apply H.
-		apply IHl; eauto.
-Qed.
-
-Lemma fold_append: forall v_C v_t v_func v_glob v_tab v_mem v_local v_lab v_ret,
-	_append {| C_TYPES := v_t;
-	C_FUNCS := v_func;
-	C_GLOBALS := v_glob;
-	C_TABLES := v_tab;
-	C_MEMS := v_mem;
-	C_LOCALS := v_local;
-	C_LABELS := v_lab;
-	C_RETURN := v_ret|} v_C = 
-	{| C_TYPES := v_t ++ C_TYPES v_C;
-	C_FUNCS := v_func ++ C_FUNCS v_C;
-	C_GLOBALS := v_glob ++ C_GLOBALS v_C;
-	C_TABLES := v_tab ++ C_TABLES v_C;
-	C_MEMS := v_mem ++ C_MEMS v_C;
-	C_LOCALS := v_local ++ C_LOCALS v_C;
-	C_LABELS := v_lab ++ C_LABELS v_C;
-	C_RETURN := _append v_ret (C_RETURN v_C)|}.
-Proof. reflexivity. Qed.
-
-Lemma option_zip_with_same_pack: forall (v_n0 : option nat) (v_sx0 : option sx) (v_ww_sx : option (sz * sx)),
-	option_zipWith (fun (v : nat) (s : sx) => (mk_sz v, s)) v_n0 v_sx0 = v_ww_sx ->
-	v_n0 = (None : option nat) <-> v_sx0 = (None : option sx) -> (exists v s, v_ww_sx = Some ((mk_sz v, s)))
-	\/ (v_ww_sx = None).
-Proof.
-	move => v_n0 v_sx0 v_ww_sx H H2.
-	assert ((None : option sx) = (None : option sx)). { reflexivity. } 
-	assert ((None : option nat) = (None : option nat)). { reflexivity. } 
-	destruct v_n0 => //=; destruct v_sx0 => //=; simpl in H.
-	- left. exists n, s; eauto.
-	- rewrite <- H2 in H0; subst. discriminate.
-	- rewrite H2 in H1. discriminate.
-	- right; eauto.
-Qed.
-
-*)

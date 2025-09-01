@@ -2396,8 +2396,6 @@ Proof.
 	- (* Step_pure *) eapply t_pure_preservation; eauto.
 	- (* Step_read *) eapply t_read_preservation; eauto.
 	{ (* Context Seq *)
-	admit.
-	(*
 		invert_ais_typing.
 		eapply ais_vals_typing_inversion in HType1
 			as [v_ts [HSub HValsok]].
@@ -2411,41 +2409,8 @@ Proof.
 			eapply IHHReduce; eauto.
 		}
 		{
-			clear -HType3 HST1 HST2 HSExt.
-			induction HType3.
-			{
-				econstructor.
-			}
-			{
-				eapply AIs_ok_seq; eauto.
-				{
-					clear -H HST1 HST2 HSExt IHHType3.
-					induction H.
-					- by eapply AI_ok_instr.
-					- by econstructor.
-					- by econstructor.
-					- {
-						econstructor.
-						eapply store_extension_externaddrs_func; eauto.
-					}
-					- {
-						econstructor.
-						eapply store_extension_externaddrs_func; eauto.
-					}
-					- {
-						econstructor; eauto.
-						admit.
-					}
-					- {
-						econstructor; eauto.
-
-					}
-
-				}
-
-			}
+			eapply store_extension_ais; eauto.
 		}
-			*)
 	}
 	{ (* Context Label *) 
 		typing_inversion HType.
