@@ -977,32 +977,35 @@ Proof.
 	by eapply IHv_i.
 Qed.
 
-Lemma table_grow_table_extension: forall v_tbs v_idx tbt tbr tb_new,
+Lemma table_grow_table_extension: forall v_tbs v_idx j ref rt n tbr,
 	(v_idx < length v_tbs) ->
 	lookup_total v_tbs v_idx = 
-		{| TAB_TYPE := tbt; TAB_REFS := tbr |} ->
-	Forall2 (fun v v' => Table_extension v v') v_tbs
-		(list_update_func v_tbs v_idx
-			(fun => tb_new )).
+		{| TAB_TYPE := mk_tabletype (mk_limits
+					(mk_uN 32 (Datatypes.length tbr)) j) rt;
+		TAB_REFS := tbr |} ->
+	Forall2 (λ tb tb', Table_extension tb tb') v_tbs
+		(list_update_func v_tbs	v_idx
+			(fun=> {|
+				TAB_TYPE := mk_tabletype (mk_limits
+					(mk_uN 32 (Datatypes.length tbr + n)) j) rt;
+				TAB_REFS := tbr ++ repeat ref n
+		|})).
 Proof.
-	move => v_tbs v_idx tbt tbr tb_new HLength HLookup.
+	move => v_tbs v_idx j ref rt n tbr HLength HLookup.
 	move: v_tbs HLength HLookup.
-Admitted. (*
-
 	induction v_idx.
 	{
 		move => v_tbs HLength HLookup.
 		destruct v_tbs; auto.
 		simpl.
+		rewrite /lookup_total /= in HLookup.
+		rewrite HLookup.
 		econstructor.
 		{
+			destruct j.
 			econstructor.
-			rewrite /lookup_total in HLookup.
-			destruct t. simpl.
-			rewrite /set /=.
-			destruct TAB_TYPE, v_limits, v__.
-			econstructor.
-			auto.
+			simpl.
+			eapply leq_addr.
 		}
 		eapply table_extension_refl.
 	}
@@ -1010,8 +1013,8 @@ Admitted. (*
 	destruct v_tbs; auto.
 	simpl.
 	econstructor; try eapply table_extension_refl0.
-	by eapply IHv_i.
-Qed. *)
+	by eapply IHv_idx.
+Qed.
 
 Lemma elem_drop_elem_extension: forall es idx,
 	(idx < length es) ->
