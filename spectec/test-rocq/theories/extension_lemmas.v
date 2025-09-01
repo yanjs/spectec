@@ -1680,6 +1680,28 @@ Proof.
 	eapply store_extension_meminst; eauto.
 Qed.
 
+Lemma store_extension_externaddrs_func: forall s s' fa ft,
+	Store_extension s s' ->
+	Externaddrs_ok s (EXTADDR_FUNC fa) (EXT_FUNC ft) ->
+	Externaddrs_ok s' (EXTADDR_FUNC fa) (EXT_FUNC ft).
+Proof.
+	move => s s' fa ft HSe HEa.
+	invert_funcs.
+	eapply funcinst_same in Hfe; subst.
+	inversion HEa; subst; clear HEa.
+	econstructor.
+	{
+		rewrite Hfeq -size_length size_cat.
+		by eapply ltn_addr.
+	}
+	{
+		rewrite Hfeq.
+		erewrite <- lookup_app; eauto.
+	}
+Qed.
+
+
+
 (*
 Lemma store_typing_extension: forall v_S v_S',
     Store_extension v_S v_S' ->
