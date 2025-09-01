@@ -760,6 +760,56 @@ Proof.
 	}
 Qed.
 
+Parameter dummy: {I32 & option (loadop_ I32)}. (* Need to provide an instance, but should be doable by the inhabitance proofs *)
+
+Parameter dummy2: {I32 & option (loadop_ I32)}. (* Need to provide an instance, but should be doable by the inhabitance proofs *)
+
+Definition load_arg_pack (i: instr) : {t: numtype & option (loadop_ t)} :=
+  match i with
+  | instr_LOAD t arg memarg =>
+      existT _ t arg
+  | _ => dummy
+  end.
+(*
+Definition load_arg_pack2 (i: instr) : {t: numtype & memarg} :=
+  match i with
+  | instr_LOAD t arg memarg =>
+      existT _ t memarg
+  | _ => dummy
+  end.*)
+
+Lemma load_eq_arg1: forall v_M v_sx0 v_memarg0 v_sz v_sx v_memarg,
+	instr_LOAD INN_I32 (Some (op_ INN_I32 (mk_sz v_M) v_sx0)) v_memarg0 =
+		instr_LOAD I32 (Some (op_ INN_I32 v_sz v_sx)) v_memarg ->
+	(v_memarg0 = v_memarg) /\
+	((mk_sz v_M)) = (v_sz) /\
+	((v_sx0) = (v_sx)).
+Proof.
+	move => v_M v_sx0 v_memarg0 v_sz v_sx v_memarg HLoadeq.
+	split. by inversion HLoadeq.
+	apply (f_equal load_arg_pack) in HLoadeq.
+	simpl in HLoadeq.
+	apply Eqdep_dec.inj_pair2_eq_dec in HLoadeq.
+	2: decide equality.
+	inversion HLoadeq; subst; split; auto; split; auto.
+Qed.
+
+Lemma load_eq_arg2: forall v_M v_sx0 v_memarg0 v_sz v_sx v_memarg,
+	instr_LOAD INN_I64 (Some (op_ INN_I64 (mk_sz v_M) v_sx0)) v_memarg0 =
+		instr_LOAD I64 (Some (op_ INN_I64 v_sz v_sx)) v_memarg ->
+	(v_memarg0 = v_memarg) /\
+	((mk_sz v_M)) = (v_sz) /\
+	((v_sx0) = (v_sx)).
+Proof.
+	move => v_M v_sx0 v_memarg0 v_sz v_sx v_memarg HLoadeq.
+	split. by inversion HLoadeq.
+	apply (f_equal load_arg_pack) in HLoadeq.
+	simpl in HLoadeq.
+	apply Eqdep_dec.inj_pair2_eq_dec in HLoadeq.
+	2: decide equality.
+	inversion HLoadeq; subst; split; auto; split; auto.
+Qed.
+
 Lemma ai_typing_inversion: forall (v_S: store) (v_C: context) v_ai t1s t2s,
 	Admin_instr_ok v_S v_C v_ai (t1s :-> t2s) ->
 	exists t1s' t2s',
@@ -774,76 +824,74 @@ Proof.
 		all: unfold ai_principal_typing;
 		unfold fun_coec_instr__admininstr.
 		57: { (* LOAD *)
-			admit.
-			(*
-			eexists [:: VALTYPE_I32], [:: VALTYPE_I32].
-			destruct v_numtype, o.
-			inversion H.
-			destruct o.
-			inversion H.
-			admit. *)(* Inversion not working for some reason
-			destruct o.
-			admit. 
+			inversion H; subst.
 			{
+				apply Eqdep_dec.inj_pair2_eq_dec in H1 => //.
+				2: decide equality.
+				subst.
+				eexists [VALTYPE_I32], [v_numtype: valtype]; split.
+				2: eapply instrtype_sub_refl.
+				all: inversion H;
 				destruct v_numtype;
-				destruct l; try destruct v_sz.
-				unfold op_ in H.
-				remember (op_ INN_I32 (mk_sz v_i) v_sx) as op.
-				inversion H; subst.
-				inversion H.
-				inversion_clear H.
-				all: inversion H.
-				all: do 2 eexists.
-				all: split; try eapply instrtype_sub_refl.
-				all: eexists.
+				exists v_mt;
+				auto.
 			}
-		    inversion H; subst.
-			(* I don't like this *)
-			apply Eqdep.EqdepTheory.inj_pair2 in H1; subst.
-			all: do 2 eexists; split; try eapply instrtype_sub_refl.
-			destruct v_numtype; repeat eexists; auto.
-			all: destruct o; try destruct l; try destruct v_sz.
-			inversion H1.
-			assert (o = None). {
-				
-			}
-			do 2 eexists.
-			destruct v_numtype.
-			all: split; try eapply instrtype_sub_refl.
-			all: destruct o; try auto.
-			all: try destruct l; try destruct v_sz.
-			remember (op_ INN_I32 (mk_sz v_i) v_sx) as so.
-			inversion H.
-			eexists.
-			repeat eexists; auto.
-			all: inversion H.
-			all: eexists v_mt.
-			inversion H.
-			all: inversion H; subst.
-			all: repeat eexists; auto.
-			inversion H.
 			{
-				do 2 eexists.
+				clear v_M H5 H7.
+				destruct o.
+				{
+					exists [VALTYPE_I32], [VALTYPE_I32].
+					split.
+					2: eapply instrtype_sub_refl.
+
+					destruct l.
+					remember (Some (op_ INN_I32 v_sz v_sx)) as arg.
+					rewrite -Heqarg in H.
+					remember (instr_LOAD I32 arg v_memarg)
+						as instr.
+					inversion H; try by (subst; clear H =>//).
+					rewrite Heqinstr in H4.
+					rewrite Heqarg in H4.
+					eapply load_eq_arg1 in H4.
+					destruct H4 as [Heq1 [Heq2 Heq3]].
+					rewrite -Heq2.
+					exists v_mt; subst; auto.
+				}
+				{
+					exists [VALTYPE_I32], [VALTYPE_I32].
+					split.
+					2: eapply instrtype_sub_refl.
+					inversion H. exists v_mt; subst; clear H; auto.
+				}
 			}
-			destruct o; destruct v_numtype; try (destruct l); try (destruct v_sz);
-			inversion H; subst.
-			do 2 eexists;
-			split; try eapply instrtype_sub_refl.
-			all: eexists.
-			1,2: destruct l; destruct v_sz.
-			all: repeat eexists; eauto.
-			inversion H; subst.
 			{
-				injection H1 as H2.
+				clear v_M H5 H7.
+				destruct o.
+				{
+					exists [VALTYPE_I32], [VALTYPE_I64].
+					split.
+					2: eapply instrtype_sub_refl.
+
+					destruct l.
+					remember (Some (op_ INN_I64 v_sz v_sx)) as arg.
+					rewrite -Heqarg in H.
+					remember (instr_LOAD I64 arg v_memarg)
+						as instr.
+					inversion H; try by (subst; clear H =>//).
+					rewrite Heqinstr in H4.
+					rewrite Heqarg in H4.
+					eapply load_eq_arg2 in H4.
+					destruct H4 as [Heq1 [Heq2 Heq3]].
+					rewrite -Heq2.
+					exists v_mt; subst; auto.
+				}
+				{
+					exists [VALTYPE_I32], [VALTYPE_I64].
+					split.
+					2: eapply instrtype_sub_refl.
+					inversion H. exists v_mt; subst; clear H; auto.
+				}
 			}
-			inversion H1.
-			do 2 eexists;
-			split.
-			2: eapply instrtype_sub_refl.
-			3: eapply instrtype_sub_refl.
-			all: eexists; split; auto.
-			destruct v_Inn; auto.
-			*)
 		}
 		all: inversion H; subst.
 		all: do 2 eexists.
