@@ -974,7 +974,7 @@ Proof.
 		(v_t'_2).
 		split; [|split; [|split; [|split]]]; auto.
 	}
-Admitted.
+Qed.
 
 Lemma instrs_single_typing_inversion: forall (v_C: context) v_instr t1s t2s,
 Instrs_ok v_C [v_instr] (t1s :-> t2s) ->
