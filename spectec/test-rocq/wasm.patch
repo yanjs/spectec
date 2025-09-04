@@ -2,7 +2,19 @@
 < From Coq Require Import String List Unicode.Utf8 Reals.
 ---
 > From Stdlib Require Import String List Unicode.Utf8 Reals.
-6594,6599c6594,6599
+5866c5866
+< 	| step_block : forall (v_z : state) (v_val : (list val)) (v_k : nat) (v_bt : blocktype) (v_instr : (list instr)) (v_n : n) (v_t_1 : (list valtype)) (v_t_2 : (list valtype)), 
+---
+> 	| step_block : forall (v_z : state) (v_val : (list val)) (v_bt : blocktype) (v_instr : (list instr)) (v_n : n) (v_t_1 : (list valtype)) (v_t_2 : (list valtype)), 
+5871c5871
+< 	| step_loop : forall (v_z : state) (v_val : (list val)) (v_k : nat) (v_bt : blocktype) (v_instr : (list instr)) (v_t_1 : (list valtype)) (v_t_2 : (list valtype)) (v_n : n), 
+---
+> 	| step_loop : forall (v_z : state) (v_val : (list val)) (v_k : nat) (v_bt : blocktype) (v_instr : (list instr)) (v_t_1 : (list valtype)) (v_t_2 : (list valtype)), 
+5888c5888
+< 	| step_call_addr : forall (v_z : state) (v_val : (list val)) (v_k : nat) (v_a : addr) (v_n : n) (v_f : frame) (v_instr : (list instr)) (v_t_1 : (list valtype)) (v_t_2 : (list valtype)) (v_mm : moduleinst) (v_func : func) (v_x : idx) (v_t : (list valtype)), 
+---
+> 	| step_call_addr : forall (v_z : state) (v_val : (list val)) (v_a : addr) (v_n : n) (v_f : frame) (v_instr : (list instr)) (v_t_1 : (list valtype)) (v_t_2 : (list valtype)) (v_mm : moduleinst) (v_func : func) (v_x : idx) (v_t : (list valtype)), 
+6605,6610c6605,6610
 < 		([(FUNCS v_store_2)] = [v_funcinst_1'; v_funcinst_2]) ->
 < 		([(TABLES v_store_2)] = [v_tableinst_1'; v_tableinst_2]) ->
 < 		([(MEMS v_store_2)] = [v_meminst_1'; v_meminst_2]) ->

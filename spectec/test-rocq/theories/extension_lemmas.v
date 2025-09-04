@@ -586,28 +586,6 @@ Proof.
 	- simpl in *. auto.
 Qed.
 
-(*
-Lemma global_type_reference: forall v_S v_i v_x v_C mut v t,
-    Module_instance_ok v_S v_i v_C ->
-	(v_x < Datatypes.length (C_GLOBALS v_C))%coq_nat -> 
-    (VALUE (lookup_total (GLOBALS v_S) (lookup_total (MODULE_GLOBALS v_i) v_x))) = v ->
-    lookup_total (C_GLOBALS v_C) v_x = mk_globaltype mut t ->
-    exists v_val_, typeof v = t /\ v = VAL_CONST t v_val_.
-(* Proof.
-	move => v_S i v_x v_C mut v t HMinst HLength HVal HTypeLookup.
-	inversion HMinst; decomp; subst.
-	simpl in *.
-	apply Forall2_lookup2 in H9; destruct H9.
-	apply H1 in HLength.
-	inversion HLength; destruct H13.
-	rewrite H14.
-	simpl.
-	rewrite HTypeLookup in H12. injection H12 as ?; eauto.
-	exists v_val_.
-	split => //=.
-	f_equal => //=.
-Qed. *) *)
-
 Lemma func_extension_refl0: forall f,
 	Func_extension f f.
 Proof.
@@ -1078,22 +1056,6 @@ Proof.
 	by erewrite <- list_update_length_func.
 Qed.
 
-Lemma update_mem_unchagned: forall v_S v_S' func v_idx,
-	v_S' = v_S <| MEMS := list_update_func (MEMS v_S) v_idx func |> ->
-	FUNCS v_S = FUNCS v_S' /\
-	TABLES v_S = TABLES v_S' /\
-	length (MEMS v_S) = length (MEMS v_S') /\
-	GLOBALS v_S = GLOBALS v_S' /\
-	ELEMS v_S = ELEMS v_S' /\
-	DATAS v_S = DATAS v_S'.
-Proof.
-	move => v_S v_S' func v_idx H.
-	subst.
-	destruct v_S; simpl.
-	repeat split; eauto.
-	by erewrite <- list_update_length_func.
-Qed.
-
 Lemma addrs_funcs_extension: forall v_S v_S' v_funcaddr v_funcinst_1' v_funcinst_2 v_ft,
 	Externaddrs_ok v_S (EXTADDR_FUNC v_funcaddr) (EXT_FUNC v_ft) ->
 	FUNCS v_S' = (v_funcinst_1' ++ v_funcinst_2) -> 
@@ -1378,35 +1340,6 @@ Proof.
 		+ eapply addrs_globals_extension; eauto.
 	- eapply IHv_exportinst; eauto.
 Qed.
-
-(*
-Lemma store_elem_extension_eleminst: forall v_S v_S' a a' t,
-	Store_extension v_S v_S' -> 
-	Elem_extension a a' ->
-	Element_instance_ok v_S a t ->
-	Element_instance_ok v_S' a' t.
-Proof.
-	move => v_S v_S' a a' t HSext Hext HOk.
-	inversion HOk; subst; clear HOk.
-	inversion Hext; subst; clear Hext.
-	econstructor.
-
-	move : v_ref_2 H3.
-	induction v_ref; move => v_ref_2 Href.
-	- destruct Href; subst; auto.
-	destruct Href; subst; auto.
-	econstructor.
-	{
-		inversion H; subst.
-		inversion H2; subst; try econstructor.
-		instantiate (1 := v_ext).
-		inversion HSext; subst.
-		eapply addrs_funcs_extension; eauto.
-	}
-	eapply IHv_ref;
-	inversion H; subst; auto.
-Qed.
-*)
 
 Lemma store_extension_eleminst: forall v_S v_S' a t,
 	Store_extension v_S v_S' ->

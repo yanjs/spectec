@@ -171,15 +171,6 @@ Proof.
 		rewrite <- Heqlab => //=. 
 Qed.
 
-Definition typeof (v_val : val): valtype :=
-	match v_val with
-		| VAL_CONST t _ => t
-		| VAL_VCONST t _ => t
-		| VAL_REF_NULL t => t
-		| VAL_REF_FUNC_ADDR _ => VALTYPE_FUNCREF
-		| VAL_REF_HOST_ADDR _ => VALTYPE_EXTERNREF
-		end.
-
 Definition instr_of (ai: admininstr) : (option instr) :=
 match ai with
   | (AI_NOP) => Some((instr_NOP))
@@ -252,32 +243,6 @@ match ai with
   | ((AI_DATA_DROP v_0)) => Some((instr_DATA_DROP v_0))
   | _ => None
   end.
-
-	
-(*
-Lemma typeof_default_inverse: forall (v_t : list valtype),
-	List.map typeof (List.map [fun t => the (fun_default_ t)] v_t) = v_t.
-Proof.
-	move => v_t.
-	induction v_t => //=.
-	f_equal.
-	destruct a; destruct v_t => //=.
-	apply IHv_t.
-Qed.
-*)
-
-Lemma Forall2_Val_ok_is_same_as_map: forall v_S v_t1 v_local_vals,
-	Forall2 (fun v s => Val_ok v_S s v) v_t1 v_local_vals ->
-	List.map typeof v_local_vals = v_t1.
-Proof.
-	move => v_S v_t1 v_local_vals H.
-	generalize dependent v_local_vals.
-	induction v_t1; move => v_local_vals H; destruct v_local_vals => //=; inversion H.
-	subst. f_equal. 
-	- inversion H3 => //=.
-		inversion H0 => //=.
-	- by apply IHv_t1.
-Qed.
 
 Notation "tf1 :-> tf2" :=
 (mk_functype (mk_list _ tf1) (mk_list _ tf2)) (at level 40).
@@ -760,9 +725,7 @@ Proof.
 	}
 Qed.
 
-Parameter dummy: {I32 & option (loadop_ I32)}. (* Need to provide an instance, but should be doable by the inhabitance proofs *)
-
-Parameter dummy2: {I32 & option (loadop_ I32)}. (* Need to provide an instance, but should be doable by the inhabitance proofs *)
+Parameter dummy: {I32 & option (loadop_ I32)}.
 
 Definition load_arg_pack (i: instr) : {t: numtype & option (loadop_ t)} :=
   match i with
@@ -770,13 +733,6 @@ Definition load_arg_pack (i: instr) : {t: numtype & option (loadop_ t)} :=
       existT _ t arg
   | _ => dummy
   end.
-(*
-Definition load_arg_pack2 (i: instr) : {t: numtype & memarg} :=
-  match i with
-  | instr_LOAD t arg memarg =>
-      existT _ t memarg
-  | _ => dummy
-  end.*)
 
 Lemma load_eq_arg1: forall v_M v_sx0 v_memarg0 v_sz v_sx v_memarg,
 	instr_LOAD INN_I32 (Some (op_ INN_I32 (mk_sz v_M) v_sx0)) v_memarg0 =
@@ -1911,6 +1867,16 @@ Proof.
 	auto.
 Qed.
 
+Lemma construct_inst_match_local_label_return : forall C C' loc lab ret,
+	inst_match C C' -> inst_match C (upd_local_label_return C' loc lab ret).
+Proof.
+	intros.
+	unfold inst_match.
+	unfold inst_match in H.
+	destruct C'; simpl in *.
+	auto.
+Qed.
+
 Lemma construct_inst_match_local_return : forall C C' loc ret,
 	inst_match C C' -> inst_match C (upd_local_return C' loc ret).
 Proof.
@@ -1935,6 +1901,8 @@ Ltac resolve_inst_match :=
 	repeat lazymatch goal with
 	| _ : _ |- inst_match _ (prepend_label _ _) =>
 		eapply construct_inst_prepend_label
+	| _ : _ |- inst_match _ (upd_local_label_return _ _ _) =>
+		eapply construct_inst_match_local_label_return
 	| _ : _ |- inst_match _ (upd_local_return _ _ _) =>
 		eapply construct_inst_match_local_return
 	| _ : _ |- inst_match _ (upd_local _ _) =>
@@ -1997,3 +1965,246 @@ Proof.
 	inversion HRefok; subst; try discriminate.
 	destruct v_t; discriminate.
 Qed.
+
+
+
+
+Ltac construct_ais_typing :=
+  repeat rewrite app_cat;
+  repeat lazymatch goal with
+    | H: _ |- Admin_instrs_ok _ _ [] (_ :-> _) =>
+        eapply ais_empty_typing
+    | H1: (([] :-> ?tp2) <ti: (?ts1 :-> ?ts2)),
+	  H2: (Vals_ok ?v_S ?v_vals ?tp2)
+	  |- Admin_instrs_ok _ _ (map fun_coec_val__admininstr ?v_vals) (?ts1 :-> ?ts2) =>
+        eapply (construct_ais_vals _ _ _ _ _ _ H1) in H2
+    | H: (_ <ti: ?ts) |- Admin_instrs_ok _ _ [_] ?ts =>
+        eapply construct_ais_typing_single;
+		[| eapply H]
+    | H: _ |- Admin_instrs_ok _ _ (_ ++ _) ?ts =>
+        eapply construct_ais_compose
+    | H: _ |- Admin_instrs_ok _ _ (_ :: (_ :: _)) ?ts =>
+        rewrite -cat1s
+	| _ : _ |- _ => idtac
+  end.
+
+Ltac extract_premise :=
+  repeat match goal with
+  | H: (_ :-> _) = (_ :-> _) |- _ =>
+    inversion H; subst; clear H
+  | H: exists t, ?P |- _ =>
+    let extr := fresh "extr" in
+    let Hextr := fresh "Hextr" in  
+    destruct H as [extr Hextr]
+  | H: ?P /\ ?Q |- _ =>
+    let H1 := fresh "H1" in  
+    let H2 := fresh "H2" in  
+    destruct H as [H1 H2]
+  | H: ?x = ?x -> _ |- _ =>
+    specialize (H erefl)
+  | H: forall x, ?x0 = x -> _ |- _ =>
+    try specialize (H _ erefl)
+  | H: forall x, _ = _ -> _ |- _ =>
+    try specialize (H _ erefl)
+  | H: forall x y, _ = _ -> _ |- _ =>
+    try specialize (H _ _ erefl)
+  | H: forall x y z, _ = _ -> _ |- _ =>
+    try specialize (H _ _ _ erefl)
+  | _ => idtac
+end.
+
+Ltac destruct_all :=
+  repeat match goal with
+  | H: exists t, ?P |- _ =>
+    let extr := fresh "extr" in
+    let Hextr := fresh "Hextr" in
+    destruct H as [extr Hextr]
+  | H: ?P /\ ?Q |- _ =>
+    let H1 := fresh "H1" in
+    let H2 := fresh "H2" in
+    destruct H as [H1 H2]
+  | _ => idtac
+end.
+
+Ltac invert_ais_single_val_typing H :=
+  let t := fresh "t" in
+  let HValok := fresh "HValok" in
+  let Hsub := fresh "Hsub" in
+  eapply ais_single_val_typing_inversion in H
+    as [t [Hsub HValok]].
+
+Ltac invert_ais_vals_typing H :=
+  let t := fresh "t" in
+  let HValsok := fresh "HValsok" in
+  let Hsub := fresh "Hsub" in
+  eapply ais_vals_typing_inversion in H
+    as [t [Hsub HValsok]].
+
+Ltac invert_ais_single_ref_typing H :=
+  let t := fresh "t" in
+  let HValsok := fresh "HRefok" in
+  let Hsub := fresh "Hsub" in
+  eapply ais_single_ref_typing_inversion in H
+    as [t [Hsub HRefok]].
+
+Ltac invert_ais_typing :=
+  destruct_functypes;
+  repeat match goal with
+  | H : Admin_instrs_ok _ _ (app _ _) _ |- _ => 
+	repeat rewrite app_cat in H
+  end;
+  repeat lazymatch goal with
+  | H: Admin_instrs_ok _ _ [] _ |- _ =>
+    eapply ais_empty_typing in H;
+	idtac
+  | H: Admin_instrs_ok _ _ [fun_coec_val__admininstr _] ( _ :-> _ ) |- _ =>
+    invert_ais_single_val_typing H;
+	idtac
+  | H: Admin_instrs_ok _ _ [fun_coec_ref__admininstr _] ( _ :-> _ ) |- _ =>
+    invert_ais_single_ref_typing H;
+	idtac
+  | H: Admin_instrs_ok _ _ (map fun_coec_val__admininstr _) ( _ :-> _ ) |- _ =>
+    invert_ais_vals_typing H;
+	idtac
+  | H: Admin_instrs_ok _ _ [?v_ai] ( ?t1s :-> ?t2s ) |- _ =>
+    let t1s' := fresh "t1s'" in
+	let t2s' := fresh "t2s'" in
+	let Hai := fresh "Hai" in
+	let Hsub := fresh "Hsub" in
+    eapply ais_single_typing_inversion in H
+	  as [t1s' [t2s' [Hai Hsub]]];
+	idtac
+  | H: Admin_instrs_ok _ _ (_ ++ _) _ |- _ =>
+    let t3s := fresh "t3s" in
+	let HType1 := fresh "HType1" in
+	let HType2 := fresh "HType2" in
+	eapply ais_composition_typing in H as [t3s [HType1 HType2]];
+	idtac
+  | H: Admin_instrs_ok _ _ (_ :: ( _ :: _)) _ |- _ =>
+    try rewrite -cat1s in H
+  | _ => idtac
+  end.
+
+Ltac invert_instrtype_sub :=
+  repeat match goal with
+  | H: ((?txs :-> ?tys) <ti: ([] :-> []) ) |- _ =>
+	eapply instrtype_sub_sub_empty in H
+  | H: (([] :-> []) <ti: (?txs :-> ?tys) ) |- _ =>
+	eapply instrtype_sub_empty in H
+  | H: ((?txs :-> ?tys) <ti: (?tzs :-> []) ) |- _ =>
+	eapply instrtype_sub_sub_empty2 in H
+  | H: ((?txs :-> ?tys) <ti: ([] :-> ?tzs) ) |- _ =>
+	eapply instrtype_sub_sub_empty1 in H
+  | _ => idtac
+  end.
+
+Ltac resolve_pt H :=
+  unfold ai_principal_typing in H;
+  extract_premise.
+
+Ltac resolve_all_pt :=
+  repeat match goal with
+  | H: (ai_principal_typing _ _ _ _) |- _ =>
+	resolve_pt H
+  | _ => idtac
+  end.
+
+Opaque instrtype_sub.
+
+Create HintDb take_drop_size_db.
+
+Hint Rewrite take_size drop_size size_cat
+	@helper_lemmas.take_size_cat @helper_lemmas.drop_size_cat
+	cats0 subn0 add_sub add_sub': take_drop_size_db.
+
+Ltac simplify_take_drop_size H :=
+	repeat (
+		autorewrite with take_drop_size_db in H;
+		repeat match goal with
+		| He : length ?l1 = length ?l2 |- _ =>
+			rewrite -!size_length in He
+		| He : size ?l1 = size ?l2 |- _ =>
+			rewrite He in H
+		| _ => auto
+		end;
+		autorewrite with take_drop_size_db in H;
+		simpl in H
+	).
+
+Ltac simplify_resulttype_sub H :=
+  simplify_take_drop_size H;
+  repeat lazymatch type of H with
+  | (?ts) <ts: (?ts) => clear H
+  | (_ :: _) <ts: (_ :: _) =>
+    let Hsubv := fresh "Hsubv" in
+    let Hsubs := fresh "Hsubs" in
+    eapply resulttype_sub_cons in H
+    as [Hsubv Hsubs];
+	simplify_resulttype_sub Hsubs
+  | _ => idtac
+  end.
+
+
+Ltac join_subtyping_trans H1 H2 :=
+  let Hsubi := fresh "Hsubi" in
+  eapply (instrtype_sub_trans _ _ _ H1) in H2
+	as Hsubi.
+
+Ltac construct_size_le :=
+  repeat rewrite take_size drop_size /=;
+  repeat match goal with
+  | _ : _ |- context [ size (?l1 ++ ?l2) ] =>
+	rewrite !size_cat
+  | H : length ?l1 = length ?l2 |- _ =>
+	rewrite -!size_length in H
+  | H : size ?l1 = size ?l2 |- context [ size ?l1 ] =>
+	rewrite H
+  | _ : _ |- is_true (?a <= ?a + ?b) =>
+	by eapply leq_addr
+  | _ : _ |- is_true (?b <= ?a + ?b) =>
+	by eapply leq_addl
+  | _ => auto
+  end.
+
+Ltac join_subtyping_eq H1 H2 :=
+  let Hsubi := fresh "Hsubi" in
+  let Hsubs := fresh "Hsubs" in
+  eapply (instrtype_sub_compose_eq _ _ _ _ _ _ _ H1) in H2
+		as [Hsubi Hsubs];
+  [simpl in Hsubi, Hsubs;
+   simplify_resulttype_sub Hsubs |
+   auto]
+  .
+
+Ltac join_subtyping_ge H1 H2 :=
+	let Hsubi := fresh "Hsubi" in
+	let Hsubs := fresh "Hsubs" in
+  	eapply (instrtype_sub_compose_ge' _ _ _ _ _ _ _ H1) in H2
+	  as [Hsubi Hsubs];
+	simplify_take_drop_size Hsubi;
+	simplify_resulttype_sub Hsubs;
+	[ |
+		construct_size_le
+	].
+
+Ltac join_subtyping_le H1 H2 :=
+	let Hsubi := fresh "Hsubi" in
+	let Hsubs := fresh "Hsubs" in
+  	eapply (instrtype_sub_compose_le' _ _ _ _ _ _ _ H1) in H2
+	  as [Hsubi Hsubs];
+	simplify_take_drop_size Hsubi;
+	simplify_resulttype_sub Hsubs;
+	[ |
+		construct_size_le
+	].
+
+Ltac resolve_subtyping :=
+  repeat lazymatch goal with
+  | H: ([] :-> []) <ti: (?ts1 :-> ?ts2) |- _ =>
+	eapply instrtype_sub_empty in H
+  | H: ([] :-> ?ts1) <ti: ([] :-> ?ts2) |- _ =>
+	eapply instrtype_sub_iff_resulttype_sub in H
+  | H: (?ts1 :-> []) <ti: (?ts2 :-> []) |- _ =>
+	eapply instrtype_sub_iff_resulttype_sub' in H
+  | _ => idtac
+  end.

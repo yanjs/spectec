@@ -24,14 +24,6 @@ Proof.
 	move => s i C HMInst. inversion HMInst => //=.
 Qed.
 
-
-Lemma fold_prepend_label : forall C lab lab1,
-	prepend_label (upd_label C lab) lab1 =
-	upd_label C ([lab1] ++ lab).
-Proof.
-	auto.
-Qed.
-
 Lemma t_preservation_vs_type': forall s f ais s' f' ais' C C' t1s t2s,
     Step (mk_config (mk_state s f) ais) (mk_config (mk_state s' f') ais') ->
     Store_ok s -> 

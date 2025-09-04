@@ -5863,12 +5863,12 @@ Inductive Step_read_before_memory_init_succ: config -> Prop :=
 
 (* Inductive Relations Definition at: ../specification/wasm-2.0/8-reduction.spectec:7.1-7.98 *)
 Inductive Step_read: config -> (list admininstr) -> Prop :=
-	| step_block : forall (v_z : state) (v_val : (list val)) (v_k : nat) (v_bt : blocktype) (v_instr : (list instr)) (v_n : n) (v_t_1 : (list valtype)) (v_t_2 : (list valtype)), 
+	| step_block : forall (v_z : state) (v_val : (list val)) (v_bt : blocktype) (v_instr : (list instr)) (v_n : n) (v_t_1 : (list valtype)) (v_t_2 : (list valtype)), 
 		((fun_blocktype v_z v_bt) = (mk_functype (mk_list _ v_t_1) (mk_list _ v_t_2))) ->
 		((List.length v_t_1) = (List.length v_val)) ->
 		((List.length v_t_2) = v_n) ->
 		Step_read (mk_config v_z ((List.map (fun (v_val : val) => (v_val : admininstr)) v_val) ++ [(AI_BLOCK v_bt v_instr)])) [(AI_LABEL_ v_n [] ((List.map (fun (v_val : val) => (v_val : admininstr)) v_val) ++ (List.map (fun (v_instr : instr) => (v_instr : admininstr)) v_instr)))]
-	| step_loop : forall (v_z : state) (v_val : (list val)) (v_k : nat) (v_bt : blocktype) (v_instr : (list instr)) (v_t_1 : (list valtype)) (v_t_2 : (list valtype)) (v_n : n), 
+	| step_loop : forall (v_z : state) (v_val : (list val)) (v_k : nat) (v_bt : blocktype) (v_instr : (list instr)) (v_t_1 : (list valtype)) (v_t_2 : (list valtype)), 
 		((fun_blocktype v_z v_bt) = (mk_functype (mk_list _ v_t_1) (mk_list _ v_t_2))) ->
 		((List.length v_t_1) = (List.length v_val)) ->
 		((List.length v_val) = v_k) ->
@@ -5885,7 +5885,7 @@ Inductive Step_read: config -> (list admininstr) -> Prop :=
 	| step_call_indirect_trap : forall (v_z : state) (v_i : (uN 32)) (v_x : idx) (v_y : idx), 
 		(~(Step_read_before_call_indirect_trap (mk_config v_z [(AI_CONST I32 v_i); (AI_CALL_INDIRECT v_x v_y)]))) ->
 		Step_read (mk_config v_z [(AI_CONST I32 v_i); (AI_CALL_INDIRECT v_x v_y)]) [AI_TRAP]
-	| step_call_addr : forall (v_z : state) (v_val : (list val)) (v_k : nat) (v_a : addr) (v_n : n) (v_f : frame) (v_instr : (list instr)) (v_t_1 : (list valtype)) (v_t_2 : (list valtype)) (v_mm : moduleinst) (v_func : func) (v_x : idx) (v_t : (list valtype)), 
+	| step_call_addr : forall (v_z : state) (v_val : (list val)) (v_a : addr) (v_n : n) (v_f : frame) (v_instr : (list instr)) (v_t_1 : (list valtype)) (v_t_2 : (list valtype)) (v_mm : moduleinst) (v_func : func) (v_x : idx) (v_t : (list valtype)), 
 		(v_a < (List.length (fun_funcinst v_z))) ->
 		((lookup_total (fun_funcinst v_z) v_a) = {| FUNC_TYPE := (mk_functype (mk_list _ v_t_1) (mk_list _ v_t_2)); FUNC_MODULE := v_mm; FUNC_CODE := v_func |}) ->
 		(v_func = (FUNC v_x (List.map (fun (v_t : valtype) => (LOCAL v_t)) v_t) v_instr)) ->
