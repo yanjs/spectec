@@ -410,12 +410,12 @@ Proof.
 	eauto.
 Qed.
 
-Lemma Step_pure__br_zero_preserves : forall v_S v_C (v_n : n) (v_instr' : (list instr)) (v_val' : (list wasm.val)) (v_val : (list wasm.val)) (v_instr : (list instr)) v_ft,
-	Admin_instrs_ok v_S v_C [(AI_LABEL_ v_n v_instr' (@app _ (map fun_coec_val__admininstr v_val') (@app _ (map fun_coec_val__admininstr v_val) (@app _ [AI_BR 0] (map fun_coec_instr__admininstr v_instr)))))] v_ft ->
+Lemma Step_pure__br_zero_preserves : forall v_S v_C (v_n : n) (v_instr' : (list instr)) (v_val' : (list wasm.val)) (v_val : (list wasm.val)) v_admininstr v_ft,
+	Admin_instrs_ok v_S v_C [(AI_LABEL_ v_n v_instr' (@app _ (map fun_coec_val__admininstr v_val') (@app _ (map fun_coec_val__admininstr v_val) (@app _ [AI_BR 0] v_admininstr))))] v_ft ->
 	((List.length v_val) = v_n) ->
 	Admin_instrs_ok v_S v_C (@app _ (map fun_coec_val__admininstr v_val) (map fun_coec_instr__admininstr v_instr')) v_ft.
 Proof.
-	move => v_S v_C v_n v_instr' v_val' v_val v_instr v_ft HType Hlength.
+	move => v_S v_C v_n v_instr' v_val' v_val v_admininstr v_ft HType Hlength.
 	invert_ais_typing.
 	resolve_all_pt.
 	invert_ais_typing.
@@ -438,12 +438,12 @@ Proof.
 	by eapply instrtype_sub_iff_resulttype_sub'.
 Qed.
 
-Lemma Step_pure__br_succ_preserves : forall v_S v_C (v_n : n) (v_instr' : (list instr)) (v_val : (list wasm.val)) (v_l : labelidx) (v_instr : (list instr)) v_ft,
-	Admin_instrs_ok v_S v_C [(AI_LABEL_ v_n v_instr' (@app _ (map fun_coec_val__admininstr v_val) (@app _ [AI_BR (v_l + 1)] (map fun_coec_instr__admininstr v_instr))))] v_ft ->
-	Step_pure [(AI_LABEL_ v_n v_instr' (@app _ (map fun_coec_val__admininstr v_val) (@app _ [AI_BR (v_l + 1)] (map fun_coec_instr__admininstr v_instr))))] (@app _ (map fun_coec_val__admininstr v_val) [(AI_BR v_l)]) ->
+Lemma Step_pure__br_succ_preserves : forall v_S v_C (v_n : n) (v_instr' : (list instr)) (v_val : (list wasm.val)) (v_l : labelidx) v_admininstr v_ft,
+	Admin_instrs_ok v_S v_C [(AI_LABEL_ v_n v_instr' (@app _ (map fun_coec_val__admininstr v_val) (@app _ [AI_BR (v_l + 1)] v_admininstr)))] v_ft ->
+	Step_pure [(AI_LABEL_ v_n v_instr' (@app _ (map fun_coec_val__admininstr v_val) (@app _ [AI_BR (v_l + 1)] v_admininstr)))] (@app _ (map fun_coec_val__admininstr v_val) [(AI_BR v_l)]) ->
 	Admin_instrs_ok v_S v_C (@app _ (map fun_coec_val__admininstr v_val) [(AI_BR v_l)]) v_ft.
 Proof.
-	move => v_S v_C v_n v_instr' v_val v_l v_instr v_ft HType HReduce.
+	move => v_S v_C v_n v_instr' v_val v_l v_admininstr v_ft HType HReduce.
 	typing_inversion HType;
 	simpl in Hai;
 	extract_premise.
@@ -650,13 +650,13 @@ Proof.
 	eauto.
 Qed.
 
-Lemma Step_pure__return_frame_preserves : forall v_S v_C (v_n : n) (v_f : frame) (v_val' : (list wasm.val)) (v_val : (list wasm.val)) (v_instr : (list instr)) v_ft,
-	Admin_instrs_ok v_S v_C [(AI_FRAME_ v_n v_f (@app _ (map fun_coec_val__admininstr v_val') (@app _ (map fun_coec_val__admininstr v_val) (@app _ [(AI_RETURN )] (map fun_coec_instr__admininstr v_instr)))))] v_ft ->
-	Step_pure [(AI_FRAME_ v_n v_f (@app _ (map fun_coec_val__admininstr v_val') (@app _ (map fun_coec_val__admininstr v_val) (@app _ [(AI_RETURN )] (map fun_coec_instr__admininstr v_instr)))))] (map fun_coec_val__admininstr v_val) ->
+Lemma Step_pure__return_frame_preserves : forall v_S v_C (v_n : n) (v_f : frame) (v_val' : (list wasm.val)) (v_val : (list wasm.val)) v_admininstr v_ft,
+	Admin_instrs_ok v_S v_C [(AI_FRAME_ v_n v_f (@app _ (map fun_coec_val__admininstr v_val') (@app _ (map fun_coec_val__admininstr v_val) (@app _ [(AI_RETURN )] v_admininstr))))] v_ft ->
+	Step_pure [(AI_FRAME_ v_n v_f (@app _ (map fun_coec_val__admininstr v_val') (@app _ (map fun_coec_val__admininstr v_val) (@app _ [(AI_RETURN )] v_admininstr))))] (map fun_coec_val__admininstr v_val) ->
 	((List.length v_val) = v_n) ->
 	Admin_instrs_ok v_S v_C (map fun_coec_val__admininstr v_val) v_ft.
 Proof.
-	move => v_S v_C v_n v_f v_val' v_val v_instr v_ft HType HReduce HLength.
+	move => v_S v_C v_n v_f v_val' v_val v_admininstr v_ft HType HReduce HLength.
 	typing_inversion HType.
 	simpl in Hai.
 	extract_premise.
@@ -698,12 +698,12 @@ Proof.
 	auto.
 Qed.
 
-Lemma Step_pure__return_label_preserves : forall v_S v_C (v_n : n) (v_instr' : (list instr)) (v_val : (list wasm.val)) (v_instr : (list instr)) v_ft,
-	Admin_instrs_ok v_S v_C [(AI_LABEL_ v_n v_instr' (@app _ (map fun_coec_val__admininstr v_val) (@app _ [(AI_RETURN )] (map fun_coec_instr__admininstr v_instr))))] v_ft ->
-	Step_pure [(AI_LABEL_ v_n v_instr' (@app _ (map fun_coec_val__admininstr v_val) (@app _ [(AI_RETURN )] (map fun_coec_instr__admininstr v_instr))))] (@app _ (map fun_coec_val__admininstr v_val) [(AI_RETURN )]) ->
+Lemma Step_pure__return_label_preserves : forall v_S v_C (v_n : n) (v_instr' : (list instr)) (v_val : (list wasm.val)) v_admininstr v_ft,
+	Admin_instrs_ok v_S v_C [(AI_LABEL_ v_n v_instr' (@app _ (map fun_coec_val__admininstr v_val) (@app _ [(AI_RETURN )] v_admininstr)))] v_ft ->
+	Step_pure [(AI_LABEL_ v_n v_instr' (@app _ (map fun_coec_val__admininstr v_val) (@app _ [(AI_RETURN )] v_admininstr)))] (@app _ (map fun_coec_val__admininstr v_val) [(AI_RETURN )]) ->
 	Admin_instrs_ok v_S v_C (@app _ (map fun_coec_val__admininstr v_val) [(AI_RETURN )]) v_ft.
 Proof.
-	move => v_S v_C v_n v_instr' v_val v_instr v_ft HType HReduce.
+	move => v_S v_C v_n v_instr' v_val v_admininstr v_ft HType HReduce.
 	typing_inversion HType.
 	simpl in Hai; extract_premise; subst.
 	typing_inversion H2.
@@ -843,40 +843,6 @@ Proof.
 	constructor.
 	eapply instrtype_sub_compose; eauto.
 Qed.
-
-Lemma size_eq_cat: forall A (l1 l2 l1' l2': list A),
-  size l1 = size l2 ->
-  l1' ++ l1 = l2' ++ l2 ->
-  l1' = l2' /\ l1 = l2.
-Proof.
-  move=> A l1 l2 l1' l2' Hsize Hcat.
-  
-  have Hsize_cat: size (l1' ++ l1) = size (l2' ++ l2) by rewrite Hcat.
-  rewrite !size_cat in Hsize_cat.
-  
-  have Hsize': size l1' = size l2'.
-  {
-	rewrite Hsize in Hsize_cat.
-    move/eqP in Hsize_cat.
-	rewrite eqn_add2r in Hsize_cat.
-	by apply/eqP.
-  }
-  
-  have Htake: take (size l1') (l1' ++ l1) = take (size l1') (l2' ++ l2).
-  { by rewrite Hcat. }
-  
-  rewrite take_size_cat // in Htake.
-  rewrite Hsize' take_size_cat // in Htake.
-  
-  split; first by exact Htake.
-  
-  have Hdrop: drop (size l1') (l1' ++ l1) = drop (size l1') (l2' ++ l2).
-  { by rewrite Hcat. }
-  
-  rewrite drop_size_cat // in Hdrop.
-  rewrite Hsize' drop_size_cat // in Hdrop.
-Qed.
-
 
 Lemma Step_pure__local_tee_preserves : forall v_S v_C (v_val : wasm.val) (v_x : idx) v_ft,
 	Admin_instrs_ok v_S v_C [(v_val : admininstr);(AI_LOCAL_TEE v_x)] v_ft ->

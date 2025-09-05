@@ -52,18 +52,8 @@ Definition is_const (e : admininstr) : bool :=
 Definition const_list (es : list admininstr) : bool :=
   List.forallb is_const es.
 
-Definition list__val := seq wasm.val.
-Definition list__admininstr := seq admininstr.
-Definition list__instr  := seq instr.
-
-Definition list__val__admininstr : list__val -> list__admininstr := map fun_coec_val__admininstr.
-Coercion list__val__admininstr : list__val >-> list__admininstr.
-
-Definition list__instr__admininstr : list__instr -> list__admininstr := map fun_coec_instr__admininstr.
-Coercion list__instr__admininstr : list__instr >-> list__admininstr.
-
 Lemma v_to_e_const: forall vs,
-    const_list (list__val__admininstr vs).
+    const_list (map fun_coec_val__admininstr vs).
 Proof.
   move => vs. elim: vs => //=.
   move => v vs Hconst.
@@ -105,7 +95,7 @@ Qed.
 
 Lemma const_es_exists: forall es,
     const_list es ->
-    {vs | es = list__val__admininstr vs}.
+    {vs | es = map fun_coec_val__admininstr vs}.
 Proof.
   induction es => //=.
   - by exists [].
@@ -145,8 +135,7 @@ Lemma reduce_trap_left: forall vs,
 Proof.
   move => vs HConst H.
   apply const_es_exists in HConst as [vcs ->].
-  eapply step_trap_vals with (v_val := vcs) (v_instr := []) => //=.
-  rewrite /list__val__admininstr in H.
+  eapply step_trap_vals with (v_val := vcs) (v_admininstr := []) => //=.
   left. by apply/map_neq_nil: H.
 Qed.
 
@@ -184,24 +173,24 @@ Proof.
 Qed.
 
 Lemma v_to_e_cat: forall vs1 vs2,
-    list__val__admininstr vs1 ++ list__val__admininstr vs2 =
-    list__val__admininstr (vs1 ++ vs2).
+    map fun_coec_val__admininstr vs1 ++ map fun_coec_val__admininstr vs2 =
+    map fun_coec_val__admininstr (vs1 ++ vs2).
 Proof.
   move => vs1. elim: vs1 => //=.
   - move => a l IH vs2. by rewrite IH.
 Qed.
 
 Lemma be_to_e_cat: forall bes1 bes2,
-    list__instr__admininstr bes1 ++ list__instr__admininstr bes2 =
-    list__instr__admininstr (bes1 ++ bes2).
+    map fun_coec_instr__admininstr bes1 ++ map fun_coec_instr__admininstr bes2 =
+    map fun_coec_instr__admininstr (bes1 ++ bes2).
 Proof.
   move => bes1. elim: bes1 => //=.
   - move => a l IH bes2. by rewrite IH.
 Qed.
 
 Lemma to_e_list_cat: forall bes1 bes2,
-    list__instr__admininstr (bes1 ++ bes2) = 
-    list__instr__admininstr bes1 ++ list__instr__admininstr bes2.
+    map fun_coec_instr__admininstr (bes1 ++ bes2) = 
+    map fun_coec_instr__admininstr bes1 ++ map fun_coec_instr__admininstr bes2.
 Proof.
   induction bes1 => //.
   move => bes2. simpl. by f_equal.
@@ -447,39 +436,9 @@ Proof.
   }
 Qed.
 
-(* Definition instr_eq_dec : forall be1 be2 : instr,
-  {be1 = be2} + {be1 <> be2}.
-Proof.
-  destruct be1, be2; try by [left | right].
-  (* TODO: This does not terminate because of mutual recursion
-           between instr and seq instr  *)
-  (* timeout 1 decidable_equality. *)
-Admitted.
-
 Definition instr_eqb v1 v2 : bool := instr_eq_dec v1 v2.
 Definition eqinstrP : Equality.axiom instr_eqb :=
   eq_dec_Equality_axiom instr instr_eq_dec.
-
-Canonical Structure instr_eqMixin := EqMixin eqinstrP.
-Canonical Structure instr_eqType :=
-  Eval hnf in EqType instr instr_eqMixin.
-
-Definition admininstr_eq_dec : forall e1 e2 : admininstr,
-  {e1 = e2} + {e1 <> e2}.
-Proof.
-  destruct e1, e2; try by [left | right].
-  (* TODO: This does not terminate because of mutual recursion
-           between admininstr and seq admininstr  *)
-  (* timeout 1 decidable_equality. *)
-Admitted.
-
-Definition admininstr_eqb v1 v2 : bool := admininstr_eq_dec v1 v2.
-Definition eqadmininstrP : Equality.axiom admininstr_eqb :=
-  eq_dec_Equality_axiom admininstr admininstr_eq_dec.
-
-Canonical Structure admininstr_eqMixin := EqMixin eqadmininstrP.
-Canonical Structure admininstr_eqType :=
-  Eval hnf in EqType admininstr admininstr_eqMixin. *)
 
 (* NOTE: This is a temporary solution to ensure valtype matches corresponding val_
          There is no check that ensures valtype and val_ matches 
@@ -575,21 +534,21 @@ Scheme Instr_ok_ind' := Induction for Instr_ok Sort Prop
 
 Definition br_reduce es := 
   exists vcs l es',
-  es = list__val__admininstr vcs ++ [AI_BR l] ++ es'.
+  es = map fun_coec_val__admininstr vcs ++ [AI_BR l] ++ es'.
 
 Definition return_reduce es :=
   exists vcs es',
-  es = list__val__admininstr vcs ++ [AI_RETURN] ++ es'.
+  es = map fun_coec_val__admininstr vcs ++ [AI_RETURN] ++ es'.
 
 (* NOTE: We could define this as ~ (br_reduce es) *)
 Definition not_lf_br es :=
   forall vcs l es',
-  es <> list__val__admininstr vcs ++ [AI_BR l] ++ es'.
+  es <> map fun_coec_val__admininstr vcs ++ [AI_BR l] ++ es'.
 
 (* NOTE: We could define this as ~ (br_reduce es) *)
 Definition not_lf_return es :=
   forall vcs es',
-  es <> list__val__admininstr vcs ++ [AI_RETURN] ++ es'.
+  es <> map fun_coec_val__admininstr vcs ++ [AI_RETURN] ++ es'.
 
 (* TODO: Define this in wasm.v *)
 Fixpoint split_vals (es : seq admininstr) : seq (wasm.val) * seq admininstr :=
@@ -614,7 +573,7 @@ Fixpoint split_vals (es : seq admininstr) : seq (wasm.val) * seq admininstr :=
 
 Lemma split_vals_inverse : forall vs es es',
   split_vals es = (vs, es') ->
-  es = list__val__admininstr vs ++ es'.
+  es = map fun_coec_val__admininstr vs ++ es'.
 Proof.
   move => vs es es' H.
   move: vs es' H.
@@ -637,7 +596,7 @@ Qed.
 
 Lemma split_vals_prefix : forall vs e es,
   (~is_const e) ->
-  split_vals (list__val__admininstr vs ++ [e] ++ es) = (vs, [e] ++ es).
+  split_vals (map fun_coec_val__admininstr vs ++ [e] ++ es) = (vs, [e] ++ es).
 Proof.
   move => vs e es H.
   elim: vs => [| v vs'].
@@ -1092,25 +1051,31 @@ Lemma Admin_instrs_ok_br_zero : forall s C ts1 ts2,
     ts1 = ts1' ++ ts.
 Proof.
   move => s C ts1 ts2 Hadmin.
-  move/admin_instrs_ok_eq: Hadmin => Hadmin.
+  move/ais_single_typing_inversion': Hadmin => Hadmin.
   move Ee: (AI_BR 0) => e.
   move Etf: (ts1 :-> ts2) => tf.
   rewrite Ee Etf in Hadmin.
   move: ts1 ts2 Ee Etf.
-  elim: s C e tf / Hadmin => //= [s C be tf Hinstr | s C e ts ts1 ts2 Hadmin IH].
+  elim: s C e tf / Hadmin => //= [s C be tf Hinstr | s C ].
   - move => ts1 ts2 Hbe Htf.
     (* TODO: Avoid using destruct *)
     have Ebe : be = instr_BR 0.
     { destruct be => //=.
       case El: (0 == v_labelidx); move/eqP: El => El.
-        - by rewrite El.
+        - rewrite El. by destruct v_labelidx.
         - by inversion Hbe. }
     rewrite Ebe in Hinstr.
-    inversion Hinstr as [| | | | | | | ? ? ts1' ts ts2' Hlen Hlookup HC Hl Htf' | | | | | | | | | | | | | | | | | | | | | |].
-    rewrite -Htf in Htf'. case: Htf' => Htf1 Htf2.
-    exists ts, ts1'. by split.
-  - move => ts1' ts2' He Htf.
-    case: Htf => Htf1 Htf2.
+    inversion Hinstr.
+    rewrite -Htf in H3. case: H3 => Htf1 Htf2.
+    exists v_t, v_t_1.
+    split.
+    + rewrite -H2 /=. by destruct (lookup_total (C_LABELS C) 0).
+    + by auto.
+  - move => es vt' vt1' vt vt2' vt1 vt2 HType IHH HSub HSub1 HSub2 ts1' ts2' He Htf.
+    specialize (IHH _ _ He erefl).
+    case: Htf => Htqf1 Htf2.
+    destruct IHH as [ts [ts1'' [Hlookup Hvt]]].
+    exists vt1', vt'.
     have Ets1 : drop (size ts) ts1' = ts1 by rewrite Htf1 drop_size_cat.
     have Ets2 : drop (size ts) ts2' = ts2 by rewrite Htf2 drop_size_cat.
     have Htf : functype__ (drop (size ts) ts1') (drop (size ts) ts2') = (ts1 :-> ts2) by congr functype__.
@@ -1120,6 +1085,28 @@ Proof.
     rewrite -catA -IH2. by split.
 Qed. *)
 
+
+Lemma size_eq1_cat: forall A (l1 l2 l1' l2': list A),
+  size l1' = size l2' ->
+  l1' ++ l1 = l2' ++ l2 ->
+  l1' = l2' /\ l1 = l2.
+Proof.
+  move=> A l1 l2 l1' l2' Hsize Hcat.
+
+  have Htake: take (size l1') (l1' ++ l1) = take (size l1') (l2' ++ l2).
+  { by rewrite Hcat. }
+
+  rewrite take_size_cat in Htake; eauto.
+  rewrite Hsize take_size_cat in Htake; eauto.
+  split; auto.
+
+  have Hdrop: drop (size l1') (l1' ++ l1) = drop (size l1') (l2' ++ l2).
+  { by rewrite Hcat. }
+  
+  rewrite drop_size_cat // in Hdrop.
+  by rewrite Hsize drop_size_cat // in Hdrop.
+Qed.
+
 Lemma br_reduce_extract_vs : forall s C ts2 ts es,
   (* TODO: This first premise is equal to br_reduce with l applied to it
            We could make br_reduce parameterised by l *)
@@ -1128,7 +1115,8 @@ Lemma br_reduce_extract_vs : forall s C ts2 ts es,
   Admin_instrs_ok s C es ([] :-> ts2) -> 
   lookup_total (C_LABELS C) 0 = ts ->
   (exists vcs1 vcs2 es',
-    es = map fun_coec_val__admininstr vcs1 ++ map fun_coec_val__admininstr vcs2 ++ [AI_BR 0] ++ es' /\
+    es = map fun_coec_val__admininstr vcs1 ++ map fun_coec_val__admininstr vcs2
+      ++ [AI_BR 0] ++ es' /\
     size vcs2 = size ts).
 Proof.
   move => s C ts2 ts es Hbr Hadmin Hlookup.
@@ -1146,29 +1134,44 @@ Proof.
   move => {ts' ts1' ts2'}.
 
   move: Hadmin1 Hadmin1' Hadmin2 => Hadmin1 Hadmin2 Hadmin3.
+
   invert_ais_typing.
   resolve_all_pt.
-Admitted.
+  eapply instrtype_sub_iff_resulttype_sub in Hsub.
+  eapply Vals_ok_non_bot in HValsok as Hnonbot.
+  eapply resulttype_sub_non_bot in Hsub; eauto.
+  subst t.
+  unfold_instrtype_sub Hsub0; subst.
+  eapply (resulttype_sub_app _ _ _ _ Hsub) in Hsub1.
+  eapply resulttype_sub_non_bot in Hsub1; eauto.
+  eapply size_eq1_cat in Hsub1 as [Hts H2].
+  2: { by inversion Hsub. }
+  subst ts_sub ts11_sub.
+  rewrite catA in HValsok.
+  eapply Forall2_length in HValsok.
+  rewrite !length_size size_cat in HValsok.
+  assert (size (ts ++ extr) <= size vcs).
+  {
+    rewrite -HValsok.
+    eapply leq_addr.
+  }
+
+  exists (take (size (ts ++ extr)) vcs), (drop (size (ts ++ extr)) vcs), es'.
+  split.
+  - by rewrite !catA -map_cat cat_take_drop.
+  - rewrite size_drop.
+    rewrite -HValsok.
+    rewrite add_sub' /=.
+    by destruct (lookup_total (C_LABELS C) 0).
+Qed.
+
 (*
-  exists vs1, vs2, es'.
-
-  rewrite Et.
-  rewrite Ets3' in Hadmin1.
-  move/Val_Const_list_typing: Hadmin1 => Hvcs.
-  rewrite map_map /= in Hvcs. symmetry in Hvcs.
-  move/typeof_cat: Hvcs => [vs1 [vs2 [Hvcs [Hvs1 Hvs2]]]].
-  exists vs1, vs2, es'. split => /=.
-  - by rewrite catA v_to_e_cat -Hvcs.
-  - by rewrite -Hvs2 size_map. 
-Qed. *)
-
 Lemma Admin_instrs_ok_return : forall s C ts1 ts2,
   Admin_instrs_ok s C [AI_RETURN] (ts1 :-> ts2) ->
   exists t ts1',
     Some t = C_RETURN C /\ 
     ts1 = ts1' ++ t.
 Proof.
-Admitted. (*
   move => s C ts1 ts2 Hadmin.
   move/admin_instrs_ok_eq: Hadmin => Hadmin.
   move Ee: (AI_RETURN) => e.
@@ -1198,11 +1201,11 @@ Qed. *)
 Lemma return_reduce_extract_vs : forall s C ts2 t es,
   (* TODO: This first premise is equal to return_reduce *)
   (exists vcs es',
-    es = list__val__admininstr vcs ++ [AI_RETURN] ++ es') -> 
+    es = map fun_coec_val__admininstr vcs ++ [AI_RETURN] ++ es') -> 
   Admin_instrs_ok s C es ([] :-> ts2) -> 
   C_RETURN C = Some t ->
   (exists vcs1 vcs2 es',
-    es = list__val__admininstr vcs1 ++ list__val__admininstr vcs2 ++ [AI_RETURN] ++ es' /\
+    es = map fun_coec_val__admininstr vcs1 ++ map fun_coec_val__admininstr vcs2 ++ [AI_RETURN] ++ es' /\
     size vcs2 = size t).
 Proof.
   move => s C ts2 t es Hret Hadmin Hlookup.
@@ -1220,21 +1223,37 @@ Proof.
   move => {ts' ts1' ts2'}.
 
   move: Hadmin1 Hadmin1' Hadmin2 => Hadmin1 Hadmin2 Hadmin3.
-  move/Admin_instrs_ok_return: Hadmin2 => [t' [ts3'' [Hlookup' Ets3']]].
-  have Et : t = t'.
-  { rewrite -Hlookup' in Hlookup. by case: Hlookup. }
-  rewrite Et.
-  rewrite Ets3' in Hadmin1.
-Admitted.
-(*
-  move/Val_Const_list_typing: Hadmin1 => Hvcs.
-  rewrite map_map /= in Hvcs. symmetry in Hvcs.
-  move/typeof_cat: Hvcs => [vs1 [vs2 [Hvcs [Hvs1 Hvs2]]]].
-  exists vs1, vs2, es'. split => /=.
-  - by rewrite catA v_to_e_cat -Hvcs.
-  - by rewrite -Hvs2 size_map.
+
+  invert_ais_typing.
+  resolve_all_pt.
+  eapply instrtype_sub_iff_resulttype_sub in Hsub.
+  eapply Vals_ok_non_bot in HValsok as Hnonbot.
+  eapply resulttype_sub_non_bot in Hsub; eauto.
+  subst t0.
+  unfold_instrtype_sub Hsub0; subst.
+  eapply (resulttype_sub_app _ _ _ _ Hsub) in Hsub1.
+  eapply resulttype_sub_non_bot in Hsub1; eauto.
+  eapply size_eq1_cat in Hsub1 as [Hts H2].
+  2: { by inversion Hsub. }
+  subst ts_sub ts11_sub.
+  rewrite catA in HValsok.
+  eapply Forall2_length in HValsok.
+  rewrite !length_size size_cat in HValsok.
+  assert (size (ts ++ extr) <= size vcs).
+  {
+    rewrite -HValsok.
+    eapply leq_addr.
+  }
+
+  exists (take (size (ts ++ extr)) vcs), (drop (size (ts ++ extr)) vcs), es'.
+  split.
+  - by rewrite !catA -map_cat cat_take_drop.
+  - rewrite size_drop.
+    rewrite -HValsok.
+    rewrite add_sub' /=.
+    rewrite Hlookup in H1.
+    by inversion H1.
 Qed.
-*)
 
 Lemma lookup_types: forall s f C loc lab ret idx,
   Module_instance_ok s (F_MODULE f) C ->
@@ -1276,6 +1295,31 @@ Proof.
 	decide equality.
 Qed.
 
+Lemma typeof_non_bot: forall v,
+  typeof v <> VALTYPE_BOT.
+Proof.
+  destruct v; rewrite /typeof; try discriminate.
+    - by destruct v_numtype.
+    - by destruct v_vectype.
+    - by destruct v_reftype.
+Qed.
+
+Lemma typeof_vals_non_bot: forall vs ts,
+  map typeof vs = ts ->
+  Forall (fun t => t <> VALTYPE_BOT) ts.
+Proof.
+  move => vs ts.
+  move : ts.
+  induction vs.
+  - move => ts Hts. by subst; auto.
+  - move => ts Hts.
+    simpl in Hts.
+    rewrite -Hts.
+    econstructor.
+    + by eapply typeof_non_bot.
+    + by eapply IHvs.
+Qed.
+
 (* TODO: Two major facts to be proven:
          1. v_n in AI_LABEL is equal to the length of types in
             C_LABELS of context used to validate AI_BR inside the label
@@ -1293,10 +1337,10 @@ Lemma t_progress_be: forall s C C' f vcs bes tf ts1 ts2 lab ret,
   Module_instance_ok s f.(F_MODULE) C' ->
   map typeof vcs = ts1 ->
   Store_ok s ->
-  not_lf_br (list__instr__admininstr bes) ->
-  not_lf_return (list__instr__admininstr bes) ->
-  const_list (list__instr__admininstr bes) \/
-  exists s' f' es', Step (mk_config (mk_state s f) (list__val__admininstr vcs ++ list__instr__admininstr bes)) (mk_config (mk_state s' f') es').
+  not_lf_br (map fun_coec_instr__admininstr bes) ->
+  not_lf_return (map fun_coec_instr__admininstr bes) ->
+  const_list (map fun_coec_instr__admininstr bes) \/
+  exists s' f' es', Step (mk_config (mk_state s f) (map fun_coec_val__admininstr vcs ++ map fun_coec_instr__admininstr bes)) (mk_config (mk_state s' f') es').
 Proof.
   move => s C C' f vcs bes tf ts1 ts2 lab ret Hinstrs.
   move: s f C' vcs ts1 ts2 lab ret.
@@ -1308,10 +1352,10 @@ Proof.
       Module_instance_ok s f.(F_MODULE) C' ->
       map typeof vcs = ts1 ->
       Store_ok s ->
-      not_lf_br (list__instr__admininstr [be]) ->
-      not_lf_return (list__instr__admininstr [be]) ->
-      const_list (list__instr__admininstr [be]) \/
-      exists s' f' es', Step (mk_config (mk_state s f) (list__val__admininstr vcs ++ list__instr__admininstr [be])) (mk_config (mk_state s' f') es'))
+      not_lf_br (map fun_coec_instr__admininstr [be]) ->
+      not_lf_return (map fun_coec_instr__admininstr [be]) ->
+      const_list (map fun_coec_instr__admininstr [be]) \/
+      exists s' f' es', Step (mk_config (mk_state s f) (map fun_coec_val__admininstr vcs ++ map fun_coec_instr__admininstr [be])) (mk_config (mk_state s' f') es'))
     (P0 := fun C bes tf (Hinstrs : Instrs_ok C bes tf) =>
       forall s f C' vcs ts1 ts2 lab ret,
       tf = (ts1 :-> ts2) ->
@@ -1319,16 +1363,16 @@ Proof.
       Module_instance_ok s f.(F_MODULE) C' ->
       map typeof vcs = ts1 ->
       Store_ok s ->
-      not_lf_br (list__instr__admininstr bes) ->
-      not_lf_return (list__instr__admininstr bes) ->
-      const_list (list__instr__admininstr bes) \/
-      exists s' f' es', Step (mk_config (mk_state s f) (list__val__admininstr vcs ++ list__instr__admininstr bes)) (mk_config (mk_state s' f') es'))
+      not_lf_br (map fun_coec_instr__admininstr bes) ->
+      not_lf_return (map fun_coec_instr__admininstr bes) ->
+      const_list (map fun_coec_instr__admininstr bes) \/
+      exists s' f' es', Step (mk_config (mk_state s f) (map fun_coec_val__admininstr vcs ++ map fun_coec_instr__admininstr bes)) (mk_config (mk_state s' f') es'))
       => // {C bes tf Hinstrs}.
   - (* Instr_ok__nop *)
     move => C.
     move => s f C' vcs ts1 ts2 lab ret Htf Hcontext Hmod Hts Hstore Hnotbr Hnotret.
     (* TODO: Can we get rid of ++ [] in exists? *)
-    right. exists s, f, (list__val__admininstr vcs ++ [] ++ []).
+    right. exists s, f, (map fun_coec_val__admininstr vcs ++ [] ++ []).
     apply step_ctxt_seq with
       (v_admininstr := [AI_NOP]).
     by apply: step_pure step_nop.
@@ -1336,7 +1380,7 @@ Proof.
     move => C ts1 ts2.
     move => s f C' vcs ts1' ts2' lab ret Htf Hcontext Hmod Hts Hstore Hnotbr Hnotret.
     (* TODO: Can we get rid of ++ [] in exists? *)
-    right. exists s, f, (list__val__admininstr vcs ++ [AI_TRAP] ++ []).
+    right. exists s, f, (map fun_coec_val__admininstr vcs ++ [AI_TRAP] ++ []).
     apply step_ctxt_seq with
       (v_admininstr := [AI_UNREACHABLE]).
     by apply: step_pure step_unreachable.
@@ -1359,10 +1403,10 @@ Proof.
     eapply invert_typeof_I32 in Ht3 as [n3 Ht3]. rewrite /= in Ht3. rewrite Ht3.
     clear Ht3.
     case: n3 => [| n3'].
-    - exists s, f, (list__val__admininstr [v2]).
+    - exists s, f, (map fun_coec_val__admininstr [v2]).
       apply: step_pure.
       by apply: step_select_false.
-    - exists s, f, (list__val__admininstr [v1]).
+    - exists s, f, (map fun_coec_val__admininstr [v1]).
       apply: step_pure.
       by apply: step_select_true.
   - (* Instr_ok__select None*)
@@ -1373,20 +1417,19 @@ Proof.
     eapply invert_typeof_I32 in Ht3 as [n3 Ht3]. rewrite /= in Ht3. rewrite Ht3.
     clear Ht3.
     case: n3 => [| n3'].
-    - exists s, f, (list__val__admininstr [v2]).
+    - exists s, f, (map fun_coec_val__admininstr [v2]).
       apply: step_pure.
       by apply: step_select_false.
-    - exists s, f, (list__val__admininstr [v1]).
+    - exists s, f, (map fun_coec_val__admininstr [v1]).
       apply: step_pure.
       by apply: step_select_true.
   - (* Instr_ok__block *)
     move => C bt bes vt1 vt2 HBok HType IHH.
     move => s f C' vcs ts1 ts2 lab ret Htf Hcontext Hmod Hts Hstore Hnotbr Hnotret.
     right. exists s, f,
-      [AI_LABEL_ (size vt2) [] (list__val__admininstr vcs ++ (list__instr__admininstr bes))].
+      [AI_LABEL_ (size vt2) [] (map fun_coec_val__admininstr vcs ++ (map fun_coec_instr__admininstr bes))].
     case: Htf => Htf1 _. rewrite -Htf1 in Hts.
     apply: step_read.
-    rewrite /list__val__admininstr /fun_coec_instr__admininstr /=.
     eapply step_block with
       (v_z := (mk_state s f))
       (v_val := vcs)
@@ -1405,10 +1448,9 @@ Proof.
     move => C bt bes vt1 vt2 HBok HType IHH.
     move => s f C' vcs ts1 ts2 lab ret Htf Hcontext Hmod Hts Hstore Hnotbr Hnotret.
     right. exists s, f,
-      [AI_LABEL_ (size vt1) [(instr_LOOP bt bes)] (list__val__admininstr vcs ++ (list__instr__admininstr bes))].
+      [AI_LABEL_ (size vt1) [(instr_LOOP bt bes)] (map fun_coec_val__admininstr vcs ++ (map fun_coec_instr__admininstr bes))].
     case: Htf => Htf1 _. rewrite -Htf1 in Hts.
     apply: step_read.
-    rewrite /list__val__admininstr /fun_coec_instr__admininstr /=.
     eapply step_loop with
       (v_z := (mk_state s f))
       (v_val := vcs)
@@ -1431,7 +1473,7 @@ Proof.
     case: Htf => Htf1 _. rewrite -Htf1 in Hts.
     eapply typeof_append in Hts as [v [Hvcs [Hvs1 Hvs2]]].
     eapply invert_typeof_I32 in Hvs2 as [n Heqv].
-    rewrite Hvcs /list__val__admininstr map_cat /= Heqv -catA.
+    rewrite Hvcs map_cat /= Heqv -catA.
     clear Heqv.
     case: n => [| n'].
     - exists s, f, ((map fun_coec_val__admininstr (take (size vt1) vcs)) ++
@@ -1460,7 +1502,7 @@ Proof.
     case: Htf => Htf1 _. rewrite -{}Htf1 in Hts.
     move/typeof_append: Hts => [v1 [Hvcs [Hts Ht1]]].
     eapply invert_typeof_I32 in Ht1 as [n Heqv].
-    rewrite Hvcs /list__val__admininstr map_cat /= Heqv -catA.
+    rewrite Hvcs map_cat /= Heqv -catA.
     rewrite -(cats0 ([AI_CONST I32 (mk_uN 32 n)] ++ [AI_BR_IF l])).
     clear Heqv.
     case: n => [| n'].
@@ -1482,7 +1524,7 @@ Proof.
     rewrite catA in Hts.
     move/typeof_append: Hts => [v1 [Hvcs [Hts Ht1]]].
     eapply invert_typeof_I32 in Ht1 as [n Heqv].
-    rewrite Hvcs /list__val__admininstr map_cat /= Heqv -catA.
+    rewrite Hvcs map_cat /= Heqv -catA.
     rewrite -(cats0 ([AI_CONST I32 (mk_uN 32 n)] ++ [AI_BR_TABLE ls lN])).
     case Hv1: (n < size ls).
     + exists s, f, (map fun_coec_val__admininstr (take (size (ts1 ++ ts)) vcs)
@@ -1500,9 +1542,9 @@ Proof.
     move => C x ts1 ts2 Haddr Hlookup.
     move => s f C' vcs ts1' ts2' lab ret Htf Hcontext Hmod Hts Hstore Hnotbr Hnotret.
     (* TODO: Can we get rid of ++ [] in exists? *)
-    right. exists s, f, (list__val__admininstr vcs ++ [AI_CALL_ADDR (lookup_total (fun_funcaddr (mk_state s f)) x)] ++ []).
+    right. exists s, f, (map fun_coec_val__admininstr vcs ++ [AI_CALL_ADDR (lookup_total (fun_funcaddr (mk_state s f)) x)] ++ []).
     (* TODO: Can we get rid of these rewrites? *)
-    rewrite -[list__val__admininstr vcs ++ _]cats0 -catA.
+    rewrite -[map fun_coec_val__admininstr vcs ++ _]cats0 -catA.
     apply step_ctxt_seq with
       (v_admininstr := [AI_CALL x]).
     apply: step_read. apply: step_call.
@@ -1519,7 +1561,7 @@ Proof.
     move/typeof_append: Hts => [v1 [Hvcs [Hts Ht1]]].
     eapply invert_typeof_I32 in Ht1 as [n Heqv].
     remember (mk_uN 32 n) as v_i.
-    rewrite Hvcs /list__val__admininstr map_cat /= Heqv -catA.
+    rewrite Hvcs map_cat /= Heqv -catA.
     rewrite -(cats0 ([AI_CONST I32 v_i] ++ [AI_CALL_INDIRECT x y])).
     eapply minst_invert_tables
       with (C' := C)
@@ -1743,7 +1785,7 @@ Proof.
     move => s f C' vcs ts1 ts2 lab ret Htf Hcontext Hmod Hts Hstore Hnotbr Hnotret.
     right.
     case: Htf => Htf1 _. rewrite -Htf1 in Hts. invert_typeof_vcs.
-    exists s, f, (list__val__admininstr [fun_local (mk_state s f) x]).
+    exists s, f, (map fun_coec_val__admininstr [fun_local (mk_state s f) x]).
     apply: step_read.
     by apply: step_local_get.
   - (* Instr_ok__local_set *)
@@ -1769,7 +1811,7 @@ Proof.
     move => s f C' vcs ts1 ts2 lab ret Htf Hcontext Hmod Hts Hstore Hnotbr Hnotret.
     right.
     case: Htf => Htf1 _. rewrite -Htf1 in Hts. invert_typeof_vcs.
-    exists s, f, (list__val__admininstr [GLOB_VALUE (fun_global (mk_state s f) x)]).
+    exists s, f, (map fun_coec_val__admininstr [GLOB_VALUE (fun_global (mk_state s f) x)]).
     apply: step_read.
     by apply: step_global_get.
   - (* Instr_ok__global_set *)
@@ -2569,21 +2611,28 @@ Proof.
     move => s f C' vcs ts1' ts2' lab ret Htf Hcontext Hmod Hts Hstore Hnotbr Hnotret.
     have Ets1 : ts1' = ts1 by case: Htf. rewrite Ets1 in Hts.
     rewrite -be_to_e_cat in Hnotbr Hnotret.
-    admit.
-    (*
-    case Hconst: (const_list (list__instr__admininstr bes1)).
+    case Hconst: (const_list (map fun_coec_instr__admininstr bes1)).
     + move/const_es_exists: (Hconst) => [vs1 Hvs1].
-      (* NOTE: Maybe we should make a separate lemma rather than reusing Val_Const_list_typing in Heqts2 *)
-      have Hadmin1 : Admin_instrs_ok s C (list__instr__admininstr bes1) (ts1 :-> ts3).
+      have Hadmin1 : Admin_instrs_ok s C (map fun_coec_instr__admininstr bes1) (ts1 :-> ts3).
       { by apply: AIs_ok_instrs. }
       have Heqtf2 : (ts3 :-> ts2) = (ts3 :-> ts2) by [].
-      (*
       have Heqts2 : map typeof (vcs ++ vs1) = ts3.
       { rewrite Hvs1 in Hadmin1.
         eapply ais_vals_typing_inversion in Hadmin1
           as [ts [Hsub HVals]].
-        move/Val_Const_list_typing: Hadmin1 => Hadmin1.
-        by rewrite Hadmin1 -Hts map_map map_cat. }*)
+        unfold_instrtype_sub Hsub.
+        eapply resulttype_sub_empty in Hsub1.
+        rewrite Hsub1 cats0 in H. clear Hsub1.
+        subst ts0.
+        eapply typeof_vals_non_bot in Hts as Htsnonbot.
+        eapply resulttype_sub_non_bot in Hsub0; eauto.
+        subst ts0_sub.
+        eapply Vals_ok_non_bot in HVals as HValsnonbot.
+        eapply resulttype_sub_non_bot in Hsub2; eauto.
+        subst ts12_sup.
+        eapply Forall2_Val_ok_is_same_as_map in HVals.
+        rewrite map_map in HVals.
+        by rewrite map_cat Hts HVals. }
       move: (not_lf_br_left _ _ Hconst Hnotbr) => Hnotbr2.
       move: (not_lf_return_left _ _ Hconst Hnotret) => Hnotret2.
       move: (IH2 s f C' (vcs ++ vs1) ts3 ts2 lab ret Heqtf2 Hcontext Hmod Heqts2 Hstore Hnotbr2 Hnotret2) => {}IH2.
@@ -2594,7 +2643,7 @@ Proof.
       * right.
         rewrite -v_to_e_cat -Hvs1 in Hprog2.
         by rewrite -catA be_to_e_cat in Hprog2.
-    + have Heqtf1 : functype__ ts1 ts3 = functype__ ts1 ts3 by [].
+    + have Heqtf1 : (ts1 :-> ts3) = (ts1 :-> ts3) by [].
       have Heqts1 := Ets1.
       move: (not_lf_br_right _ _ Hnotbr) => Hnotbr1.
       move: (not_lf_return_right _ _ Hnotret) => Hnotret1.
@@ -2602,14 +2651,17 @@ Proof.
       move: IH1 => [Hcontra | Hprog1]; first by move/negP: Hconst.
       right.
       move: Hprog1 => [s' [f' [es1' Hprog1]]].
-      exists s', f', (es1' ++ list__instr__admininstr [be2]).
+      exists s', f', (es1' ++ map fun_coec_instr__admininstr [be2]).
       rewrite -be_to_e_cat catA.
       by apply step_ctxt_seq with (v_val := []).
-      *)
   - (* Instrs_ok__sub *)
-    move => C bes t1' t2' t1 t2 HType IH2 HSub1 HSub2.
+    move => C bes ts1'' ts2'' ts1 ts2 HType IH2 HSub1 HSub2.
     move => s f C' vcs ts1' ts2' lab ret Htf Hcontext Hmod Hts Hstore Hnotbr Hnotret.
-    admit.
+    have Ets1 : ts1' = ts1'' by case: Htf. rewrite Ets1 in Hts.
+    eapply IH2; eauto.
+    eapply typeof_vals_non_bot in Hts as Htsnonbot.
+    eapply resulttype_sub_non_bot in HSub1; eauto.
+    subst; eauto.
   - (* Instrs_ok__frame *)
     move => C bes ts ts1 ts2 Hinstrs IH.
     move => s f C' vcs ts1' ts2' lab ret Htf Hcontext Hmod Hts Hstore Hnotbr Hnotret.
@@ -2628,14 +2680,14 @@ Proof.
     case: IH => [Hconst | Hprog].
     + by left.
     + right. move: Hprog => [s' [f' [es' IH]]].
-      exists s', f', (list__val__admininstr vcs1 ++ es').
+      exists s', f', (map fun_coec_val__admininstr vcs1 ++ es').
       rewrite -v_to_e_cat -catA.
       (* TODO: Can we get rid of these rewrites? *)
-      rewrite -[list__val__admininstr vcs2 ++ _]cats0.
-      rewrite -[list__val__admininstr vcs1 ++ es']cats0.
-      rewrite -[(list__val__admininstr vcs1 ++ es') ++ []]catA.
+      rewrite -[map fun_coec_val__admininstr vcs2 ++ _]cats0.
+      rewrite -[map fun_coec_val__admininstr vcs1 ++ es']cats0.
+      rewrite -[(map fun_coec_val__admininstr vcs1 ++ es') ++ []]catA.
       by apply step_ctxt_seq with
-        (v_admininstr := list__val__admininstr vcs2 ++ list__instr__admininstr bes)
+        (v_admininstr := map fun_coec_val__admininstr vcs2 ++ map fun_coec_instr__admininstr bes)
         (v_admininstr' := es')
         (v_admininstr'' := []).
   (* TODO: These goals are shelved by Instr_ok__call_indirect for some reason *)
@@ -2680,8 +2732,8 @@ Lemma t_progress_e: forall s C C' f vcs es tf ts1 ts2 lab ret,
   Store_ok s ->
   not_lf_br es ->
   not_lf_return es ->
-  terminal_form (list__val__admininstr vcs ++ es) \/
-  exists s' f' es', Step (mk_config (mk_state s f) (list__val__admininstr vcs ++ es)) (mk_config (mk_state s' f') es').
+  terminal_form (map fun_coec_val__admininstr vcs ++ es) \/
+  exists s' f' es', Step (mk_config (mk_state s f) (map fun_coec_val__admininstr vcs ++ es)) (mk_config (mk_state s' f') es').
 Proof.
   move => s C C' f vcs es tf ts1 ts2 lab ret Hadmin.
   move: f C' vcs ts1 ts2 lab ret.
@@ -2695,8 +2747,8 @@ Proof.
       Store_ok s ->
       not_lf_br [e] ->
       not_lf_return [e] ->
-      terminal_form (list__val__admininstr vcs ++ [e]) \/
-      exists s' f' es', Step (mk_config (mk_state s f) (list__val__admininstr vcs ++ [e])) (mk_config (mk_state s' f') es'))
+      terminal_form (map fun_coec_val__admininstr vcs ++ [e]) \/
+      exists s' f' es', Step (mk_config (mk_state s f) (map fun_coec_val__admininstr vcs ++ [e])) (mk_config (mk_state s' f') es'))
     (P0 := fun s C es tf (Hadmin : Admin_instrs_ok s C es tf) => 
       forall f C' vcs ts1 ts2 lab ret,
       tf = (ts1 :-> ts2) ->
@@ -2706,8 +2758,8 @@ Proof.
       Store_ok s ->
       not_lf_br es ->
       not_lf_return es ->
-      terminal_form (list__val__admininstr vcs ++ es) \/
-      exists s' f' es', Step (mk_config (mk_state s f) (list__val__admininstr vcs ++ es)) (mk_config (mk_state s' f') es'))
+      terminal_form (map fun_coec_val__admininstr vcs ++ es) \/
+      exists s' f' es', Step (mk_config (mk_state s f) (map fun_coec_val__admininstr vcs ++ es)) (mk_config (mk_state s' f') es'))
     (P1 := fun s rs f es ts (Hthread : Thread_ok s rs f es ts) =>
       Store_ok s ->
       not_lf_br es ->
@@ -2734,7 +2786,6 @@ Proof.
     + right. exists s, f, [AI_TRAP].
       apply: step_pure.
       rewrite -cat_cons.
-      rewrite /list__val__admininstr.
       rewrite -{1}(cats0 [AI_TRAP]).
       assert (map fun_coec_val__admininstr (vc :: vcs) =
         fun_coec_val__admininstr (vc) :: map fun_coec_val__admininstr (vcs)).
@@ -2744,7 +2795,7 @@ Proof.
       rewrite -H.
       eapply step_trap_vals with
         (v_val := vc :: vcs)
-        (v_instr := [])
+        (v_admininstr := [])
         .
       by left. 
   - (* Admin_instr_ok__ref_host_addr *)
@@ -2774,7 +2825,7 @@ Proof.
     {| F_LOCALS := (vcs ++ (map (fun (t: valtype) => the (fun_default_ t)) ts)); F_MODULE := inst |}
     ).
     pose f'' := (f' Inhabited__val).
-    exists s, f, [AI_FRAME_ (size ts2) f'' [AI_LABEL_ (size ts2) [] (list__instr__admininstr es)]].
+    exists s, f, [AI_FRAME_ (size ts2) f'' [AI_LABEL_ (size ts2) [] (map fun_coec_instr__admininstr es)]].
     apply: step_read.
     assert (map (fun t => LOCAL t) ts = ls) as Hlocal.
     {
@@ -2798,7 +2849,6 @@ Proof.
     {
       by rewrite -Hts !length_size size_map.
     }
-Admitted. (*
   - (* Admin_instr_ok__label *)
     move => s C n bes es t1 t2 Hinstrs Hadmin IH Hsize.
     move => f C' vcs ts1 ts2 lab ret Htf Hcontext Hmod Hts Hstore Hnotbr Hnotret.
@@ -2808,7 +2858,7 @@ Admitted. (*
       move: Hbrred => [vcs' [l [es' Hes]]].
       case: l Hes => [[| l']] Hes.
       * right.
-        have Hexists : exists vcs es', es = list__val__admininstr vcs ++ [AI_BR 0] ++ es'. 
+        have Hexists : exists vcs es', es = map fun_coec_val__admininstr vcs ++ [AI_BR 0] ++ es'. 
         { by exists vcs', es'. }
         have Hlookup : lookup_total (C_LABELS (_append {|
           C_TYPES := [];
@@ -2816,6 +2866,8 @@ Admitted. (*
           C_GLOBALS := [];
           C_TABLES := [];
           C_MEMS := [];
+          C_ELEMS := [];
+          C_DATAS := [];
           C_LOCALS := [];
           C_LABELS := [mk_list _ t2];
           C_RETURN := None
@@ -2825,22 +2877,23 @@ Admitted. (*
         move: (br_reduce_extract_vs _ _ _ _ _ Hexists Hadmin Hlookup) => Hextract.
         move: Hextract => [vcs1 [vcs2 [es'' [Hes' Hsize']]]].
         rewrite Hes'.
-        exists s, f, (list__val__admininstr vcs2 ++ list__instr__admininstr bes).
+        exists s, f, (map fun_coec_val__admininstr vcs2 ++ map fun_coec_instr__admininstr bes).
         apply: step_pure.
-        apply: step_br_zero.
+        eapply step_br_zero.
         rewrite length_size Hsize' Hsize.
         by case: t2 Hinstrs Hadmin IH Hsize Hsize' Hlookup.
-      * right. exists s, f, (list__val__admininstr vcs' ++ [AI_BR l']).
-        rewrite Hes -addn1.
+      * right. exists s, f, (map fun_coec_val__admininstr vcs' ++ [AI_BR (mk_uN _ l')]).
+        rewrite -(addn1 l') in Hes.
+        rewrite Hes.
         apply: step_pure.
-        by apply: step_br_succ.
+        by eapply step_br_succ with (v_l := (mk_uN 32 l')).
     + case: (return_reduce_decidable es) => [Hretred | Hnotretred].
       * rewrite /return_reduce in Hretred.
         move: Hretred => [vcs' [es' Hes]].
-        right. exists s, f, (list__val__admininstr vcs' ++ [AI_RETURN]).
+        right. exists s, f, (map fun_coec_val__admininstr vcs' ++ [AI_RETURN]).
         rewrite Hes.
         apply: step_pure.
-        by apply: step_return_label.
+        eapply step_return_label.
       * (* TODO: Can we simplify this? *)
         have Heqc : _append {|
           C_TYPES := [];
@@ -2848,16 +2901,18 @@ Admitted. (*
           C_GLOBALS := [];
           C_TABLES := [];
           C_MEMS := [];
+          C_ELEMS := [];
+          C_DATAS := [];
           C_LOCALS := [];
-          C_LABELS := [t2];
+          C_LABELS := [mk_list _ t2];
           C_RETURN := None
-          |} C = upd_local_label_return C' [seq typeof i  | i <- F_LOCALS f] (t2 :: lab) ret.
+          |} C = upd_local_label_return C' [seq typeof i  | i <- F_LOCALS f] ((mk_list _ t2) :: lab) ret.
           by rewrite Hcontext.
-        have Heqtf : functype__ [] (option_to_list t1) = functype__ [] (option_to_list t1) by [].
+        have Heqtf : ([] :-> t1) = ([] :-> t1) by [].
         have Heqts : map typeof [] = [] by [].
         move/not_br_reduce_not_lf_br: Hnotbrred => Hnotbr'.
         move/not_return_reduce_not_lf_return: Hnotretred => Hnotret'.
-        move/(_ f C' [] [] (option_to_list t1) (t2 :: lab) ret Heqtf Heqc Hmod Heqts Hstore Hnotbr' Hnotret'): IH => IH.
+        move/(_ f C' [] [] (t1) ((mk_list _ t2) :: lab) ret Heqtf Heqc Hmod Heqts Hstore Hnotbr' Hnotret'): IH => IH.
         move => {Heqtf Heqc Hmod Heqts Hstore}.
         case: IH => [Hterm | Hprog].
         { right. exists s, f, es.
@@ -2881,7 +2936,7 @@ Admitted. (*
       right.
       inversion Hthread as [? ? ? ? ? C'' Hframe Hadmin Hs Ht Hf Hes' Ht'].
       move => {Hs Ht Hf Hes' Ht'}.
-      have Hexists : exists vcs es', es = list__val__admininstr vcs ++ [AI_RETURN] ++ es'. 
+      have Hexists : exists vcs es', es = map fun_coec_val__admininstr vcs ++ [AI_RETURN] ++ es'. 
       { by exists vcs', es'. }
       have Hlookup : C_RETURN (_append {|
         C_TYPES := [];
@@ -2889,17 +2944,19 @@ Admitted. (*
         C_GLOBALS := [];
         C_TABLES := [];
         C_MEMS := [];
+        C_ELEMS := [];
+        C_DATAS := [];
         C_LOCALS := [];
         C_LABELS := [];
-        C_RETURN := Some t
-        |} C'') = Some t.
+        C_RETURN := Some (mk_list _ t)
+        |} C'') = Some (mk_list _ t).
       { move => {Hadmin IH} /=.
         move/frame_t_context_return_empty: Hframe => Hret.
         by rewrite Hret. }
       move: (return_reduce_extract_vs _ _ _ _ _ Hexists Hadmin Hlookup) => Hextract.
       move: Hextract => [vcs1 [vcs2 [es'' [Hes' Hsize']]]].
       rewrite Hes'.
-      exists s, f', (list__val__admininstr vcs2).
+      exists s, f', (map fun_coec_val__admininstr vcs2).
       apply: step_pure.
       apply: step_return_frame.
       rewrite length_size Hsize' Hsize.
@@ -2920,13 +2977,23 @@ Admitted. (*
         exists s', f', [AI_FRAME_ n f'' es'].
         by apply: step_ctxt_frame.
   - (* Admin_instr_ok__weakening *)
-    move => s C e ts ts1 ts2 Hadmin IH.
+    move => s C e ts' ts1'' ts ts2'' ts1 ts2 Hadmin IH HSub HSub1 HSub2.
     move => f C' vcs ts1' ts2' lab ret Htf Hcontext Hmod Hts Hstore Hnotbr Hnotret.
+    case: Htf => Htf1 _. subst ts1'.
     have Heqtf : (ts1 :-> ts2) = (ts1 :-> ts2) by [].
     have Heqts : map typeof (drop (length ts) vcs) = ts1.
-    { rewrite map_drop.
-      injection Htf => Htf2 Htf1.
-      rewrite -Hts in Htf1. by rewrite -Htf1 drop_cat length_size ltnn subnn drop0. }
+    {
+      assert (size ts' = size ts) as Hsizets. { by inversion HSub. }
+      symmetry in Htf1.
+      eapply typeof_vals_non_bot in Htf1 as Hnonbot.
+      eapply (resulttype_sub_app _ _ _ _ HSub) in HSub1.
+      eapply resulttype_sub_non_bot in HSub1; eauto.
+      rewrite map_drop length_size -Hsizets.
+      rewrite Htf1 drop_cat ltnn subnn drop0.
+      rewrite -(helper_lemmas.drop_size_cat ts' ts1'').
+      rewrite -(helper_lemmas.drop_size_cat ts ts1).
+      by rewrite Hsizets HSub1.
+      }
     move/(_ f C' (drop (length ts) vcs) ts1 ts2 lab ret Heqtf Hcontext Hmod Heqts Hstore Hnotbr Hnotret): IH => IH.
     have -> : vcs = (take (size ts) vcs ++ drop (size ts) vcs) by rewrite cat_take_drop.
     rewrite length_size in IH.
@@ -2944,17 +3011,26 @@ Admitted. (*
         -- left. by right.
         -- right. exists s, f, [AI_TRAP].
            apply: step_pure.
-           apply step_trap_vals with (v_val := (vc1 :: vcs1)).
+           assert (fun_coec_val__admininstr vc1 :: map fun_coec_val__admininstr vcs1
+            = map fun_coec_val__admininstr (vc1 :: vcs1)) as Hmap.
+            {
+              auto.
+            }
+           rewrite -cat_cons Hmap.
+           rewrite -{1}(cats0 [AI_TRAP]).
+           eapply step_trap_vals with
+            (v_val := (vc1 :: vcs1))
+            (v_admininstr := []).
            by left.
     + right. move: Hprog => [s' [f' [es' IH]]].
-      exists s', f', (list__val__admininstr vcs1 ++ es').
+      exists s', f', (map fun_coec_val__admininstr vcs1 ++ es').
       rewrite -v_to_e_cat -catA.
       (* TODO: Can we get rid of these rewrites? *)
-      rewrite -[list__val__admininstr vcs2 ++ _]cats0.
-      rewrite -[list__val__admininstr vcs1 ++ es']cats0.
-      rewrite -[(list__val__admininstr vcs1 ++ es') ++ []]catA.
+      rewrite -[map fun_coec_val__admininstr vcs2 ++ _]cats0.
+      rewrite -[map fun_coec_val__admininstr vcs1 ++ es']cats0.
+      rewrite -[(map fun_coec_val__admininstr vcs1 ++ es') ++ []]catA.
       by apply step_ctxt_seq with
-        (v_admininstr := list__val__admininstr vcs2 ++ [e])
+        (v_admininstr := map fun_coec_val__admininstr vcs2 ++ [e])
         (v_admininstr' := es')
         (v_admininstr'' := []).
   - (* Admin_instrs_ok__empty *)
@@ -2968,11 +3044,24 @@ Admitted. (*
     have Ets1 : ts1' = ts1 by case: Htf. rewrite Ets1 in Hts.
     case Hconst: (const_list es1).
     + move/const_es_exists: (Hconst) => [vs1 Hvs1].
-      have Heqtf2 : functype__ ts3 ts2 = functype__ ts3 ts2 by [].
+      have Heqtf2 : (ts3 :-> ts2) = (ts3 :-> ts2) by [].
       have Heqts2 : map typeof (vcs ++ vs1) = ts3.
       { rewrite Hvs1 in Hadmin1.
-        move/Val_Const_list_typing: Hadmin1 => Hadmin1.
-        by rewrite Hadmin1 -Hts map_map map_cat. }
+        eapply ais_vals_typing_inversion in Hadmin1
+          as [ts [Hsub HVals]].
+        unfold_instrtype_sub Hsub.
+        eapply resulttype_sub_empty in Hsub1.
+        rewrite Hsub1 cats0 in H. clear Hsub1.
+        subst ts0.
+        eapply typeof_vals_non_bot in Hts as Htsnonbot.
+        eapply resulttype_sub_non_bot in Hsub0; eauto.
+        subst ts0_sub.
+        eapply Vals_ok_non_bot in HVals as HValsnonbot.
+        eapply resulttype_sub_non_bot in Hsub2; eauto.
+        subst ts12_sup.
+        eapply Forall2_Val_ok_is_same_as_map in HVals.
+        rewrite map_map in HVals.
+        by rewrite map_cat Hts HVals. }
       move: (not_lf_br_left _ _ Hconst Hnotbr) => Hnotbr2.
       move: (not_lf_return_left _ _ Hconst Hnotret) => Hnotret2.
       move/(_ f C' (vcs ++ vs1) ts3 ts2 lab ret Heqtf2 Hcontext Hmod Heqts2 Hstore Hnotbr2 Hnotret2): IH2 => IH2.
@@ -2985,7 +3074,7 @@ Admitted. (*
           rewrite catA Hvs1 v_to_e_cat Hvcs He /=. 
           by rewrite /terminal_form. }
       * right. by rewrite catA Hvs1 v_to_e_cat.
-    + have Heqtf1 : functype__ ts1 ts3 = functype__ ts1 ts3 by [].
+    + have Heqtf1 : (ts1 :-> ts3) = (ts1 :-> ts3) by [].
       have Heqts1 := Ets1.
       move: (not_lf_br_right _ _ Hnotbr) => Hnotbr1.
       move: (not_lf_return_right _ _ Hnotret) => Hnotret1.
@@ -2998,11 +3087,20 @@ Admitted. (*
         { right. move: (v_e_trap _ _ (v_to_e_const vcs) Htrap1) => [-> ->] //=.
           exists s, f, [AI_TRAP].
           apply: step_pure.
-          apply step_trap_vals with (v_val := []). by right. }
+          
+          eapply step_trap_vals with (v_val := []). by right. }
       * right. move: Hprog1 => [s' [f' [es1' Hprog1]]].
         exists s', f', (es1' ++ [e2]).
         rewrite catA.
         by apply step_ctxt_seq with (v_val := []).
+  - (* AIs_ok_sub *)
+    move => s C es ts1'' ts2'' ts1 ts2 Hadmin IH HSub1 HSub2.
+    move => f C' vcs ts1' ts2' lab ret Htf Hcontext Hmod Hts Hstore Hnotbr Hnotret.
+    have Ets1 : ts1'' = ts1' by case: Htf. subst ts1''.
+    eapply IH; eauto.
+    eapply typeof_vals_non_bot in Hts as Hnonbot.
+    eapply resulttype_sub_non_bot in HSub1; eauto.
+    by subst ts1'.
   - (* AIs_ok_frame *)
     move => s C es ts ts1 ts2 Hadmin IH.
     move => f C' vcs ts1' ts2' lab ret Htf Hcontext Hmod Hts Hstore Hnotbr Hnotret.
@@ -3032,14 +3130,14 @@ Admitted. (*
           apply step_trap_vals with (v_val := (vc1 :: vcs1)).
           by left. }
     + right. move: Hprog => [s' [f' [es' IH]]].
-      exists s', f', (list__val__admininstr vcs1 ++ es').
+      exists s', f', (map fun_coec_val__admininstr vcs1 ++ es').
       rewrite -v_to_e_cat -catA.
       (* TODO: Can we get rid of these rewrites? *)
-      rewrite -[list__val__admininstr vcs2 ++ _]cats0.
-      rewrite -[list__val__admininstr vcs1 ++ es']cats0.
-      rewrite -[(list__val__admininstr vcs1 ++ es') ++ []]catA.
+      rewrite -[map fun_coec_val__admininstr vcs2 ++ _]cats0.
+      rewrite -[map fun_coec_val__admininstr vcs1 ++ es']cats0.
+      rewrite -[(map fun_coec_val__admininstr vcs1 ++ es') ++ []]catA.
       by apply step_ctxt_seq with
-        (v_admininstr := list__val__admininstr vcs2 ++ es)
+        (v_admininstr := map fun_coec_val__admininstr vcs2 ++ es)
         (v_admininstr' := es')
         (v_admininstr'' := []).
   - (* Admin_instrs_ok__instrs *)
@@ -3056,7 +3154,7 @@ Admitted. (*
   - (* Thread_ok__ *)
     move => s rs f es ts C.
     move => Hframe Hadmin IH Hstore Hnotbr Hnotret.
-    have Heqtf : functype__ [] ts = functype__ [] ts by [].
+    have Heqtf : ([] :-> ts) = ([] :-> ts) by [].
     have Heqts : map typeof [] = [] by [].
     move/frame_t_context_local_types: (Hframe) => Eloc.
     move/frame_t_context_label_empty: (Hframe) => Elab.
@@ -3068,26 +3166,33 @@ Admitted. (*
         C_GLOBALS := [];
         C_TABLES := [];
         C_MEMS := [];
+        C_ELEMS := [];
+        C_DATAS := [];
         C_LOCALS := [];
         C_LABELS := [];
         C_RETURN := rs
       |} C = upd_local_label_return (upd_local C []) [seq typeof i  | i <- F_LOCALS f] [] rs.
     { move => {IH Hframe Hadmin}.
-      case: C Eloc Elab Eret => //= ? ? ? ? ? ? ? ? Eloc Elab Eret.
-      rewrite Eloc Elab Eret. by case: rs. }
+      case: C Eloc Elab Eret => //= ? ? ? ? ? ? ? ? ? ? Eloc Elab Eret.
+      rewrite Eloc Elab Eret.
+      by case: rs. }
     have Hmod : Module_instance_ok s (F_MODULE f) (upd_local C []).
-    { inversion Hframe as [? ? ? ? ? ? Hmod]. by inversion Hmod. }
+    { inversion Hframe as [? ? ? ? ? Hmod]. by inversion Hmod. }
     move/(_ f (upd_local C []) [] [] ts [] (rs) Heqtf Heqc Hmod Heqts Hstore Hnotbr Hnotret): IH => IH {Heqtf Heqc}.
     case: IH => /= [Hterm | Hprog].
     + case: Hterm => [Hconst | Htrap].
       * left. split => //=.
         move/const_es_exists: Hconst => [vs Hvs].
         rewrite Hvs in Hadmin *.
-        move/Val_Const_list_typing: Hadmin => /= ->.
-        by rewrite 2!length_size map_map 2!size_map.
+        eapply ais_vals_typing_inversion in Hadmin as [v_ts [HSub HVals]].
+        eapply instrtype_sub_iff_resulttype_sub in HSub.
+        eapply Forall2_length in HVals.
+        rewrite !length_size in HVals.
+        assert (size v_ts = size ts). { by inversion HSub. }
+        by rewrite !length_size size_map -HVals H.
       * right. left. by rewrite Htrap.
     + right. by right.
-Qed. *)
+Admitted.
 
 Theorem t_progress: forall s f es ts,
   Config_ok (mk_config (mk_state s f) es) ts ->

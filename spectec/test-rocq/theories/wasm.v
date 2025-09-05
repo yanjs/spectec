@@ -5269,10 +5269,10 @@ Inductive Step_pure: (list admininstr) -> (list admininstr) -> Prop :=
 		((fun_proj_uN_0 32 v_c) = 0) ->
 		Step_pure [(AI_CONST I32 v_c); (AI_IFELSE v_bt v_instr_1 v_instr_2)] [(AI_BLOCK v_bt v_instr_2)]
 	| step_label_vals : forall (v_n : n) (v_instr : (list instr)) (v_val : (list val)), Step_pure [(AI_LABEL_ v_n v_instr (List.map (fun (v_val : val) => (v_val : admininstr)) v_val))] (List.map (fun (v_val : val) => (v_val : admininstr)) v_val)
-	| step_br_zero : forall (v_n : n) (v_instr' : (list instr)) (v_val' : (list val)) (v_val : (list val)) (v_instr : (list instr)), 
+	| step_br_zero : forall (v_n : n) (v_instr' : (list instr)) (v_val' : (list val)) (v_val : (list val)) (v_admininstr : (list admininstr)), 
 		((List.length v_val) = v_n) ->
-		Step_pure [(AI_LABEL_ v_n v_instr' ((List.map (fun (v_val' : val) => (v_val' : admininstr)) v_val') ++ ((List.map (fun (v_val : val) => (v_val : admininstr)) v_val) ++ ([(AI_BR (mk_uN _ 0))] ++ (List.map (fun (v_instr : instr) => (v_instr : admininstr)) v_instr)))))] ((List.map (fun (v_val : val) => (v_val : admininstr)) v_val) ++ (List.map (fun (v_instr' : instr) => (v_instr' : admininstr)) v_instr'))
-	| step_br_succ : forall (v_n : n) (v_instr' : (list instr)) (v_val : (list val)) (v_l : labelidx) (v_instr : (list instr)), Step_pure [(AI_LABEL_ v_n v_instr' ((List.map (fun (v_val : val) => (v_val : admininstr)) v_val) ++ ([(AI_BR (mk_uN _ ((fun_proj_uN_0 32 v_l) + 1)))] ++ (List.map (fun (v_instr : instr) => (v_instr : admininstr)) v_instr))))] ((List.map (fun (v_val : val) => (v_val : admininstr)) v_val) ++ [(AI_BR v_l)])
+		Step_pure [(AI_LABEL_ v_n v_instr' ((List.map (fun (v_val' : val) => (v_val' : admininstr)) v_val') ++ ((List.map (fun (v_val : val) => (v_val : admininstr)) v_val) ++ ([(AI_BR (mk_uN _ 0))] ++ v_admininstr))))] ((List.map (fun (v_val : val) => (v_val : admininstr)) v_val) ++ (List.map (fun (v_instr' : instr) => (v_instr' : admininstr)) v_instr'))
+	| step_br_succ : forall (v_n : n) (v_instr' : (list instr)) (v_val : (list val)) (v_l : labelidx) (v_admininstr : (list admininstr)), Step_pure [(AI_LABEL_ v_n v_instr' ((List.map (fun (v_val : val) => (v_val : admininstr)) v_val) ++ ([(AI_BR (mk_uN _ ((fun_proj_uN_0 32 v_l) + 1)))] ++ v_admininstr)))] ((List.map (fun (v_val : val) => (v_val : admininstr)) v_val) ++ [(AI_BR v_l)])
 	| step_br_if_true : forall (v_c : (uN 32)) (v_l : labelidx), 
 		((fun_proj_uN_0 32 v_c) <> 0) ->
 		Step_pure [(AI_CONST I32 v_c); (AI_BR_IF v_l)] [(AI_BR v_l)]
@@ -5286,13 +5286,13 @@ Inductive Step_pure: (list admininstr) -> (list admininstr) -> Prop :=
 		((fun_proj_uN_0 32 v_i) >= (List.length v_l)) ->
 		Step_pure [(AI_CONST I32 v_i); (AI_BR_TABLE v_l v_l')] [(AI_BR v_l')]
 	| step_frame_vals : forall (v_n : n) (v_f : frame) (v_val : (list val)), Step_pure [(AI_FRAME_ v_n v_f (List.map (fun (v_val : val) => (v_val : admininstr)) v_val))] (List.map (fun (v_val : val) => (v_val : admininstr)) v_val)
-	| step_return_frame : forall (v_n : n) (v_f : frame) (v_val' : (list val)) (v_val : (list val)) (v_instr : (list instr)), 
+	| step_return_frame : forall (v_n : n) (v_f : frame) (v_val' : (list val)) (v_val : (list val)) (v_admininstr : (list admininstr)), 
 		((List.length v_val) = v_n) ->
-		Step_pure [(AI_FRAME_ v_n v_f ((List.map (fun (v_val' : val) => (v_val' : admininstr)) v_val') ++ ((List.map (fun (v_val : val) => (v_val : admininstr)) v_val) ++ ([AI_RETURN] ++ (List.map (fun (v_instr : instr) => (v_instr : admininstr)) v_instr)))))] (List.map (fun (v_val : val) => (v_val : admininstr)) v_val)
-	| step_return_label : forall (v_n : n) (v_instr' : (list instr)) (v_val : (list val)) (v_instr : (list instr)), Step_pure [(AI_LABEL_ v_n v_instr' ((List.map (fun (v_val : val) => (v_val : admininstr)) v_val) ++ ([AI_RETURN] ++ (List.map (fun (v_instr : instr) => (v_instr : admininstr)) v_instr))))] ((List.map (fun (v_val : val) => (v_val : admininstr)) v_val) ++ [AI_RETURN])
-	| step_trap_vals : forall (v_val : (list val)) (v_instr : (list instr)), 
-		((v_val <> []) \/ (v_instr <> [])) ->
-		Step_pure ((List.map (fun (v_val : val) => (v_val : admininstr)) v_val) ++ ([AI_TRAP] ++ (List.map (fun (v_instr : instr) => (v_instr : admininstr)) v_instr))) [AI_TRAP]
+		Step_pure [(AI_FRAME_ v_n v_f ((List.map (fun (v_val' : val) => (v_val' : admininstr)) v_val') ++ ((List.map (fun (v_val : val) => (v_val : admininstr)) v_val) ++ ([AI_RETURN] ++ v_admininstr))))] (List.map (fun (v_val : val) => (v_val : admininstr)) v_val)
+	| step_return_label : forall (v_n : n) (v_instr' : (list instr)) (v_val : (list val)) (v_admininstr : (list admininstr)), Step_pure [(AI_LABEL_ v_n v_instr' ((List.map (fun (v_val : val) => (v_val : admininstr)) v_val) ++ ([AI_RETURN] ++ v_admininstr)))] ((List.map (fun (v_val : val) => (v_val : admininstr)) v_val) ++ [AI_RETURN])
+	| step_trap_vals : forall (v_val : (list val)) (v_admininstr : (list admininstr)), 
+		((v_val <> []) \/ (v_admininstr <> [])) ->
+		Step_pure ((List.map (fun (v_val : val) => (v_val : admininstr)) v_val) ++ ([AI_TRAP] ++ v_admininstr)) [AI_TRAP]
 	| step_trap_label : forall (v_n : n) (v_instr' : (list instr)), Step_pure [(AI_LABEL_ v_n v_instr' [AI_TRAP])] [AI_TRAP]
 	| step_trap_frame : forall (v_n : n) (v_f : frame), Step_pure [(AI_FRAME_ v_n v_f [AI_TRAP])] [AI_TRAP]
 	| step_unop_val : forall (v_nt : numtype) (v_c_1 : (num_ v_nt)) (v_unop : (unop_ v_nt)) (v_c : (num_ v_nt)), 

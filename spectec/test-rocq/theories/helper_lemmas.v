@@ -3,7 +3,7 @@ From RecordUpdate Require Import RecordSet.
 Import ListNotations.
 Import RecordSetNotations.
 From WasmSpectec Require Import wasm.
-From mathcomp Require Import ssreflect ssrfun ssrnat ssrbool seq.
+From mathcomp Require Import ssreflect ssrfun ssrnat ssrbool seq eqtype.
 
 (*** 
 
@@ -746,4 +746,38 @@ Proof.
   rewrite subnn.
   rewrite take0.
   apply cats0.
+Qed.
+
+
+Lemma size_eq_cat: forall A (l1 l2 l1' l2': list A),
+  size l1 = size l2 ->
+  l1' ++ l1 = l2' ++ l2 ->
+  l1' = l2' /\ l1 = l2.
+Proof.
+  move=> A l1 l2 l1' l2' Hsize Hcat.
+  
+  have Hsize_cat: size (l1' ++ l1) = size (l2' ++ l2) by rewrite Hcat.
+  rewrite !size_cat in Hsize_cat.
+  
+  have Hsize': size l1' = size l2'.
+  {
+	rewrite Hsize in Hsize_cat.
+    move/eqP in Hsize_cat.
+	rewrite eqn_add2r in Hsize_cat.
+	by apply/eqP.
+  }
+  
+  have Htake: take (size l1') (l1' ++ l1) = take (size l1') (l2' ++ l2).
+  { by rewrite Hcat. }
+  
+  rewrite take_size_cat // in Htake.
+  rewrite Hsize' take_size_cat // in Htake.
+  
+  split; first by exact Htake.
+  
+  have Hdrop: drop (size l1') (l1' ++ l1) = drop (size l1') (l2' ++ l2).
+  { by rewrite Hcat. }
+  
+  rewrite drop_size_cat // in Hdrop.
+  rewrite Hsize' drop_size_cat // in Hdrop.
 Qed.
