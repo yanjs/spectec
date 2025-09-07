@@ -247,62 +247,6 @@ match ai with
 Notation "tf1 :-> tf2" :=
 (mk_functype (mk_list _ tf1) (mk_list _ tf2)) (at level 40).
 
-Lemma admin_weakening_empty_both: forall v_S v_C v_ais ts,
-    Admin_instrs_ok v_S v_C v_ais ( nil :-> nil ) ->
-    Admin_instrs_ok v_S v_C v_ais ( ts :-> ts ).
-Proof.
-  move => v_S v_C v_ais ts HType.
-  assert (Admin_instrs_ok v_S v_C v_ais ((ts ++ []) :-> (ts ++ []))); first by apply AIs_ok_frame.
-  by rewrite cats0 in H.
-Qed.
-
-(*
-Lemma instrs_weakening_empty_both: forall v_C v_ais ts,
-    Instrs_ok v_C v_ais (functype_from_lists [::] [::]) ->
-    Instrs_ok v_C v_ais (functype_from_lists ts ts).
-Proof.
-  move => v_C v_ais ts HType.
-  assert (Instrs_ok v_C v_ais (functype_from_lists (ts ++ [::]) (ts ++ [::]))); first by apply instrs_frame.
-  by rewrite cats0 in H.
-Qed.
-
-Lemma admin_instrs_weakening_empty_1: forall v_S v_C instrs ts t2s,
-    Admin_instrs_ok v_S v_C instrs (functype_from_lists [::] t2s) ->
-    Admin_instrs_ok v_S v_C instrs (functype_from_lists ts (ts ++ t2s)).
-Proof.
-  move => v_S v_C instrs ts t2s HType.
-  assert (Admin_instrs_ok v_S v_C instrs (functype_from_lists (ts ++ [::]) (ts ++ t2s))); first by apply AIs_ok_frame.
-  by rewrite cats0 in H.
-Qed.
-
-Lemma instrs_weakening_empty_1: forall v_C instrs ts t2s,
-    Instrs_ok v_C instrs (functype_from_lists [::] t2s) ->
-    Instrs_ok v_C instrs (functype_from_lists ts (ts ++ t2s)).
-Proof.
-  move => v_C instrs ts t2s HType.
-  assert (Instrs_ok v_C instrs (functype_from_lists (ts ++ [::]) (ts ++ t2s))); first by apply instrs_frame.
-  by rewrite cats0 in H.
-Qed.
-
-Lemma admin_instr_weakening_empty_1: forall v_S v_C instr ts t2s,
-    Admin_instr_ok v_S v_C instr (functype_from_lists [::] t2s) ->
-    Admin_instr_ok v_S v_C instr (functype_from_lists ts (ts ++ t2s)).
-Proof.
-  move => v_S v_C instr ts t2s HType.
-  assert (Admin_instr_ok v_S v_C instr (functype_from_lists (ts ++ [::]) (ts ++ t2s))); first by apply AI_ok_weakening.
-  by rewrite cats0 in H.
-Qed.
-
-Lemma admin_instr_weakening_empty_2: forall v_S v_C instr ts t1s,
-    Admin_instr_ok v_S v_C instr (functype_from_lists t1s []) ->
-    Admin_instr_ok v_S v_C instr (functype_from_lists (ts ++ t1s) (ts)).
-Proof.
-  move => v_S v_C instr ts t1s HType.
-  assert (Admin_instr_ok v_S v_C instr (functype_from_lists (ts ++ t1s) (ts ++ []))); first by apply AI_ok_weakening.
-  by rewrite cats0 in H.
-Qed.
-*)
-
 Lemma instrs_composition_typing_single: forall v_C v_instrs v_instr t1s t2s,
 	Instrs_ok v_C (v_instrs ++ [v_instr]) ( t1s :-> t2s ) ->
 	exists t3s, Instrs_ok v_C v_instrs ( t1s :-> t3s ) /\

@@ -6,7 +6,7 @@ Require Import Stdlib.Program.Equality.
 Declare Scope wasm_scope.
 Open Scope wasm_scope.
 Import RecordSetNotations.
-From WasmSpectec Require Import wasm helper_lemmas helper_tactics typing_lemmas subtyping type_preservation_pure extension_lemmas.
+From WasmSpectec Require Import wasm helper_lemmas helper_tactics typing_lemmas subtyping type_preservation_pure extension_lemmas axioms.
 From mathcomp Require Import ssreflect ssrfun ssrnat ssrbool seq eqtype.
 Import ListNotations.
 
@@ -548,7 +548,7 @@ Proof.
 			as Heqlen.
 		{
 			(* fun_nbytes_ not implemented *)
-			admit.
+			by eapply fun_nbytes_len.
 		}
 
 		remember ((fun_proj_uN_0 32 v_i)) as i.
@@ -645,7 +645,7 @@ Proof.
 			as Heqlen.
 		{
 			(* fun_ibytes_ fun_wrap__ not implemented *)
-			admit.
+			by eapply fun_ibytes_32_len.
 		}
 
 		remember ((fun_proj_uN_0 32 v_i)) as i.
@@ -745,7 +745,7 @@ Proof.
 			as Heqlen.
 		{
 			(* fun_ibytes_ fun_wrap__ not implemented *)
-			admit.
+			by eapply fun_ibytes_64_len.
 		}
 
 		remember ((fun_proj_uN_0 32 v_i)) as i.
@@ -835,7 +835,7 @@ Proof.
 		}
 	}
 	(* SIMD instructions *)
-	admit. admit. admit. admit. admit.
+	1-5: admit.
 	{ (* Memory Grow *)
 		destruct_all; subst.
 		invert_ais_typing.
@@ -1941,9 +1941,7 @@ Proof.
 		econstructor.
 	}
 	(* SIMD instructions *) 
-	admit.	admit.	admit.	admit.	admit.
-	admit.	admit.	admit.	admit.	admit.
-	admit.	admit.	admit.	admit.
+	1-14: admit.
 	{ (* Memory_size *)
 		typing_inversion HType.
 		simpl in Hai; extract_premise.
@@ -2496,7 +2494,7 @@ Proof.
 		}
 	}
 	(* The rest are all SIMD instructions *)
-	admit. admit. admit. admit. admit.
+	1-5: admit.
 Admitted.
 
 

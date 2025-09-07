@@ -440,64 +440,6 @@ Definition instr_eqb v1 v2 : bool := instr_eq_dec v1 v2.
 Definition eqinstrP : Equality.axiom instr_eqb :=
   eq_dec_Equality_axiom instr instr_eq_dec.
 
-(* NOTE: This is a temporary solution to ensure valtype matches corresponding val_
-         There is no check that ensures valtype and val_ matches 
-         and thus we cannot tell e.g. v3 is inn from typeof (VAL_CONST t3 v3) = valtype__INN inn__I32 *)
-Definition val_wf (c : wasm.val): Prop :=
-  match c with
-      | _ => True
-  end.
-
-Axiom val_wf_temp: forall (v : wasm.val), val_wf v.
-
-Ltac invert_val_wf v :=
-  let H := fresh "H" in
-  let t := fresh "t" in
-  let n := fresh "n" in
-  let f := fresh "f" in
-  let inn := fresh "inn" in
-  let fnn := fresh "fnn" in
-  (* TODO: Rewrite using case tactic somehow *)
-  destruct v as [t v];
-  destruct v as [v | v];
-  destruct t as [inn | fnn] => //= {H}.
-
-(*
-Lemma fun_testop_returns_inn_entry : forall t testop v c,
-  fun_testop_ t testop v = c ->
-  exists c', c = val___inn__entry c'.
-Proof.
-  move => t testop v c H.
-  (* TODO: This is a bit tedious *)
-  case: t H => [nn | nn] H;
-  case: nn H => H;
-  case: testop H => [arg | arg] H;
-  case: arg H => H;
-  case: v H => v' H;
-  try rewrite /fun_testop_ /= in H;
-  try rewrite /default_val /= in H;
-  by eauto.
-Qed.
-
-Lemma fun_relop_returns_inn_entry : forall t relop v1 v2 c,
-  fun_relop t relop v1 v2 = c ->
-  exists c', c = val___inn__entry c'.
-Proof.
-  move => t relop v1 v2 c H.
-  (* TODO: This is a bit tedious *)
-  case: t H => [nn | nn] H;
-  case: nn H => H;
-  case: relop H => [arg | arg] H;
-  do [ case: arg H => [ | | sx | sx | sx | sx ] H 
-     | case: arg H => H ];
-  case: v1 H => v1' H;
-  case: v2 H => v2' H;
-  try rewrite /fun_relop /= in H;
-  try rewrite /default_val /= in H;
-  by eauto.
-Qed.
-*)
-
 Lemma list_slice_size : forall {T : Type} (bs : seq T) i j,
   i + j <= size bs ->
   size (list_slice bs i j) = j.
@@ -517,16 +459,6 @@ Proof.
       rewrite -addnA -[1 + j'.+1]addnC addnA in H.
       by rewrite (leq_add2r 1) in H.
 Qed.
-
-(*
-Axiom fun_bytes_inverse : forall t bs,
-  size bs = fun_size t / 8 ->
-  exists c, fun_bytes t c = bs.
-
-Axiom fun_ibytes_inverse : forall n bs,
-  size bs = n / 8 ->
-  exists c, fun_ibytes n c = bs.
-*)
 
 (* NOTE: Mutual induction principle used in t_progress_be *)
 Scheme Instr_ok_ind' := Induction for Instr_ok Sort Prop
@@ -779,45 +711,6 @@ Proof.
   by inversion Hmod.
 Qed.
 
-(* TODO: Duplicate of composition_typing_single? *)
-(*
-Lemma Instrs_ok_rcons : forall C bes be ts1 ts2, 
-  Instrs_ok C (bes ++ [be]) (ts1 :-> ts2) ->
-  exists ts ts1' ts2' ts3,
-    ts1 = ts ++ ts1' /\
-    ts2 = ts ++ ts2' /\
-    Instrs_ok C bes (ts1' :-> ts3) /\
-    Instr_ok C be (ts3 :-> ts2').
-Proof.
-  move => C bes be ts1 ts2 Hinstrs.
-  move Ebes': (bes ++ [be]) => bes'.
-  move Etf: (ts1 :-> ts2) => tf.
-  rewrite Ebes' Etf in Hinstrs.
-  move: bes be ts1 ts2 Ebes' Etf.
-  (* NOTE: This is a type families syntax for elim tactic *)
-  elim: C bes' tf / Hinstrs => [
-    C | 
-    C bes' be' ts1' ts2' ts3' Hinstrs IH Hinstrs' |
-    C bes' ts1' ts2' ts1'' ts2'' Hinstrs IH Hsub1 Hsub2 |
-    C bes' ts ts1' ts2' Hinstrs IH ].
-  - move => bes be ts1 ts2 Ebes' Etf.
-    by case: bes Ebes'.
-  - move => bes be ts1 ts2 Ebes' Etf.
-    case: Etf => -> ->.
-    move/(split_append_last _ _ _ _ ): Ebes' => [-> ->].
-    by exists [], ts1', ts2', ts3'.
-  - move => bes be ts1 ts2 Ebes' Etf.
-    eapply IH => //.
-    case: Etf => -> ->.
-    eexists [], ts1', ts2'.
-  - move => bes be ts1 ts2 Ebes' Etf.
-    move/(_ bes be ts1' ts2'): IH => IH.
-    case: IH => //= [ts' [ts1'' [ts2'' [ts3'' [E1 [E2 [IH1 IH2]]]]]]].
-    case: Etf => Etf1 Etf2. rewrite E1 E2 in Etf1 Etf2.
-    exists (ts ++ ts'), ts1'', ts2'', ts3''.
-    by rewrite -2!catA.
-Qed. *)
-
 (* TODO: Duplicate of admin_composition_typing_single? *)
 Lemma Admin_instrs_ok_rcons : forall s C es e ts1 ts2,
   Admin_instrs_ok s C (es ++ [e]) (ts1 :-> ts2) ->
@@ -1043,49 +936,6 @@ Proof.
     + by inversion Hcontra.
 Qed.
 
-(*
-Lemma Admin_instrs_ok_br_zero : forall s C ts1 ts2,
-  Admin_instrs_ok s C [AI_BR 0] (ts1 :-> ts2) ->
-  exists ts ts1',
-    ts = lookup_total (C_LABELS C) 0 /\ 
-    ts1 = ts1' ++ ts.
-Proof.
-  move => s C ts1 ts2 Hadmin.
-  move/ais_single_typing_inversion': Hadmin => Hadmin.
-  move Ee: (AI_BR 0) => e.
-  move Etf: (ts1 :-> ts2) => tf.
-  rewrite Ee Etf in Hadmin.
-  move: ts1 ts2 Ee Etf.
-  elim: s C e tf / Hadmin => //= [s C be tf Hinstr | s C ].
-  - move => ts1 ts2 Hbe Htf.
-    (* TODO: Avoid using destruct *)
-    have Ebe : be = instr_BR 0.
-    { destruct be => //=.
-      case El: (0 == v_labelidx); move/eqP: El => El.
-        - rewrite El. by destruct v_labelidx.
-        - by inversion Hbe. }
-    rewrite Ebe in Hinstr.
-    inversion Hinstr.
-    rewrite -Htf in H3. case: H3 => Htf1 Htf2.
-    exists v_t, v_t_1.
-    split.
-    + rewrite -H2 /=. by destruct (lookup_total (C_LABELS C) 0).
-    + by auto.
-  - move => es vt' vt1' vt vt2' vt1 vt2 HType IHH HSub HSub1 HSub2 ts1' ts2' He Htf.
-    specialize (IHH _ _ He erefl).
-    case: Htf => Htqf1 Htf2.
-    destruct IHH as [ts [ts1'' [Hlookup Hvt]]].
-    exists vt1', vt'.
-    have Ets1 : drop (size ts) ts1' = ts1 by rewrite Htf1 drop_size_cat.
-    have Ets2 : drop (size ts) ts2' = ts2 by rewrite Htf2 drop_size_cat.
-    have Htf : functype__ (drop (size ts) ts1') (drop (size ts) ts2') = (ts1 :-> ts2) by congr functype__.
-    move/(_ (drop (size ts) ts1') (drop (size ts) ts2') He Htf): IH => [ts' [ts1'' [IH1 IH2]]].
-    exists ts', (ts ++ ts1'').
-    rewrite Ets1 in IH2.
-    rewrite -catA -IH2. by split.
-Qed. *)
-
-
 Lemma size_eq1_cat: forall A (l1 l2 l1' l2': list A),
   size l1' = size l2' ->
   l1' ++ l1 = l2' ++ l2 ->
@@ -1164,39 +1014,6 @@ Proof.
     rewrite add_sub' /=.
     by destruct (lookup_total (C_LABELS C) 0).
 Qed.
-
-(*
-Lemma Admin_instrs_ok_return : forall s C ts1 ts2,
-  Admin_instrs_ok s C [AI_RETURN] (ts1 :-> ts2) ->
-  exists t ts1',
-    Some t = C_RETURN C /\ 
-    ts1 = ts1' ++ t.
-Proof.
-  move => s C ts1 ts2 Hadmin.
-  move/admin_instrs_ok_eq: Hadmin => Hadmin.
-  move Ee: (AI_RETURN) => e.
-  move Etf: (ts1 :-> ts2) => tf.
-  rewrite Ee Etf in Hadmin.
-  move: ts1 ts2 Ee Etf.
-  elim: s C e tf / Hadmin => //= [s C be tf Hinstr | s C e ts ts1 ts2 Hadmin IH].
-  - move => ts1 ts2 Hbe Htf.
-    (* TODO: Avoid using destruct *)
-    have Ebe : be = instr_RETURN.
-    { by destruct be => //=. }
-    rewrite Ebe in Hinstr.
-    inversion Hinstr as [| | | | | | | | | | | | ? ts1' ts ts2' Hsome Hc Hret Htf' | | | | | | | | | | | | | | | | |].
-    rewrite -Htf in Htf'. case: Htf' => Htf1 Htf2.
-    exists ts, ts1'. by split.
-  - move => ts1' ts2' He Htf.
-    case: Htf => Htf1 Htf2.
-    have Ets1 : drop (size ts) ts1' = ts1 by rewrite Htf1 drop_size_cat.
-    have Ets2 : drop (size ts) ts2' = ts2 by rewrite Htf2 drop_size_cat.
-    have Htf : functype__ (drop (size ts) ts1') (drop (size ts) ts2') = (ts1 :-> ts2) by congr functype__.
-    move/(_ (drop (size ts) ts1') (drop (size ts) ts2') He Htf): IH => [ts' [ts1'' [IH1 IH2]]].
-    exists ts', (ts ++ ts1'').
-    rewrite Ets1 in IH2.
-    rewrite -catA -IH2. by split.
-Qed. *)
 
 Lemma return_reduce_extract_vs : forall s C ts2 t es,
   (* TODO: This first premise is equal to return_reduce *)
@@ -2844,6 +2661,7 @@ Proof.
       by rewrite -{1}Hlocal.
     }
     {
+      (* Problem in Spectec DSL *)
       admit.
     }
     {
