@@ -2661,8 +2661,23 @@ Proof.
       by rewrite -{1}Hlocal.
     }
     {
-      (* Problem in Spectec DSL *)
-      admit.
+      eapply s_invert_funcs in Hstore as [fts HFunc].
+      eapply Forall2_nth in HFunc as [_ HFunc].
+      eapply HFunc in Haddr.
+      rewrite /lookup_total in Hlookup.
+      rewrite Hlookup in Haddr.
+      destruct_all.
+      inversion H1; clear H1; subst extr extr0.
+      inversion H3.
+      rewrite -H1 -map_map in Hlocal.
+      eapply map_local_inj in Hlocal.
+      subst v_t.
+      assert (forall t, t <> VALTYPE_BOT -> fun_default_ t <> None) as Hnonbot.
+      {
+        rewrite /fun_default_.
+        by destruct t.
+      }
+      by eapply Forall_impl in H9; eauto.
     }
     {
       by rewrite -Hts !length_size size_map.

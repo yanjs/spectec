@@ -1840,6 +1840,14 @@ Proof.
 	auto.
 Qed.
 
+Lemma map_local_inj: injective (ListDef.map [eta LOCAL]).
+Proof.
+	eapply inj_map.
+	unfold injective.
+	move=> x1 x2 Hconstructor.
+	by inversion Hconstructor.
+Qed.
+
 Ltac resolve_inst_match :=
 	repeat lazymatch goal with
 	| _ : _ |- inst_match _ (prepend_label _ _) =>

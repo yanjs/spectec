@@ -50,21 +50,23 @@ Lemma s_invert_funcs: forall s,
 	Store_ok s ->
 	exists fts,
 	List.Forall2 (fun f t =>
-		exists v_minst v_func,
+		exists v_minst v_func C,
 		(f = {| FUNC_TYPE := t;
 			FUNC_MODULE := v_minst;
-			FUNC_CODE := v_func |})
+			FUNC_CODE := v_func |}) /\
+		(Module_instance_ok s v_minst C) /\
+		(Func_ok C v_func t)
 			(* May add more here *)
 	) (FUNCS s) fts.
 Proof.
 	move => s HSt.
 	inversion HSt.
-	rewrite H /=.
+	rewrite {2}H /=.
 	clear -H1.
 	exists v_functype.
 
-	move : v_funcinst H1.
-	induction v_functype; move => v_funcinst HFok.
+	move : v_funcinst s H1.
+	induction v_functype; move => v_funcinst s HFok.
 	{
 		inversion HFok; subst; auto.
 	}
@@ -72,7 +74,7 @@ Proof.
 	econstructor.
 	{
 		inversion H2; subst.
-		by exists v_moduleinst, v_func.
+		by exists v_moduleinst, v_func, v_C.
 	}
 	by eapply IHv_functype.
 Qed.

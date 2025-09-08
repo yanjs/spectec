@@ -24,6 +24,13 @@ Proof.
 	move => s i C HMInst. inversion HMInst => //=.
 Qed.
 
+Lemma inst_t_context_return_empty: forall s i C,
+	Module_instance_ok s i C ->
+    C_RETURN C = None.
+Proof.
+	move => s i C HMInst. inversion HMInst => //=.
+Qed.
+
 Lemma t_preservation_vs_type': forall s f ais s' f' ais' C C' t1s t2s,
     Step (mk_config (mk_state s f) ais) (mk_config (mk_state s' f') ais') ->
     Store_ok s -> 
@@ -1193,10 +1200,8 @@ Proof.
 		econstructor.
 		econstructor; eauto.
 		rewrite /lookup_total.
-		rewrite Hextr0.
-		rewrite /lookup_total Hextr0 /= in H2.
-		rewrite H2.
-		eauto.
+		rewrite /lookup_total H1 /= in H2.
+		by rewrite H1 H2.
 	}
 	{ (* Call_addr *)
 		typing_inversion HType.
@@ -1221,7 +1226,7 @@ Proof.
 			eapply (resulttype_sub_non_bot _ _ Hnonbot) in Hsubs; subst.
 			auto.
 		}
-		subst.
+		subst extr.
 
 		eapply construct_ais_typing_single.
 		2: eapply Hsub0.
@@ -1229,14 +1234,13 @@ Proof.
 		2: auto.
 
 		(* Thread_ok *)
-		invert_funcs.
-		inversion HST; subst.
-		eapply Forall2_nth in H4 as [_ H4].
-		simpl in *.
-		eapply H4 in H as Hfiok.
-		unfold lookup_total in H0.
-		rewrite H0 in Hfiok.
-		inversion Hfiok; subst.
+		eapply s_invert_funcs in HST as [fts HFunc].
+		eapply Forall2_nth in HFunc as [_ HFunc].
+		eapply HFunc in H.
+		rewrite /lookup_total in H0.
+		rewrite H0 in H.
+		destruct_all.
+		inversion H1; clear H1; subst extr extr1.
 
 		eapply mk_Thread_ok with (v_C := ({|
 			C_TYPES := [];
@@ -1246,12 +1250,12 @@ Proof.
 			C_MEMS := [];
 			C_ELEMS := [];
 			C_DATAS := [];
-			C_LOCALS := extr ++ v_t;
+			C_LOCALS := v_ts ++ v_t;
 			C_LABELS := [];
 			C_RETURN := None
-			|} @@ v_C0)).
+			|} @@ extr2)).
 		{
-			eapply mk_Frame_ok with (v_t := extr ++ v_t); auto.
+			eapply mk_Frame_ok with (v_t := v_ts ++ v_t); auto.
 			{
 				rewrite -!size_length.
 				rewrite !size_cat.
@@ -1260,7 +1264,7 @@ Proof.
 			}
 			subst.
 			eapply Forall2_app; auto.
-			clear H22 H0 Hfiok.
+			clear -H2.
 			induction v_t; eauto.
 			simpl.
 			econstructor.
@@ -1284,27 +1288,70 @@ Proof.
 			eapply instrs_empty_typing; eapply resulttype_sub_refl.
 		}
 		subst.
+		inversion H6; subst.
+		rewrite -H9 in H3; inversion H3; clear H9 H3; subst v_t_1 v_t_2.
+		inversion H14; subst.
+		eapply map_local_inj in H1; subst v_t0.
 
 		eapply AIs_ok_instrs.
-
-		inversion H22; subst.
-		inversion H27; subst.
-		inversion H21; subst.
-		unfold _append, Append_context, _append_context, _append, Append_List_.
-		simpl.
-		unfold _append, Append_context, _append_context, _append, Append_List_ in H23.
-		simpl in H23.
-		rewrite !app_nil_r in H23.
-		rewrite !app_nil_r.
-		assert (injective (ListDef.map [eta LOCAL])) as map_local_inj.
-		{
-			eapply inj_map.
-			unfold injective.
-			move=> x1 x2 Hconstructor.
-			by inversion Hconstructor.
+		assert ({|
+			C_TYPES := [];
+			C_FUNCS := [];
+			C_GLOBALS := [];
+			C_TABLES := [];
+			C_MEMS := [];
+			C_ELEMS := [];
+			C_DATAS := [];
+			C_LOCALS := [];
+			C_LABELS := [mk_list valtype extr0];
+			C_RETURN := None
+			|} @@
+			{|
+			C_TYPES := [];
+			C_FUNCS := [];
+			C_GLOBALS := [];
+			C_TABLES := [];
+			C_MEMS := [];
+			C_ELEMS := [];
+			C_DATAS := [];
+			C_LOCALS := [];
+			C_LABELS := [];
+			C_RETURN := Some (mk_list valtype extr0)
+			|} @@
+			{|
+			C_TYPES := [];
+			C_FUNCS := [];
+			C_GLOBALS := [];
+			C_TABLES := [];
+			C_MEMS := [];
+			C_ELEMS := [];
+			C_DATAS := [];
+			C_LOCALS := v_ts ++ v_t;
+			C_LABELS := [];
+			C_RETURN := None
+			|} @@ extr2
+			= extr2 @@
+			{|
+			C_TYPES := [];
+			C_FUNCS := [];
+			C_GLOBALS := [];
+			C_TABLES := [];
+			C_MEMS := [];
+			C_ELEMS := [];
+			C_DATAS := [];
+			C_LOCALS := v_ts ++ v_t;
+			C_LABELS := [mk_list valtype extr0];
+			C_RETURN := Some (mk_list valtype extr0)
+			|}) as HContext. {
+			destruct extr2.
+			eapply inst_t_context_local_empty in H4 as Hlocalempty.
+			eapply inst_t_context_labels_empty in H4 as Hlabelempty.
+			eapply inst_t_context_return_empty in H4 as Hreturnempty.
+			simpl in *; subst.
+			by rewrite /_append /Append_context /_append_context /=
+				/_append /Append_List_ !app_nil_r /=.
 		}
-		eapply map_local_inj in H16; subst.
-		auto.
+		by rewrite HContext.
 	}
 	{ (* Ref_func *)
 		typing_inversion HType.

@@ -4993,6 +4993,7 @@ Inductive Func_ok: context -> func -> functype -> Prop :=
 	| mk_Func_ok : forall (v_C : context) (v_x : idx) (v_t : (list valtype)) (v_expr : expr) (v_t_1 : (list valtype)) (v_t_2 : (list valtype)), 
 		((fun_proj_uN_0 32 v_x) < (List.length (C_TYPES v_C))) ->
 		((lookup_total (C_TYPES v_C) (fun_proj_uN_0 32 v_x)) = (mk_functype (mk_list _ v_t_1) (mk_list _ v_t_2))) ->
+		List.Forall (fun (v_t : valtype) => (v_t <> VALTYPE_BOT)) (v_t) ->
 		(Expr_ok (v_C @@ {| C_TYPES := []; C_FUNCS := []; C_GLOBALS := []; C_TABLES := []; C_MEMS := []; C_ELEMS := []; C_DATAS := []; C_LOCALS := (v_t_1 ++ v_t); C_LABELS := [(mk_list _ v_t_2)]; C_RETURN := (Some (mk_list _ v_t_2)) |}) v_expr (mk_list _ v_t_2)) ->
 		Func_ok v_C (FUNC v_x (List.map (fun (v_t : valtype) => (LOCAL v_t)) v_t) v_expr) (mk_functype (mk_list _ v_t_1) (mk_list _ v_t_2)).
 
@@ -5055,13 +5056,13 @@ Inductive Start_ok: context -> start -> Prop :=
 		((lookup_total (C_FUNCS v_C) (fun_proj_uN_0 32 v_x)) = (mk_functype (mk_list _ []) (mk_list _ []))) ->
 		Start_ok v_C (START v_x).
 
-(* Inductive Relations Definition at: ../specification/wasm-2.0/6-typing.spectec:624.1-624.80 *)
+(* Inductive Relations Definition at: ../specification/wasm-2.0/6-typing.spectec:625.1-625.80 *)
 Inductive Import_ok: context -> import -> externtype -> Prop :=
 	| mk_Import_ok : forall (v_C : context) (v_name_1 : name) (v_name_2 : name) (v_xt : externtype), 
 		(Externtype_ok v_xt) ->
 		Import_ok v_C (IMPORT v_name_1 v_name_2 v_xt) v_xt.
 
-(* Inductive Relations Definition at: ../specification/wasm-2.0/6-typing.spectec:626.1-626.109 *)
+(* Inductive Relations Definition at: ../specification/wasm-2.0/6-typing.spectec:627.1-627.109 *)
 Inductive Externidx_ok: context -> externidx -> externtype -> Prop :=
 	| extidx_ok_func : forall (v_C : context) (v_x : idx) (v_ft : functype), 
 		((fun_proj_uN_0 32 v_x) < (List.length (C_FUNCS v_C))) ->
@@ -5080,13 +5081,13 @@ Inductive Externidx_ok: context -> externidx -> externtype -> Prop :=
 		((lookup_total (C_MEMS v_C) (fun_proj_uN_0 32 v_x)) = v_mt) ->
 		Externidx_ok v_C (EXTIDX_MEM v_x) (EXT_MEM v_mt).
 
-(* Inductive Relations Definition at: ../specification/wasm-2.0/6-typing.spectec:625.1-625.80 *)
+(* Inductive Relations Definition at: ../specification/wasm-2.0/6-typing.spectec:626.1-626.80 *)
 Inductive Export_ok: context -> export -> externtype -> Prop :=
 	| mk_Export_ok : forall (v_C : context) (v_name : name) (v_externidx : externidx) (v_xt : externtype), 
 		(Externidx_ok v_C v_externidx v_xt) ->
 		Export_ok v_C (EXPORT v_name v_externidx) v_xt.
 
-(* Inductive Relations Definition at: ../specification/wasm-2.0/6-typing.spectec:656.1-656.62 *)
+(* Inductive Relations Definition at: ../specification/wasm-2.0/6-typing.spectec:657.1-657.62 *)
 Inductive Module_ok: module -> Prop :=
 	| mk_Module_ok : forall (v_type : (list type)) (v_import : (list import)) (v_func : (list func)) (v_global : (list global)) (v_table : (list table)) (v_mem : (list mem)) (v_elem : (list elem)) (v_data : (list data)) (v_n : n) (v_start : (option start)) (v_export : (list export)) (v_ft' : (list functype)) (v_ixt : (list externtype)) (v_C' : context) (v_gt : (list globaltype)) (v_tt : (list tabletype)) (v_mt : (list memtype)) (v_rt : (list reftype)) (v_C : context) (v_ft : (list functype)) (v_xt : (list externtype)) (v_ift : (list functype)) (v_igt : (list globaltype)) (v_itt : (list tabletype)) (v_imt : (list memtype)), 
 		((List.length v_ft') = (List.length v_type)) ->
