@@ -431,14 +431,10 @@ Proof.
 	typing_inversion H3.
 	simpl in Hai.
 	extract_premise.
-	inversion H7; subst; clear H7.
-	simpl in H9.
-	rewrite H3 in H9.
-	inversion H9; subst; clear H9.
-	eapply app_inv_tail in H; subst.
+
 	vals_typing_inversion H4.
-	unfold _append, Append_Option, option_append in H3.
-	inversion H3; subst; clear H3.
+	unfold _append, Append_Option, option_append in H5.
+	inversion H5; subst; clear H5.
 
 	eapply construct_ais_instrtype_sub.
 	eapply construct_ais_vals.
@@ -473,29 +469,26 @@ Proof.
 	typing_inversion H3.
 	typing_inversion H2.
 	simpl in Hai; extract_premise; subst.
-	inversion H5; subst; clear H5.
-	simpl in H7.
-	rewrite H2 in H7.
-	inversion H7; subst; clear H7.
-	eapply app_inv_tail in H; subst.
 	unfold_instrtype_sub Hsub0; subst.
+	unfold _append, Append_Option, option_append in H3.
 
 	eapply construct_ais_instrtype_sub.
 	2: eapply Hsub.
-	eapply construct_ais_compose with (t2s := (ts_sub ++ extr1 ++ v_t)).
+	eapply construct_ais_compose with (t2s := (ts ++ ts11_sub)).
 	{
-		eapply construct_ais_instrtype_sub.
-		eapply construct_ais_vals'.
-		eapply H0.
-		eapply instrtype_sub_iff_resulttype_sub.
-		eapply resulttype_sub_app; eauto.
+		eapply construct_ais_vals'; eauto.
 	}
 	eapply construct_ais_typing_single.
-	2: by eapply instrtype_sub_refl.
+	2: {
+		instantiate (1 := extr0).
+		instantiate (1 := ts ++ (extr1 ++ extr3)).
+		eapply instrtype_sub_iff_resulttype_sub'.
+		eapply resulttype_sub_app. eapply resulttype_sub_refl.
+		eauto.
+	}
 	eapply AI_ok_instr with (v_instr := instr_RETURN).
 	rewrite catA.
-	econstructor.
-	auto.
+	by econstructor.
 Qed.
 
 Lemma Step_pure__unop_val_preserves : forall v_S v_C v_t v_c_1 v_unop v_c v_ft,

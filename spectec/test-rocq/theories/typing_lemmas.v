@@ -449,8 +449,7 @@ match v_ai with
 	| AI_RETURN =>
 	  exists t t' v_t,
 	    v_ft = ((t ++ v_t) :-> t') /\
-		((C_RETURN v_C) = (Some (mk_list _ v_t))) /\
-		Instr_ok v_C instr_RETURN ((t ++ v_t) :-> t')
+		((C_RETURN v_C) = (Some (mk_list _ v_t)))
 	| (AI_CONST v_nt _) =>
 	  v_ft = ([] :-> ([v_nt: valtype]))
 	| (AI_UNOP v_nt _) =>

@@ -1050,7 +1050,7 @@ Proof.
   unfold_instrtype_sub Hsub0; subst.
   eapply (resulttype_sub_app _ _ _ _ Hsub) in Hsub1.
   eapply resulttype_sub_non_bot in Hsub1; eauto.
-  eapply size_eq1_cat in Hsub1 as [Hts H2].
+  eapply size_eq1_cat in Hsub1 as [Hts H3].
   2: { by inversion Hsub. }
   subst ts_sub ts11_sub.
   rewrite catA in HValsok.
@@ -1068,8 +1068,8 @@ Proof.
   - rewrite size_drop.
     rewrite -HValsok.
     rewrite add_sub' /=.
-    rewrite Hlookup in H1.
-    by inversion H1.
+    rewrite Hlookup in H2.
+    by inversion H2.
 Qed.
 
 Lemma lookup_types: forall s f C loc lab ret idx,
