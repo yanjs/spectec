@@ -2349,7 +2349,7 @@ Proof.
     + exists s, f, [AI_TRAP].
       eapply step_read.
       eapply step_load_num_trap; eauto.
-    + (* Need definition for fun_nbytes_ *)
+    + (* Need a v_c but that requires the definition of fun_nbytes_ *)
       admit.
   - (* Instr_ok__load INN_I32 *)
     move => C M sx memarg mt Hlen Hlookup HLim.
@@ -2362,7 +2362,7 @@ Proof.
     + exists s, f, [AI_TRAP].
       eapply step_read.
       by eapply step_load_pack_trap_I32.
-    + (* Need definition for fun_ibytes_ *)
+    + (* Need a v_c but that requires the definition of fun_ibytes_ *)
       admit.
   - (* Instr_ok__load INN_I64 *)
     move => C M sx memarg mt Hlen Hlookup HLim.
@@ -2375,7 +2375,7 @@ Proof.
     + exists s, f, [AI_TRAP].
       eapply step_read.
       by eapply step_load_pack_trap_I64.
-    + (* Need definition for fun_ibytes_ *)
+    + (* Need a v_c but that requires the definition of fun_ibytes_ *)
       admit.
   - (* Instr_ok__store None *)
     move => C nt memarg mt Hlen Hlookup Hfunsize HLim.
@@ -2390,7 +2390,7 @@ Proof.
       > (List.length (MEM_BYTES (fun_mem (mk_state s f) (mk_uN _ 0))))).
     + exists s, f, [AI_TRAP].
       by eapply step_store_num_trap; eauto.
-    + (* Need definition for fun_nbytes_ *)
+    + (* Need a v_c but that requires the definition of fun_nbytes_ *)
       admit.
   - (* Instr_ok__store INN *)
     move => C Inn M memarg mt Hlen Hlookup HLim.
@@ -2415,8 +2415,8 @@ Proof.
         by eapply step_store_pack_trap_I64; eauto.
       }
     }
-    (* Need definition for fun_ibytes_ *)
-    admit.
+    (* Need a v_c but that requires the definition of fun_ibytes_ *)
+      admit.
     (* SIMD *)
   1-6: admit.
   - (* Instrs_ok__empty *)
